@@ -4,8 +4,6 @@ import "./globals.css";
 import Navigation from "@/components/layout/Navigation";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
-const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
-
 const publicSans = Public_Sans({
   subsets: ["latin"],
   variable: "--font-public-sans",
@@ -58,9 +56,9 @@ export default function RootLayout({
     <html lang="en" className={publicSans.variable}>
       <body className="font-sans antialiased bg-[#F8F9FA] dark:bg-gray-950 text-gray-900 dark:text-white">
         <ServiceWorkerRegistration />
-        <div className="flex flex-col md:flex-row min-h-screen">
+        <div className="flex flex-col md:flex-row min-h-screen relative">
           <Navigation />
-          <main className="flex-1 pb-20 md:pb-0">
+          <main className="flex-1 pb-32">
             {children}
           </main>
         </div>

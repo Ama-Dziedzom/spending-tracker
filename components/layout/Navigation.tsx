@@ -14,37 +14,30 @@ export default function Navigation() {
     const pathname = usePathname();
 
     const navItems = [
-        { href: '/dashboard', icon: Home, label: 'Home' },
-        { href: '/wallet', icon: Wallet, label: 'Wallet' },
-        { href: '/dashboard?add=true', icon: Plus, label: 'Add', isAction: true },
-        { href: '/analytics', icon: LayoutGrid, label: 'Analytics' },
-        { href: '/settings', icon: Target, label: 'Goals' },
+        { href: '/dashboard', icon: Home, label: 'Dashboard' },
+        { href: '/analytics', icon: LayoutGrid, label: 'Analysis' },
     ];
 
     return (
-        <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-zinc-900/95 dark:bg-zinc-800/95 backdrop-blur-xl px-4 py-3 rounded-[32px] flex items-center justify-between gap-6 shadow-2xl border border-white/10">
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-black/95 backdrop-blur-2xl border-t border-zinc-100 dark:border-zinc-800 px-6 pb-[env(safe-area-inset-bottom,20px)] pt-3 shadow-[0_-1px_3px_0_rgba(0,0,0,0.02)]">
+            <div className="max-w-screen-xl mx-auto flex items-center justify-around">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href;
-                    if (item.isAction) {
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                className="w-12 h-12 bg-white rounded-full flex items-center justify-center hover:scale-110 active:scale-90 transition-all shadow-lg"
-                            >
-                                <Plus className="w-6 h-6 text-black" strokeWidth={3} />
-                            </Link>
-                        );
-                    }
-
                     return (
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`p-2 transition-all hover:opacity-100 ${isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                            className={`flex flex-col items-center gap-1.5 px-6 py-1 transition-all duration-300 ${isActive
+                                ? 'text-indigo-600 dark:text-indigo-400'
+                                : 'text-zinc-400 hover:text-zinc-600 dark:text-zinc-500'
+                                }`}
                         >
-                            <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
+                            <div className={`p-2 rounded-2xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-500/10' : 'bg-transparent'}`}>
+                                <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
+                            </div>
+                            <span className={`text-[11px] font-bold uppercase tracking-widest transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-60'}`}>
+                                {item.label}
+                            </span>
                         </Link>
                     );
                 })}

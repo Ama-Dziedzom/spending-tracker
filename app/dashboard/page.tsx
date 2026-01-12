@@ -15,10 +15,36 @@ import {
     Car,
     Film,
     Home,
-    Eye,
+    Search,
+    ChevronLeft,
+    ChevronRight,
+    ArrowLeft,
+    UserPlus,
 } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { format } from 'date-fns';
+
+const chartData = [
+    { day: 'Sep 1', amount: 80 },
+    { day: 'Sep 2', amount: 45 },
+    { day: 'Sep 3', amount: 45 },
+    { day: 'Sep 4', amount: 120 },
+    { day: 'Sep 5', amount: 60 },
+    { day: 'Sep 6', amount: 90 },
+    { day: 'Sep 7', amount: 45 },
+    { day: 'Sep 8', amount: 45 },
+    { day: 'Sep 9', amount: 55 },
+    { day: 'Sep 10', amount: 40 },
+    { day: 'Sep 11', amount: 80 },
+    { day: 'Sep 12', amount: 140 },
+    { day: 'Sep 13', amount: 70 },
+    { day: 'Sep 14', amount: 90 },
+    { day: 'Sep 15', amount: 45 },
+    { day: 'Sep 16', amount: 45 },
+    { day: 'Sep 17', amount: 110 },
+];
 
 export default function DashboardPage() {
     return (
@@ -28,6 +54,7 @@ export default function DashboardPage() {
     );
 }
 
+
 function DashboardContent() {
     const searchParams = useSearchParams();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -35,6 +62,9 @@ function DashboardContent() {
     const [loading, setLoading] = useState(true);
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const currentMonth = format(new Date(), 'MMMM');
+    const currentYear = format(new Date(), 'yyyy');
 
     useEffect(() => {
         if (searchParams.get('add') === 'true') {
@@ -83,14 +113,12 @@ function DashboardContent() {
             ? allTransactions[0].balance
             : 0;
 
-        const categorySpending = transactions.reduce((acc, t) => {
-            if (t.type === 'debit') {
-                acc[t.category] = (acc[t.category] || 0) + t.amount;
-            }
+        const totalSpent = transactions.reduce((acc, t) => {
+            if (t.type === 'debit') return acc + t.amount;
             return acc;
-        }, {} as Record<string, number>);
+        }, 0);
 
-        return { currentBalance, categorySpending };
+        return { currentBalance, totalSpent };
     }, [transactions, allTransactions]);
 
     const handleTransactionClick = (transaction: Transaction) => {
@@ -99,91 +127,95 @@ function DashboardContent() {
     };
 
     return (
-        <div className="min-h-screen bg-white dark:bg-black pb-32">
-            <Header />
+        <div className="min-h-screen bg-white dark:bg-black pb-64 pt-[env(safe-area-inset-top,64px)]">
+            <main className="animate-fade-in-up flex flex-col">
 
-            <main className="px-6 space-y-8 animate-fade-in-up">
-                {/* Balance Section */}
-                <div className="space-y-1">
-                    <p className="text-[17px] font-medium text-zinc-400">Main balance</p>
+                {/* Spending Summary & Chart */}
+                <section className="px-6 pb-6 pt-4 space-y-10">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-[44px] font-bold tracking-tight">
-                            <span className="text-[32px] align-top mr-1">{CURRENCY_SYMBOL}</span>
-                            {stats.currentBalance.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
-                        </h2>
-                        <button className="w-12 h-12 rounded-full border border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
-                            <Eye className="w-6 h-6 text-zinc-400" />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Main Action Buttons */}
-                <div className="flex items-center justify-between">
-                    {[
-                        { icon: Plus, label: 'Add' },
-                        { icon: ArrowRightLeft, label: 'Move' },
-                        { icon: Send, label: 'Send' },
-                        { icon: MoreHorizontal, label: 'Details' }
-                    ].map((action, idx) => (
-                        <div key={idx} className="flex flex-col items-center gap-2">
-                            <button className="w-16 h-14 rounded-3xl bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                                <action.icon className="w-6 h-6" />
-                            </button>
-                            <span className="text-sm font-medium text-zinc-500">{action.label}</span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl font-bold">{currentMonth},</span>
+                            <span className="text-xl text-zinc-400 font-medium">{currentYear}</span>
                         </div>
-                    ))}
-                </div>
-
-                {/* Quick Actions Grid */}
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-xl font-bold">Quick actions</h3>
-                        <button className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">Edit</button>
+                        <div className="flex items-center gap-6">
+                            <ChevronLeft className="w-6 h-6 text-zinc-400 active:text-black transition-colors" />
+                            <ChevronRight className="w-6 h-6 text-zinc-400 active:text-black transition-colors" />
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        {[
-                            { name: 'Groceries', amount: 1540.80, color: 'bg-purple-500', icon: ShoppingBag },
-                            { name: 'Transport', amount: 820.40, color: 'bg-sky-500', icon: Car },
-                            { name: 'Entertainment', amount: 450.00, color: 'bg-emerald-500', icon: Film },
-                            { name: 'Rent & Utilities', amount: 1200.00, color: 'bg-orange-500', icon: Home },
-                        ].map((cat, idx) => (
-                            <Link
-                                key={idx}
-                                href={`/category/${encodeURIComponent(cat.name)}`}
-                                className="p-6 rounded-[32px] border border-zinc-50 dark:border-zinc-900 bg-white dark:bg-zinc-900/50 space-y-4 active:scale-95 transition-all block"
-                            >
-                                <div className="flex items-center gap-2">
-                                    <div className={`w-8 h-8 rounded-lg ${cat.color} flex items-center justify-center`}>
-                                        <cat.icon className="w-5 h-5 text-white" />
-                                    </div>
-                                    <span className="text-sm font-medium text-zinc-500">{cat.name}</span>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-lg font-bold">
-                                        <span className="text-[13px] mr-0.5">{CURRENCY_SYMBOL}</span>
-                                        {cat.amount.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
-                                    </p>
-                                    <div className="h-1.5 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                        <div className={`h-full ${cat.color} transition-all duration-300`} style={{ width: `${Math.random() * 60 + 20}%` }} />
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
+                    <div className="space-y-1">
+                        <h3 className="text-5xl font-black tracking-tighter">
+                            <span className="text-2xl mr-1 text-zinc-300 font-bold">{CURRENCY_SYMBOL}</span>
+                            {stats.totalSpent.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                            <span className="text-[13px] text-zinc-400 ml-3 font-bold uppercase tracking-[0.2em]">Spent</span>
+                        </h3>
                     </div>
+
+                    <div className="h-64 w-full pt-4">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={chartData} margin={{ left: -20, right: 10, top: 20 }}>
+                                <Line
+                                    type="monotone"
+                                    dataKey="amount"
+                                    stroke="#818cf8"
+                                    strokeWidth={4}
+                                    dot={false}
+                                    activeDot={{ r: 8, fill: '#818cf8', strokeWidth: 0 }}
+                                />
+                                <Tooltip
+                                    cursor={{ stroke: '#818cf8', strokeWidth: 2, strokeDasharray: '5 5' }}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="bg-black/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl text-center shadow-2xl border border-white/10">
+                                                    <p className="font-bold text-base">{CURRENCY_SYMBOL}{payload[0].value}</p>
+                                                    <p className="text-xs text-zinc-400 mt-0.5">{payload[0].payload.day}, {currentYear}</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                        <div className="flex items-center justify-between px-2 text-[11px] font-bold text-zinc-300 uppercase tracking-[0.2em] mt-6">
+                            <span>Sep 1</span>
+                            <span className="text-black dark:text-white font-black bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-full">Sep 7</span>
+                            <span>Sep 15</span>
+                        </div>
+                    </div>
+                </section>
+
+                <div className="py-10">
+                    <div className="h-[1px] bg-zinc-100 dark:bg-zinc-800 w-full" />
                 </div>
 
-                {/* Latest Transaction */}
-                <div className="space-y-4">
-                    <h3 className="text-xl font-bold">Latest transaction</h3>
-                    <TransactionList
-                        transactions={transactions.slice(0, 10)}
-                        onTransactionClick={handleTransactionClick}
-                        loading={loading}
-                        compact
-                    />
-                </div>
+                {/* Search & Transactions */}
+                <section className="px-6 space-y-12">
+                    <div className="relative group">
+                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 transition-colors group-focus-within:text-indigo-500" />
+                        <input
+                            type="text"
+                            placeholder="Search your spending..."
+                            className="w-full bg-zinc-50 dark:bg-zinc-900 border border-transparent focus:border-indigo-500/20 rounded-[32px] py-6 pl-16 pr-8 text-[17px] font-semibold focus:outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-sm"
+                        />
+                    </div>
+
+                    <div className="space-y-8 pb-32">
+                        <div className="flex items-center justify-between px-1">
+                            <h3 className="text-3xl font-black tracking-tight">Activities</h3>
+                            <button className="text-sm font-bold text-indigo-500">View all</button>
+                        </div>
+                        <TransactionList
+                            transactions={transactions.slice(0, 10)}
+                            onTransactionClick={handleTransactionClick}
+                            loading={loading}
+                            compact
+                        />
+                    </div>
+                </section>
             </main>
+
 
             <TransactionModal
                 transaction={selectedTransaction}
