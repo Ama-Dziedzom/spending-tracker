@@ -1,35 +1,29 @@
 'use client';
 
-import { Transaction, CATEGORIES } from '@/types/transactions';
+import { Transaction } from '@/types/transactions';
 import { cn } from '@/lib/utils';
 import {
     ShoppingBag,
-    Utensils,
     Car,
-    Zap,
     Film,
-    Plus,
-    HeartPulse,
-    GraduationCap,
+    Home,
     ArrowDownLeft,
-    HandCoins,
-    Banknote,
-    Receipt
+    Receipt,
+    Wallet,
+    HeartPulse,
+    User,
+    CreditCard
 } from 'lucide-react';
+import { formatShortDate } from '@/lib/utils';
 
 const CATEGORY_ICONS: Record<string, any> = {
-    'Food & Dining': Utensils,
-    'Transportation': Car,
-    'Shopping': ShoppingBag,
-    'Utilities & Bills': Zap,
+    'Groceries': ShoppingBag,
+    'Transport': Car,
     'Entertainment': Film,
+    'Rent & Utilities': Home,
+    'Shopping': ShoppingBag,
     'Health': HeartPulse,
-    'Education': GraduationCap,
     'Income': ArrowDownLeft,
-    'Transfers': HandCoins,
-    'Cash Withdrawal': Banknote,
-    'Fees & Charges': Receipt,
-    'Church & Charity': Plus,
     'Other': Receipt,
 };
 
@@ -43,47 +37,52 @@ export default function TransactionItem({ transaction, onClick, compact = false 
     const isCredit = transaction.type === 'credit';
     const IconComponent = CATEGORY_ICONS[transaction.category] || CATEGORY_ICONS['Other'];
 
-    // Formatting date as "Today", "Yesterday", or "DD MMM YYYY"
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (diffDays === 0) return 'Today';
-        if (diffDays === 1) return 'Yesterday';
-
-        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    };
-
     return (
         <div
             onClick={onClick}
-            className="flex items-center gap-4 py-4 px-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer group rounded-xl"
+            className="flex items-center gap-4 py-3 px-2 active:bg-zinc-50 dark:active:bg-zinc-900 transition-colors cursor-pointer rounded-[20px]"
         >
-            {/* Circular Icon */}
-            <div className="flex-shrink-0 w-12 h-12 rounded-full border border-gray-100 dark:border-gray-800 flex items-center justify-center bg-white dark:bg-gray-900 shadow-sm">
-                <IconComponent className="w-5 h-5 text-gray-900 dark:text-white" />
+            {/* Rounded Icon with specific styling */}
+            <div className="flex-shrink-0 w-12 h-12 rounded-full border border-zinc-50 dark:border-zinc-900 flex items-center justify-center bg-zinc-50 dark:bg-zinc-900 shadow-sm overflow-hidden">
+                {/* Mocking the avatar style from image for some transactions */}
+                {transaction.description === 'Fresh Bakery' || transaction.description === 'Supermart Groceries' ? (
+                    <div className="w-full h-full bg-orange-100 flex items-center justify-center">
+                        <IconComponent className="w-6 h-6 text-orange-600" />
+                    </div>
+                ) : (
+                    <IconComponent className="w-6 h-6 text-zinc-900 dark:text-white" />
+                )}
             </div>
 
             {/* Details */}
             <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[15px] text-gray-900 dark:text-white truncate">
+                <p className="font-bold text-[16px] text-zinc-900 dark:text-white truncate">
                     {transaction.description || 'Transaction'}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                    {formatDate(transaction.transaction_date)}
-                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-[13px] text-zinc-400 font-medium">
+                        {formatShortDate(transaction.transaction_date)}
+                    </p>
+                    {transaction.source && (
+                        <div className="flex items-center gap-1">
+                            <div className="w-1 h-1 rounded-full bg-zinc-300" />
+                            <p className="text-[13px] text-zinc-400 font-medium">
+                                {transaction.source.includes('MTN') ? 'MoMo' : 'Card ••••1234'}
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Amount */}
             <div className="text-right flex-shrink-0">
                 <p
                     className={cn(
-                        'font-bold text-[15px]',
-                        isCredit ? 'text-[#50E3C2]' : 'text-[#FF4B4B]'
+                        'font-bold text-[16px]',
+                        'text-zinc-900 dark:text-white'
                     )}
                 >
-                    {isCredit ? '+' : '-'}GH₵{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                    GH₵{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
                 </p>
             </div>
         </div>

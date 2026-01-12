@@ -2,34 +2,21 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Header from '@/components/layout/Header';
-import SpendingChart from '@/components/charts/SpendingChart';
-import CategoryChart from '@/components/charts/CategoryChart';
-import { Transaction, CATEGORIES } from '@/types/transactions';
+import TransactionList from '@/components/transactions/TransactionList';
+import { Transaction, CATEGORIES, CURRENCY_SYMBOL } from '@/types/transactions';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/utils';
 import {
-    TrendingUp,
-    TrendingDown,
+    ArrowLeft,
+    MoreHorizontal,
     PieChart,
-    BarChart3,
-    Calendar,
-    Wallet,
-    Building2,
-    Smartphone,
-    RefreshCw,
-    ArrowUpRight,
-    ArrowDownRight,
+    Search,
+    ShoppingBag,
+    Car,
+    Film,
+    Home,
+    AlertCircle,
 } from 'lucide-react';
-import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Cell,
-} from 'recharts';
+import Link from 'next/link';
 
 export default function AnalyticsPage() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -49,14 +36,9 @@ export default function AnalyticsPage() {
         }
 
         try {
-            // Fetch last 6 months of data
-            const sixMonthsAgo = new Date();
-            sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
             const { data, error } = await supabase
                 .from('transactions')
                 .select('*')
-                .gte('transaction_date', sixMonthsAgo.toISOString())
                 .order('transaction_date', { ascending: false });
 
             if (error) throw error;
@@ -69,282 +51,160 @@ export default function AnalyticsPage() {
         }
     };
 
-    const analytics = useMemo(() => {
-        if (transactions.length === 0) {
-            return {
-                totalIncome: 0,
-                totalExpenses: 0,
-                netSavings: 0,
-                avgDaily: 0,
-                avgWeekly: 0,
-                avgMonthly: 0,
-                topCategories: [],
-                sourceBreakdown: [],
-                transactionCount: { debit: 0, credit: 0 },
-            };
-        }
+    const stats = useMemo(() => {
+        const debitTransactions = transactions.filter(t => t.type === 'debit');
+        const totalSpending = debitTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-        const totalIncome = transactions
-            .filter((t) => t.type === 'credit')
-            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const categorySpending = debitTransactions.reduce((acc, t) => {
+            acc[t.category] = (acc[t.category] || 0) + t.amount;
+            return acc;
+        }, {} as Record<string, number>);
 
-        const totalExpenses = transactions
-            .filter((t) => t.type === 'debit')
-            .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const sortedCategories = Object.entries(categorySpending)
+            .sort((a, b) => b[1] - a[1]);
 
-        const netSavings = totalIncome - totalExpenses;
-
-        // Calculate date range for averages
-        const dates = transactions.map((t) => new Date(t.transaction_date).getTime());
-        const minDate = Math.min(...dates);
-        const maxDate = Math.max(...dates);
-        const daysDiff = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24)));
-
-        const avgDaily = totalExpenses / daysDiff;
-        const avgWeekly = avgDaily * 7;
-        const avgMonthly = avgDaily * 30;
-
-        // Top spending categories
-        const categoryTotals: Record<string, number> = {};
-        transactions
-            .filter((t) => t.type === 'debit')
-            .forEach((t) => {
-                categoryTotals[t.category] = (categoryTotals[t.category] || 0) + Math.abs(t.amount);
-            });
-
-        const topCategories = Object.entries(categoryTotals)
-            .map(([name, amount]) => ({
-                name,
-                amount,
-                color: CATEGORIES[name]?.color || CATEGORIES['Other'].color,
-            }))
-            .sort((a, b) => b.amount - a.amount)
-            .slice(0, 5);
-
-        // Source breakdown
-        const sourceTotals: Record<string, { income: number; expenses: number }> = {};
-        transactions.forEach((t) => {
-            if (!sourceTotals[t.source]) {
-                sourceTotals[t.source] = { income: 0, expenses: 0 };
-            }
-            if (t.type === 'credit') {
-                sourceTotals[t.source].income += Math.abs(t.amount);
-            } else {
-                sourceTotals[t.source].expenses += Math.abs(t.amount);
-            }
-        });
-
-        const sourceBreakdown = Object.entries(sourceTotals).map(([name, values]) => ({
-            name: name.replace('_', ' '),
-            ...values,
-        }));
-
-        const transactionCount = {
-            debit: transactions.filter((t) => t.type === 'debit').length,
-            credit: transactions.filter((t) => t.type === 'credit').length,
-        };
-
-        return {
-            totalIncome,
-            totalExpenses,
-            netSavings,
-            avgDaily,
-            avgWeekly,
-            avgMonthly,
-            topCategories,
-            sourceBreakdown,
-            transactionCount,
-        };
+        return { totalSpending, categorySpending, sortedCategories };
     }, [transactions]);
 
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white dark:bg-gray-800 px-4 py-3 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
-                    <p className="font-semibold text-gray-900 dark:text-white mb-2">{label}</p>
-                    {payload.map((entry: any, index: number) => (
-                        <p key={index} className="text-sm" style={{ color: entry.color }}>
-                            {entry.name}: {formatCurrency(entry.value)}
-                        </p>
-                    ))}
-                </div>
-            );
-        }
-        return null;
-    };
-
     return (
-        <div className="min-h-screen bg-[#F8F9FB] dark:bg-gray-950 pb-20">
-            <header className="px-6 pt-10 pb-4">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Insights</h1>
+        <div className="min-h-screen bg-white dark:bg-black pb-32">
+            {/* Header */}
+            <header className="px-6 py-8 flex items-center justify-between animate-fade-in-up">
+                <Link href="/dashboard" className="w-10 h-10 flex items-center justify-center rounded-full border border-zinc-100 dark:border-zinc-800">
+                    <ArrowLeft className="w-5 h-5" />
+                </Link>
+                <h1 className="text-xl font-bold">Spend analysis</h1>
+                <button className="w-10 h-10 flex items-center justify-center rounded-full border border-zinc-100 dark:border-zinc-800">
+                    <MoreHorizontal className="w-5 h-5" />
+                </button>
             </header>
 
-            <main className="px-6 space-y-6">
-                {/* Tabs for Daily/Monthly/Yearly */}
-                <div className="bg-gray-100 dark:bg-gray-900 p-1 rounded-full flex justify-between items-center">
-                    <button className="flex-1 py-2 text-sm font-medium text-gray-500">Daily</button>
-                    <button className="flex-1 py-2 text-sm font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-full shadow-sm">Monthly</button>
-                    <button className="flex-1 py-2 text-sm font-medium text-gray-500">Yearly</button>
+            <main className="px-6 space-y-8 animate-fade-in-up">
+                {/* Total Spending */}
+                <div className="flex items-end justify-between">
+                    <div className="space-y-1">
+                        <p className="text-[17px] font-medium text-zinc-400">Total spending</p>
+                        <h2 className="text-[44px] font-bold tracking-tight leading-none">
+                            <span className="text-[32px] align-top mr-1">{CURRENCY_SYMBOL}</span>
+                            {stats.totalSpending.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                        </h2>
+                    </div>
+                    <button className="w-12 h-12 rounded-full border border-zinc-100 dark:border-zinc-800 flex items-center justify-center">
+                        <PieChart className="w-6 h-6 text-zinc-900 dark:text-white" />
+                    </button>
                 </div>
 
-                {/* Main Chart Container */}
-                <div className="bg-white dark:bg-gray-900 rounded-[32px] p-6 shadow-sm border border-gray-50 dark:border-gray-800">
-                    <div className="h-64 mb-6 relative">
-                        {/* Tooltip Placeholder matching image style */}
-                        <div className="absolute top-0 left-1/4 bg-black text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1 z-10">
-                            GH₵6,745.04
-                            <div className="absolute -bottom-1 left-12 w-2 h-2 bg-black rotate-45" />
-                        </div>
+                {/* Segmented Bar Chart */}
+                <div className="h-4 flex gap-1 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500" style={{ width: '40%' }} />
+                    <div className="h-full bg-sky-500" style={{ width: '25%' }} />
+                    <div className="h-full bg-emerald-500" style={{ width: '20%' }} />
+                    <div className="h-full bg-orange-500" style={{ width: '15%' }} />
+                </div>
 
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={analytics.sourceBreakdown.slice(0, 5)} margin={{ top: 20, right: 0, left: -20, bottom: 0 }} barGap={8}>
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fill: '#9CA3AF', fontSize: 10 }}
-                                    dy={10}
-                                />
-                                <Tooltip cursor={{ fill: 'transparent' }} content={() => null} />
-                                <Bar
-                                    dataKey="income"
-                                    fill="#50E3C2"
-                                    radius={[10, 10, 0, 0]}
-                                    barSize={20}
-                                />
-                                <Bar
-                                    dataKey="expenses"
-                                    fill="#E5E7EB"
-                                    radius={[10, 10, 0, 0]}
-                                    barSize={20}
-                                />
-                            </BarChart>
-                        </ResponsiveContainer>
+                {/* Category Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                    {[
+                        { name: 'Groceries', icon: ShoppingBag, color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
+                        { name: 'Transport', icon: Car, color: 'text-sky-500', bgColor: 'bg-sky-500/10' },
+                        { name: 'Entertainment', icon: Film, color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
+                        { name: 'Rent & Utilities', icon: Home, color: 'text-orange-500', bgColor: 'bg-orange-500/10' }
+                    ].map((cat, idx) => (
+                        <div key={idx} className="p-4 rounded-3xl border border-zinc-50 dark:border-zinc-900 bg-zinc-50/50 dark:bg-zinc-900/50 space-y-3">
+                            <div className="flex items-center gap-2">
+                                <div className={`${cat.bgColor} ${cat.color} p-1.5 rounded-lg`}>
+                                    <cat.icon className="w-4 h-4" />
+                                </div>
+                                <span className="text-sm font-medium text-zinc-500">{cat.name}</span>
+                            </div>
+                            <p className="text-lg font-bold">
+                                <span className="text-sm mr-0.5">{CURRENCY_SYMBOL}</span>
+                                {(stats.categorySpending[cat.name] || 0).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Smart Category Banner */}
+                <div className="p-6 rounded-[32px] bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 flex gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-amber-400 flex flex-shrink-0 items-center justify-center">
+                        <AlertCircle className="w-6 h-6 text-white" />
                     </div>
-
-                    {/* Chart Legend */}
-                    <div className="flex justify-center gap-8 mt-4">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-[#50E3C2]" />
-                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Income</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-[#E5E7EB]" />
-                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Expenditure</span>
-                        </div>
+                    <div className="space-y-1">
+                        <h4 className="font-bold text-zinc-900 dark:text-zinc-100">Smart category</h4>
+                        <p className="text-[13px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                            We&quot;ve categorized your transaction, you may change here if you want.
+                        </p>
                     </div>
                 </div>
 
-                {/* Recently Used Section */}
-                <div className="space-y-4 pb-10">
-                    <h3 className="text-[17px] font-bold text-gray-900 dark:text-white">Recently Used</h3>
+                {/* Search Bar */}
+                <div className="relative">
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                    <input
+                        type="text"
+                        placeholder="Search for any transaction"
+                        className="w-full h-16 pl-14 pr-6 rounded-full bg-zinc-50 dark:bg-zinc-900 border-none focus:ring-2 focus:ring-zinc-900 transition-all text-sm font-medium"
+                    />
+                </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        {/* Dribbble Card */}
-                        <div className="bg-white dark:bg-gray-900 p-5 rounded-[24px] shadow-sm border border-gray-50 dark:border-gray-800 space-y-4">
-                            <div className="space-y-1">
-                                <p className="text-[13px] font-bold text-gray-900 dark:text-white">Dribbble Pro</p>
-                                <p className="text-[11px] text-gray-400">Monthly Bill</p>
-                            </div>
-                            <div className="space-y-2 pt-2 border-t border-gray-50 dark:border-gray-800">
-                                <div className="flex items-center gap-1.5 text-gray-400">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-medium">Last Transaction</span>
-                                </div>
-                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">Yesterday</p>
-                            </div>
-                        </div>
-
-                        {/* Spotify Card */}
-                        <div className="bg-white dark:bg-gray-900 p-5 rounded-[24px] shadow-sm border border-gray-50 dark:border-gray-800 space-y-4">
-                            <div className="space-y-1">
-                                <p className="text-[13px] font-bold text-gray-900 dark:text-white">Spotify Premium</p>
-                                <p className="text-[11px] text-gray-400">Monthly Bill</p>
-                            </div>
-                            <div className="space-y-2 pt-2 border-t border-gray-50 dark:border-gray-800">
-                                <div className="flex items-center gap-1.5 text-gray-400">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    <span className="text-[10px] font-medium">Last Transaction</span>
-                                </div>
-                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">12 Jan 2026</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Dribbble Item below */}
-                    <div className="bg-white dark:bg-gray-900 p-2 rounded-[24px] shadow-sm border border-gray-50 dark:border-gray-800">
-                        <div className="flex items-center gap-4 p-4">
-                            <div className="w-12 h-12 rounded-full border border-gray-100 dark:border-gray-800 flex items-center justify-center bg-white dark:bg-gray-900">
-                                <Building2 className="w-5 h-5 text-gray-900 dark:text-white" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="font-bold text-[15px] text-gray-900 dark:text-white truncate">Dribbble Pro</p>
-                                <p className="text-xs text-gray-400 mt-0.5">Today</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="font-bold text-[15px] text-[#FF4B4B]">-GH₵8.00</p>
-                            </div>
-                        </div>
-                    </div>
+                {/* Latest Transaction */}
+                <div className="space-y-4">
+                    <h3 className="text-xl font-bold">Latest transaction</h3>
+                    <TransactionList
+                        transactions={transactions.slice(0, 10)}
+                        onTransactionClick={() => { }}
+                        loading={loading}
+                        compact
+                    />
                 </div>
             </main>
         </div>
     );
 }
 
-// Mock data generator
 function generateMockTransactions(): Transaction[] {
-    const categories = Object.keys(CATEGORIES);
-    const sources = ['MTN_MoMo', 'Vodafone_Cash', 'Bank'];
-    const descriptions = {
-        'Food & Dining': ['Lunch at restaurant', 'Grocery shopping', 'Coffee shop', 'Dinner delivery'],
-        'Transportation': ['Uber ride', 'Fuel purchase', 'Taxi fare', 'Bus ticket'],
-        'Shopping': ['Amazon purchase', 'Clothing store', 'Electronics shop', 'Online shopping'],
-        'Utilities & Bills': ['Electricity bill', 'Water bill', 'Internet subscription', 'Phone bill'],
-        'Entertainment': ['Netflix subscription', 'Cinema tickets', 'Gaming purchase', 'Spotify'],
-        'Health': ['Pharmacy purchase', 'Doctor visit', 'Gym membership', 'Health supplements'],
-        'Income': ['Salary deposit', 'Freelance payment', 'Refund received', 'Gift received'],
-        'Transfers': ['Bank transfer', 'Mobile money transfer', 'Sent to friend'],
-        'Cash Withdrawal': ['ATM withdrawal', 'Cash out'],
+    const categories = ['Groceries', 'Transport', 'Entertainment', 'Rent & Utilities', 'Shopping', 'Health'];
+    const sources = ['MTN MoMo', 'Bank', 'Cash'];
+    const transactions: Transaction[] = [];
+    let balance = 3465.80;
+
+    const baseDescriptions = {
+        'Groceries': ['Supermart Groceries', 'Fresh Bakery', 'Corner Shop'],
+        'Transport': ['Uber Ride', 'Bolt', 'Fuel at Shell'],
+        'Entertainment': ['Netflix', 'Spotify', 'Cinema'],
+        'Rent & Utilities': ['ECG Prepaid', 'Water Bill', 'Internet'],
+        'Shopping': ['Melcom', 'Pharmacy', 'Online Store'],
+        'Health': ['Drugstore', 'Clinic', 'Gym'],
     };
 
-    const transactions: Transaction[] = [];
-    let balance = 15000;
+    const now = new Date();
 
-    // Generate 6 months of data
-    for (let month = 0; month < 6; month++) {
-        const transactionsThisMonth = 30 + Math.floor(Math.random() * 20);
+    for (let i = 0; i < 20; i++) {
+        const type = 'debit';
+        const category = categories[Math.floor(Math.random() * 4)]; // Focus on the 4 main ones
+        const amount = Math.floor(Math.random() * 200) + 10;
 
-        for (let i = 0; i < transactionsThisMonth; i++) {
-            const isCredit = Math.random() > 0.75;
-            const category = isCredit ? 'Income' : categories[Math.floor(Math.random() * (categories.length - 1))];
-            const amount = isCredit
-                ? Math.floor(Math.random() * 5000) + 500
-                : Math.floor(Math.random() * 500) + 10;
+        const date = new Date(now);
+        date.setHours(now.getHours() - i * 4);
 
-            balance = isCredit ? balance + amount : balance - amount;
+        const descriptions = baseDescriptions[category as keyof typeof baseDescriptions] || ['Transaction'];
 
-            const descList = descriptions[category as keyof typeof descriptions] || ['Transaction'];
-            const date = new Date();
-            date.setMonth(date.getMonth() - month);
-            date.setDate(Math.floor(Math.random() * 28) + 1);
+        transactions.push({
+            id: `mock-ana-${i}`,
+            transaction_date: date.toISOString(),
+            amount,
+            type,
+            source: sources[Math.floor(Math.random() * sources.length)],
+            description: descriptions[Math.floor(Math.random() * descriptions.length)],
+            balance: balance,
+            category: category,
+            raw_sms: '',
+            created_at: date.toISOString()
+        });
 
-            transactions.push({
-                id: `mock-${month}-${i}`,
-                transaction_date: date.toISOString(),
-                amount,
-                type: isCredit ? 'credit' : 'debit',
-                source: sources[Math.floor(Math.random() * sources.length)],
-                description: descList[Math.floor(Math.random() * descList.length)],
-                balance,
-                category,
-                raw_sms: 'Sample SMS message for this transaction',
-                created_at: new Date().toISOString(),
-            });
-        }
+        balance -= amount;
     }
 
-    return transactions.sort((a, b) =>
-        new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
-    );
+    return transactions;
 }

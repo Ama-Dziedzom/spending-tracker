@@ -30,35 +30,17 @@ export interface CategoryConfig {
 }
 
 export const CATEGORIES: Record<string, CategoryConfig> = {
-    'Church & Charity': {
-        name: 'Church & Charity',
-        color: '#8B5CF6',
+    'Groceries': {
+        name: 'Groceries',
+        color: '#A855F7',
         bgColor: 'bg-purple-100 dark:bg-purple-900/30',
         textColor: 'text-purple-700 dark:text-purple-300',
     },
-    'Food & Dining': {
-        name: 'Food & Dining',
-        color: '#F97316',
-        bgColor: 'bg-orange-100 dark:bg-orange-900/30',
-        textColor: 'text-orange-700 dark:text-orange-300',
-    },
-    'Transportation': {
-        name: 'Transportation',
+    'Transport': {
+        name: 'Transport',
         color: '#3B82F6',
         bgColor: 'bg-blue-100 dark:bg-blue-900/30',
         textColor: 'text-blue-700 dark:text-blue-300',
-    },
-    'Shopping': {
-        name: 'Shopping',
-        color: '#EC4899',
-        bgColor: 'bg-pink-100 dark:bg-pink-900/30',
-        textColor: 'text-pink-700 dark:text-pink-300',
-    },
-    'Utilities & Bills': {
-        name: 'Utilities & Bills',
-        color: '#EAB308',
-        bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
-        textColor: 'text-yellow-700 dark:text-yellow-300',
     },
     'Entertainment': {
         name: 'Entertainment',
@@ -66,41 +48,29 @@ export const CATEGORIES: Record<string, CategoryConfig> = {
         bgColor: 'bg-green-100 dark:bg-green-900/30',
         textColor: 'text-green-700 dark:text-green-300',
     },
+    'Rent & Utilities': {
+        name: 'Rent & Utilities',
+        color: '#F97316',
+        bgColor: 'bg-orange-100 dark:bg-orange-900/30',
+        textColor: 'text-orange-700 dark:text-orange-300',
+    },
+    'Shopping': {
+        name: 'Shopping',
+        color: '#EC4899',
+        bgColor: 'bg-pink-100 dark:bg-pink-900/30',
+        textColor: 'text-pink-700 dark:text-pink-300',
+    },
     'Health': {
         name: 'Health',
         color: '#EF4444',
         bgColor: 'bg-red-100 dark:bg-red-900/30',
         textColor: 'text-red-700 dark:text-red-300',
     },
-    'Education': {
-        name: 'Education',
-        color: '#14B8A6',
-        bgColor: 'bg-teal-100 dark:bg-teal-900/30',
-        textColor: 'text-teal-700 dark:text-teal-300',
-    },
     'Income': {
         name: 'Income',
         color: '#10B981',
         bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
         textColor: 'text-emerald-700 dark:text-emerald-300',
-    },
-    'Transfers': {
-        name: 'Transfers',
-        color: '#6B7280',
-        bgColor: 'bg-gray-100 dark:bg-gray-900/30',
-        textColor: 'text-gray-700 dark:text-gray-300',
-    },
-    'Cash Withdrawal': {
-        name: 'Cash Withdrawal',
-        color: '#6366F1',
-        bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
-        textColor: 'text-indigo-700 dark:text-indigo-300',
-    },
-    'Fees & Charges': {
-        name: 'Fees & Charges',
-        color: '#F43F5E',
-        bgColor: 'bg-rose-100 dark:bg-rose-900/30',
-        textColor: 'text-rose-700 dark:text-rose-300',
     },
     'Other': {
         name: 'Other',
@@ -109,6 +79,9 @@ export const CATEGORIES: Record<string, CategoryConfig> = {
         textColor: 'text-slate-700 dark:text-slate-300',
     },
 };
+
+export const CURRENCY = 'GHS';
+export const CURRENCY_SYMBOL = 'GH₵';
 
 export const SOURCES = [
     'MTN_MoMo',
