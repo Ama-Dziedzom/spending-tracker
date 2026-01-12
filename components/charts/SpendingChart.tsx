@@ -60,10 +60,10 @@ export default function SpendingChart({ transactions, months = 6 }: SpendingChar
                 <div className="bg-white dark:bg-gray-800 px-4 py-3 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
                     <p className="font-semibold text-gray-900 dark:text-white mb-2">{label}</p>
                     <div className="space-y-1">
-                        <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                        <p className="text-sm text-[#50E3C2]">
                             Income: {formatCurrency(payload[0]?.value || 0)}
                         </p>
-                        <p className="text-sm text-rose-600 dark:text-rose-400">
+                        <p className="text-sm text-[#FF4B4B]">
                             Expenses: {formatCurrency(payload[1]?.value || 0)}
                         </p>
                     </div>
@@ -87,12 +87,12 @@ export default function SpendingChart({ transactions, months = 6 }: SpendingChar
                 <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                         <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#50E3C2" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#50E3C2" stopOpacity={0} />
                         </linearGradient>
                         <linearGradient id="expensesGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#F43F5E" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#FF4B4B" stopOpacity={0.3} />
+                            <stop offset="95%" stopColor="#FF4B4B" stopOpacity={0} />
                         </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" className="dark:stroke-gray-700" />
@@ -118,14 +118,14 @@ export default function SpendingChart({ transactions, months = 6 }: SpendingChar
                     <Area
                         type="monotone"
                         dataKey="income"
-                        stroke="#10B981"
+                        stroke="#50E3C2"
                         strokeWidth={2}
                         fill="url(#incomeGradient)"
                     />
                     <Area
                         type="monotone"
                         dataKey="expenses"
-                        stroke="#F43F5E"
+                        stroke="#FF4B4B"
                         strokeWidth={2}
                         fill="url(#expensesGradient)"
                     />

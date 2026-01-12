@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Public_Sans } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/layout/Navigation";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
-const inter = Inter({ subsets: ["latin"] });
+const publicSans = Public_Sans({
+  subsets: ["latin"],
+  variable: "--font-public-sans",
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 export const metadata: Metadata = {
   title: "SpendWise - Personal Spending Tracker",
@@ -49,19 +53,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
-        <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      </head>
-      <body className={`${inter.className} antialiased`}>
+    <html lang="en" className={publicSans.variable}>
+      <body className="font-sans antialiased bg-[#F8F9FA] dark:bg-gray-950 text-gray-900 dark:text-white">
         <ServiceWorkerRegistration />
-        <div className="flex min-h-screen">
+        <div className="flex flex-col md:flex-row min-h-screen">
           <Navigation />
-          <main className="flex-1 md:ml-64">
+          <main className="flex-1 pb-20 md:pb-0">
             {children}
           </main>
         </div>

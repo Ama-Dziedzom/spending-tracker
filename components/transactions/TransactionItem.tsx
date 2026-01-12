@@ -1,7 +1,7 @@
 'use client';
 
 import { Transaction, CATEGORIES } from '@/types/transactions';
-import { formatCurrency, getRelativeTime, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import {
     ShoppingBag,
     Utensils,
@@ -11,7 +11,6 @@ import {
     Plus,
     HeartPulse,
     GraduationCap,
-    ArrowUpRight,
     ArrowDownLeft,
     HandCoins,
     Banknote,
@@ -84,10 +83,9 @@ export default function TransactionItem({ transaction, onClick, compact = false 
                         isCredit ? 'text-[#50E3C2]' : 'text-[#FF4B4B]'
                     )}
                 >
-                    {isCredit ? '+' : '-'}${Math.abs(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    {isCredit ? '+' : '-'}GH₵{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
                 </p>
             </div>
         </div>
     );
 }
-

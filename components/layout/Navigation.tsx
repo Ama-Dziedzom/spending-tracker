@@ -5,16 +5,20 @@ import { usePathname } from 'next/navigation';
 import {
     Home,
     BarChart3,
-    Plus,
+    List,
     Wallet,
-    Settings,
+    MoreHorizontal,
+    Plus,
 } from 'lucide-react';
 
 const navItems = [
     { href: '/dashboard', icon: Home, label: 'Home' },
     { href: '/analytics', icon: BarChart3, label: 'Insight' },
+];
+
+const rightNavItems = [
     { href: '/budget', icon: Wallet, label: 'Budget' },
-    { href: '/settings', icon: Settings, label: 'Settings' },
+    { href: '/settings', icon: MoreHorizontal, label: 'Settings' },
 ];
 
 export default function Navigation() {
@@ -22,7 +26,7 @@ export default function Navigation() {
 
     return (
         <>
-            {/* Desktop Sidebar (Optional, but kept for responsiveness) */}
+            {/* Desktop Sidebar (kept for responsiveness) */}
             <nav className="hidden md:flex fixed left-0 top-0 bottom-0 w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex-col z-40">
                 <div className="p-6">
                     <h1 className="text-xl font-bold bg-gray-900 dark:bg-white bg-clip-text text-transparent italic">
@@ -32,7 +36,7 @@ export default function Navigation() {
 
                 <div className="flex-1 px-3">
                     <div className="space-y-1">
-                        {navItems.map((item) => {
+                        {[...navItems, ...rightNavItems].map((item) => {
                             const isActive = pathname === item.href;
                             return (
                                 <Link
@@ -53,54 +57,50 @@ export default function Navigation() {
             </nav>
 
             {/* Mobile Bottom Navigation - Matching the Image */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 z-50 px-4 pb-6 pt-2">
+            <nav className="md:hidden fixed bottom-10 left-6 right-6 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-gray-100 dark:border-gray-800 z-50 px-4 py-2 rounded-[32px] shadow-lg">
                 <div className="flex justify-between items-center max-w-md mx-auto relative px-2">
-                    {/* Left Two Items */}
-                    <Link
-                        href="/dashboard"
-                        className={`flex flex-col items-center gap-1 transition-all ${pathname === '/dashboard' ? 'text-black dark:text-white' : 'text-gray-400'}`}
-                    >
-                        <Home className="w-6 h-6" />
-                        <span className="text-[10px] font-medium">Home</span>
-                    </Link>
+                    {/* Home & Insight */}
+                    <div className="flex gap-8">
+                        {navItems.map((item) => {
+                            const isActive = pathname === item.href;
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'text-black dark:text-white font-bold' : 'text-gray-400'}`}
+                                >
+                                    <item.icon className="w-6 h-6" />
+                                    <span className="text-[10px] font-medium">{item.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
 
-                    <Link
-                        href="/analytics"
-                        className={`flex flex-col items-center gap-1 transition-all ${pathname === '/analytics' ? 'text-black dark:text-white' : 'text-gray-400'}`}
-                    >
-                        <BarChart3 className="w-6 h-6" />
-                        <span className="text-[10px] font-medium">Insight</span>
-                    </Link>
-
-                    {/* Center Plus Button */}
-                    <div className="relative -top-3">
-                        <Link href="/dashboard?add=true">
-                            <button className="bg-[#0F172A] dark:bg-white text-white dark:text-black p-3.5 rounded-2xl shadow-lg hover:scale-105 active:scale-95 transition-all">
-                                <Plus className="w-7 h-7 stroke-[3]" />
-                            </button>
+                    {/* Central Plus Button */}
+                    <div className="absolute left-1/2 -translate-x-1/2 -top-4">
+                        <Link href="/dashboard?add=true" className="w-14 h-14 bg-gray-900 dark:bg-white rounded-2xl flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform">
+                            <Plus className="w-6 h-6 text-white dark:text-black" />
                         </Link>
                     </div>
 
-
-                    {/* Right Two Items */}
-                    <Link
-                        href="/dashboard?view=budget"
-                        className={`flex flex-col items-center gap-1 transition-all ${pathname === '/budget' ? 'text-black dark:text-white' : 'text-gray-400'}`}
-                    >
-                        <Wallet className="w-6 h-6" />
-                        <span className="text-[10px] font-medium">Budget</span>
-                    </Link>
-
-                    <Link
-                        href="/dashboard?view=settings"
-                        className={`flex flex-col items-center gap-1 transition-all ${pathname === '/settings' ? 'text-black dark:text-white' : 'text-gray-400'}`}
-                    >
-                        <Settings className="w-6 h-6" />
-                        <span className="text-[10px] font-medium">Settings</span>
-                    </Link>
+                    {/* Budget & Extras */}
+                    <div className="flex gap-8">
+                        {rightNavItems.map((item) => {
+                            const isActive = pathname === item.href;
+                            return (
+                                <Link
+                                    key={item.href}
+                                    href={item.href}
+                                    className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'text-black dark:text-white font-bold' : 'text-gray-400'}`}
+                                >
+                                    <item.icon className="w-6 h-6" />
+                                    <span className="text-[10px] font-medium">{item.label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
                 </div>
             </nav>
         </>
     );
 }
-

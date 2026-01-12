@@ -4,10 +4,9 @@ import { Bell } from 'lucide-react';
 
 interface HeaderProps {
     title: string;
-    subtitle?: string;
 }
 
-export default function Header({ title, subtitle }: HeaderProps) {
+export default function Header({ title }: HeaderProps) {
     return (
         <header className="sticky top-0 z-30 bg-transparent">
             <div className="px-6 py-6">

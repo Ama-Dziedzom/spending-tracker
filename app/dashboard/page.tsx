@@ -4,19 +4,11 @@ import { useState, useEffect, useMemo, Suspense } from 'react';
 import Header from '@/components/layout/Header';
 import TransactionList from '@/components/transactions/TransactionList';
 import TransactionModal from '@/components/transactions/TransactionModal';
-import CategoryChart from '@/components/charts/CategoryChart';
-import InsightsCard from '@/components/insights/InsightsCard';
 import { Transaction, CATEGORIES } from '@/types/transactions';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { formatCurrency, getDateRange, formatDateRange, getRelativeTime } from '@/lib/utils';
+import { getDateRange } from '@/lib/utils';
 import {
     Wallet,
-    TrendingUp,
-    TrendingDown,
-    ArrowRight,
-    RefreshCw,
-    Activity,
-    Clock,
     Plus,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -40,7 +32,6 @@ function DashboardContent() {
     const [dateRange, setDateRange] = useState<DateRangeType>('month');
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
     useEffect(() => {
         if (searchParams.get('add') === 'true') {
@@ -59,13 +50,11 @@ function DashboardContent() {
             const mockData = generateMockTransactions();
             setAllTransactions(mockData);
             filterTransactionsByDateRange(mockData);
-            setLastUpdated(new Date());
             setLoading(false);
             return;
         }
 
         try {
-            // Fetch all transactions for insights comparison
             const { data: allData, error: allError } = await supabase
                 .from('transactions')
                 .select('*')
@@ -76,7 +65,6 @@ function DashboardContent() {
 
             setAllTransactions(allData || []);
             filterTransactionsByDateRange(allData || []);
-            setLastUpdated(new Date());
         } catch (error) {
             console.error('Error fetching transactions:', error);
             const mockData = generateMockTransactions();
@@ -113,16 +101,10 @@ function DashboardContent() {
             ? allTransactions[0].balance
             : 0;
 
-        const avgTransactionAmount = transactions.length > 0
-            ? transactions.filter(t => t.type === 'debit').reduce((sum, t) => sum + Math.abs(t.amount), 0) /
-            Math.max(1, transactions.filter(t => t.type === 'debit').length)
-            : 0;
-
-        return { totalIncome, totalExpenses, currentBalance, avgTransactionAmount };
+        return { totalIncome, totalExpenses, currentBalance };
     }, [transactions, allTransactions]);
 
     const recentTransactions = transactions.slice(0, 8);
-    const { start, end } = getDateRange(dateRange);
 
     const handleTransactionClick = (transaction: Transaction) => {
         setSelectedTransaction(transaction);
@@ -142,7 +124,7 @@ function DashboardContent() {
         <div className="min-h-screen bg-[#F8F9FB] dark:bg-gray-950 pb-20">
             <Header title="Omar Levin" />
 
-            <main className="px-6 space-y-8">
+            <main className="px-6 space-y-10">
                 {/* Check for empty state */}
                 {!loading && allTransactions.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
@@ -162,53 +144,52 @@ function DashboardContent() {
                 ) : (
                     <>
                         {/* Planned Expenses Section */}
-                        <div className="space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                            <p className="text-sm font-medium text-gray-400">Planned Expenses</p>
-                            <p className="text-[40px] font-bold text-gray-900 dark:text-white leading-tight">
-                                ${loading ? '---' : stats.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        <div className="space-y-1 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <p className="text-[15px] font-medium text-gray-400">Planned Expenses</p>
+                            <p className="text-[42px] font-extrabold text-gray-900 dark:text-white leading-tight tracking-tight uppercase">
+                                GH₵{loading ? '---' : stats.totalExpenses.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
                             </p>
                         </div>
 
                         {/* Category Progress Bars */}
-                        <div className="space-y-6">
-                            <div className="flex gap-2 h-4">
-                                <div className="h-full rounded-full bg-[#50E3C2]" style={{ width: '58%' }} />
-                                <div className="h-full rounded-full bg-[#FF9EBC]" style={{ width: '20%' }} />
-                                <div className="h-full rounded-full bg-[#FFD66B]" style={{ width: '15%' }} />
+                        <div className="space-y-8">
+                            <div className="flex gap-2.5 h-6">
+                                <div className="h-full rounded-2xl bg-[#50E3C2]" style={{ width: '58%' }} />
+                                <div className="h-full rounded-2xl bg-[#FF9EBC]" style={{ width: '25%' }} />
+                                <div className="h-full rounded-2xl bg-[#FFD66B]" style={{ width: '17%' }} />
                             </div>
 
-                            <div className="space-y-4">
+                            <div className="space-y-4 px-1">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-2.5 h-2.5 rounded-full bg-[#50E3C2]" />
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Invest</span>
+                                        <span className="text-[15px] font-medium text-gray-600 dark:text-gray-300">Invest</span>
                                     </div>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">58%</span>
+                                    <span className="text-[15px] font-bold text-gray-900 dark:text-white">58%</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-2.5 h-2.5 rounded-full bg-[#FF9EBC]" />
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Healthcare</span>
-                                        <span className="text-xs text-gray-400 ml-auto"></span>
+                                        <span className="text-[15px] font-medium text-gray-600 dark:text-gray-300">Healthcare</span>
                                     </div>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">32%</span>
+                                    <span className="text-[15px] font-bold text-gray-900 dark:text-white">32%</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-2.5 h-2.5 rounded-full bg-[#FFD66B]" />
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Self Reward</span>
+                                        <span className="text-[15px] font-medium text-gray-600 dark:text-gray-300">Self Reward</span>
                                     </div>
-                                    <span className="text-sm font-semibold text-gray-900 dark:text-white">24%</span>
+                                    <span className="text-[15px] font-bold text-gray-900 dark:text-white">24%</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Recent Activities - Sheet Style */}
-                        <div className="bg-white dark:bg-gray-900 rounded-t-[32px] -mx-6 px-6 pt-8 pb-12 flex-1 shadow-[0_-8px_30px_rgba(0,0,0,0.04)] min-h-[400px]">
-                            <div className="w-12 h-1 bg-gray-200 dark:bg-gray-800 rounded-full mx-auto -mt-4 mb-6" />
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white">Recent Activities</h3>
-                                <Link href="/transactions" className="text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors">
+                        <div className="bg-white dark:bg-gray-900 rounded-t-[40px] -mx-6 px-6 pt-10 pb-16 flex-1 shadow-[0_-12px_40px_rgba(0,0,0,0.03)] border-t border-gray-50/50 dark:border-gray-800/50 min-h-[500px]">
+                            <div className="w-12 h-1 bg-gray-200 dark:bg-gray-800 rounded-full mx-auto -mt-6 mb-8" />
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Recent Activities</h3>
+                                <Link href="/transactions" className="text-sm font-semibold text-gray-400 hover:text-gray-600 transition-colors">
                                     View All
                                 </Link>
                             </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Transaction, CATEGORIES } from '@/types/transactions';
 import { formatCurrency, formatFriendlyDate, formatShortDate } from '@/lib/utils';
-import { X, Save, MessageSquare, Tag, Calendar, CreditCard, Wallet, Building2, Check } from 'lucide-react';
+import { X, Save, MessageSquare, Tag, Calendar, CreditCard, Wallet, Building2, Check, RefreshCw } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface TransactionModalProps {
@@ -99,176 +99,115 @@ export default function TransactionModal({
     };
 
     return (
-        <>
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center p-4">
             {/* Backdrop */}
             <div
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 transition-opacity"
+                className="absolute inset-0 bg-black/40 backdrop-blur-md transition-opacity"
                 onClick={onClose}
             />
 
             {/* Modal */}
-            <div className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 md:max-w-lg md:w-full">
-                <div className="bg-white dark:bg-gray-900 rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-                    {/* Header */}
-                    <div className="sticky top-0 bg-white dark:bg-gray-900 p-6 border-b border-gray-100 dark:border-gray-800">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                                    Transaction Details
-                                </h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {formatFriendlyDate(transaction.transaction_date)}
-                                </p>
-                            </div>
-                            <button
-                                onClick={onClose}
-                                className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                            </button>
-                        </div>
-                    </div>
+            <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-[32px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 duration-500">
+                {/* Header with visual indicator */}
+                <div className="p-6 flex flex-col items-center gap-4">
+                    <div className="w-12 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full mb-2" />
 
-                    {/* Content */}
-                    <div className="p-6 space-y-6">
-                        {/* Amount Card */}
-                        <div
-                            className={`p-6 rounded-2xl ${isCredit
-                                    ? 'bg-gradient-to-br from-emerald-500 to-green-600'
-                                    : 'bg-gradient-to-br from-rose-500 to-red-600'
-                                }`}
-                        >
-                            <p className="text-white/80 text-sm font-medium mb-1">
-                                {isCredit ? 'Money Received' : 'Money Spent'}
-                            </p>
-                            <p className="text-3xl font-bold text-white">
-                                {isCredit ? '+' : '-'}GH₵{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
-                            </p>
-                            <p className="text-white/60 text-sm mt-2">
-                                Balance after: GH₵{transaction.balance.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
-                            </p>
-                        </div>
-
-                        {/* Details Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                                <Calendar className="w-5 h-5 text-gray-400" />
-                                <div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Date</p>
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                                        {formatShortDate(transaction.transaction_date)}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                                <div className={`p-2 rounded-lg ${getSourceColor(transaction.source)}`}>
-                                    {getSourceIcon(transaction.source)}
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400">Source</p>
-                                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                                        {transaction.source.replace('_', ' ')}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Description */}
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Description</p>
-                            <p className="text-sm text-gray-900 dark:text-white font-medium">
-                                {transaction.description || 'No description available'}
-                            </p>
-                        </div>
-
-                        {/* Category Selector - This is the only editable field */}
-                        <div>
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                                <Tag className="w-4 h-4" />
-                                Category
-                                <span className="text-xs text-gray-500">(tap to change)</span>
-                            </label>
-                            <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-                                {Object.entries(CATEGORIES).map(([key, cat]) => (
-                                    <button
-                                        key={key}
-                                        onClick={() => setSelectedCategory(key)}
-                                        className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${selectedCategory === key
-                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
-                                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                                            }`}
-                                    >
-                                        <div
-                                            className="w-3 h-3 rounded-full flex-shrink-0"
-                                            style={{ backgroundColor: cat.color }}
-                                        />
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate text-left">
-                                            {cat.name}
-                                        </span>
-                                        {selectedCategory === key && (
-                                            <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 ml-auto" />
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Raw SMS */}
-                        {transaction.raw_sms && (
-                            <div>
-                                <button
-                                    onClick={() => setShowRawSms(!showRawSms)}
-                                    className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
-                                >
-                                    <MessageSquare className="w-4 h-4" />
-                                    {showRawSms ? 'Hide' : 'Show'} Original SMS
-                                </button>
-                                {showRawSms && (
-                                    <div className="mt-3 p-4 bg-gray-100 dark:bg-gray-800 rounded-xl">
-                                        <p className="text-xs font-mono text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed">
-                                            {transaction.raw_sms}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center border-4 border-white dark:border-gray-800 shadow-md ${isCredit ? 'bg-[#50E3C2]' : 'bg-[#FF4B4B]'}`}>
+                        {isCredit ? (
+                            <Wallet className="w-10 h-10 text-white" />
+                        ) : (
+                            <CreditCard className="w-10 h-10 text-white" />
                         )}
                     </div>
 
-                    {/* Footer - Only show save button if category changed */}
-                    <div className="sticky bottom-0 bg-white dark:bg-gray-900 p-6 border-t border-gray-100 dark:border-gray-800">
+                    <div className="text-center">
+                        <p className="text-sm font-medium text-gray-400">Transaction Amount</p>
+                        <p className={`text-[36px] font-bold ${isCredit ? 'text-[#50E3C2]' : 'text-[#FF4B4B]'}`}>
+                            {isCredit ? '+' : '-'}GH₵{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Info List & Category Selector */}
+                <div className="px-8 pb-10 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-6 pt-4 border-t border-gray-50 dark:border-gray-800">
+                        <div className="space-y-1">
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</p>
+                            <p className="text-[15px] font-bold text-gray-900 dark:text-white">
+                                {isCredit ? 'Received' : 'Success'}
+                            </p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Date</p>
+                            <p className="text-[15px] font-bold text-gray-900 dark:text-white">
+                                {formatFriendlyDate(transaction.transaction_date)}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Description</p>
+                        <p className="text-[15px] font-bold text-gray-900 dark:text-white leading-relaxed">
+                            {transaction.description || 'No description available'}
+                        </p>
+                    </div>
+
+                    {/* Category Selector */}
+                    <div className="space-y-3">
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Change Category</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {Object.entries(CATEGORIES).map(([key, cat]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setSelectedCategory(key)}
+                                    className={`flex items-center gap-2 p-3 rounded-xl border-2 transition-all ${selectedCategory === key
+                                        ? 'border-black dark:border-white bg-gray-50 dark:bg-gray-800'
+                                        : 'border-transparent bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800'
+                                        }`}
+                                >
+                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
+                                    <span className="text-[13px] font-bold text-gray-900 dark:text-white truncate">{cat.name}</span>
+                                    {selectedCategory === key && <Check className="w-3.5 h-3.5 ml-auto text-black dark:text-white" />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {showRawSms && (
+                        <div className="space-y-2 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl">
+                            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider tracking-widest">Metadata</p>
+                            <p className="text-[12px] font-mono text-gray-500 break-all leading-relaxed">
+                                {transaction.raw_sms}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="pt-4 sticky bottom-0 bg-white dark:bg-gray-900">
                         {hasChanges ? (
                             <button
                                 onClick={handleSave}
                                 disabled={saving}
-                                className={`w-full flex items-center justify-center gap-2 py-4 font-semibold rounded-xl transition-all disabled:opacity-50 ${saveSuccess
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-lg hover:shadow-emerald-500/30'
-                                    }`}
+                                className="w-full py-4 bg-black dark:bg-white text-white dark:text-black font-bold rounded-2xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
                             >
-                                {saveSuccess ? (
-                                    <>
-                                        <Check className="w-5 h-5" />
-                                        Saved!
-                                    </>
+                                {saving ? (
+                                    <RefreshCw className="w-5 h-5 animate-spin" />
                                 ) : (
-                                    <>
-                                        <Save className="w-5 h-5" />
-                                        {saving ? 'Saving...' : 'Save Category'}
-                                    </>
+                                    <Save className="w-5 h-5" />
                                 )}
+                                {saveSuccess ? 'Saved!' : 'Update Category'}
                             </button>
                         ) : (
                             <button
                                 onClick={onClose}
-                                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                className="w-full py-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-bold rounded-2xl hover:opacity-90 transition-opacity"
                             >
-                                Close
+                                Done
                             </button>
                         )}
                     </div>
                 </div>
             </div>
-        </>
+        </div>
     );
+
 }

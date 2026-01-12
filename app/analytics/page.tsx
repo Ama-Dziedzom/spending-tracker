@@ -192,7 +192,7 @@ export default function AnalyticsPage() {
                     <div className="h-64 mb-6 relative">
                         {/* Tooltip Placeholder matching image style */}
                         <div className="absolute top-0 left-1/4 bg-black text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1 z-10">
-                            $6.745,04
+                            GH₵6,745.04
                             <div className="absolute -bottom-1 left-12 w-2 h-2 bg-black rotate-45" />
                         </div>
 
@@ -251,7 +251,7 @@ export default function AnalyticsPage() {
                                     <Calendar className="w-3.5 h-3.5" />
                                     <span className="text-[10px] font-medium">Last Transaction</span>
                                 </div>
-                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">20 July 2024</p>
+                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">Yesterday</p>
                             </div>
                         </div>
 
@@ -266,7 +266,7 @@ export default function AnalyticsPage() {
                                     <Calendar className="w-3.5 h-3.5" />
                                     <span className="text-[10px] font-medium">Last Transaction</span>
                                 </div>
-                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">15 June 2024</p>
+                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">12 Jan 2026</p>
                             </div>
                         </div>
                     </div>
@@ -282,7 +282,7 @@ export default function AnalyticsPage() {
                                 <p className="text-xs text-gray-400 mt-0.5">Today</p>
                             </div>
                             <div className="text-right">
-                                <p className="font-bold text-[15px] text-[#FF4B4B]">-$8.00</p>
+                                <p className="font-bold text-[15px] text-[#FF4B4B]">-GH₵8.00</p>
                             </div>
                         </div>
                     </div>
