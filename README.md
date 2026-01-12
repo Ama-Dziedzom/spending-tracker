@@ -1,36 +1,203 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SpendWise - Personal Spending Tracker PWA
 
-## Getting Started
+A beautiful, mobile-first Progressive Web App for tracking personal finances, built with Next.js 14+, React, TypeScript, and Supabase.
 
-First, run the development server:
+![SpendWise Dashboard](public/icons/icon-512x512.png)
 
+## ✨ Features
+
+### 📊 Dashboard
+- Current balance overview with beautiful gradient cards
+- Total income vs expenses summary
+- Spending by category (interactive donut chart)
+- Top spending categories with progress bars
+- Recent transactions list
+- Date range filters (Today, This Week, This Month, Custom)
+
+### 💳 Transactions
+- Paginated list of all transactions
+- Search by description
+- Filter by type (Income/Expenses)
+- Filter by source (MTN MoMo, Vodafone Cash, Bank)
+- Filter by category
+- Sort by date or amount
+- Transaction details modal with category editing
+
+### 📈 Analytics
+- Monthly spending trends (area chart)
+- Category breakdown (donut chart)
+- Spending by source (bar chart)
+- Daily/Weekly/Monthly averages
+- Net savings overview
+- Top spending categories ranking
+
+### 📱 PWA Features
+- Installable on mobile devices
+- Offline support with service worker caching
+- App-like experience
+- Works great on iPhone and Android
+
+## 🎨 Categories
+
+- 💜 Church & Charity
+- 🍊 Food & Dining
+- 💙 Transportation
+- 💗 Shopping
+- 💛 Utilities & Bills
+- 💚 Entertainment
+- ❤️ Health
+- 🩵 Education
+- 💚 Income
+- ⬜ Transfers
+- 💜 Cash Withdrawal
+- 🌹 Fees & Charges
+- ⬛ Other
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Supabase account (optional - app works with mock data)
+
+### Installation
+
+1. Clone or navigate to the project:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd spending-tracker
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Set up environment variables:
+```bash
+cp env.example .env.local
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Edit `.env.local` with your Supabase credentials:
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
 
-## Learn More
+5. Run the development server:
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+6. Open [http://localhost:3000](http://localhost:3000)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📁 Project Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+spending-tracker/
+├── app/
+│   ├── dashboard/
+│   │   ├── page.tsx        # Dashboard page
+│   │   └── loading.tsx     # Loading skeleton
+│   ├── transactions/
+│   │   ├── page.tsx        # Transactions list page
+│   │   └── loading.tsx     # Loading skeleton
+│   ├── analytics/
+│   │   ├── page.tsx        # Analytics page
+│   │   └── loading.tsx     # Loading skeleton
+│   ├── globals.css         # Global styles
+│   ├── layout.tsx          # Root layout
+│   └── page.tsx            # Root redirect
+├── components/
+│   ├── layout/
+│   │   ├── Navigation.tsx  # Sidebar/bottom nav
+│   │   └── Header.tsx      # Page header
+│   ├── transactions/
+│   │   ├── TransactionItem.tsx
+│   │   ├── TransactionList.tsx
+│   │   └── TransactionModal.tsx
+│   ├── charts/
+│   │   ├── CategoryChart.tsx   # Donut chart
+│   │   └── SpendingChart.tsx   # Area chart
+│   └── ServiceWorkerRegistration.tsx
+├── lib/
+│   ├── supabase.ts         # Supabase client
+│   └── utils.ts            # Utility functions
+├── types/
+│   └── transactions.ts     # TypeScript types
+├── public/
+│   ├── icons/              # PWA icons
+│   ├── manifest.json       # PWA manifest
+│   └── sw.js               # Service worker
+└── package.json
+```
 
-## Deploy on Vercel
+## 🗄️ Database Schema
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The app expects a Supabase table with this schema:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```sql
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transaction_date TIMESTAMPTZ NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('debit', 'credit')),
+    source TEXT NOT NULL,
+    description TEXT,
+    balance DECIMAL(10, 2) NOT NULL,
+    category TEXT,
+    raw_sms TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 14+ (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Charts**: Recharts
+- **Database**: Supabase
+- **Icons**: Lucide React
+- **Date Handling**: date-fns
+- **PWA**: Custom service worker
+
+## 📱 Screenshots
+
+### Dashboard
+- Balance card with gradient
+- Income/Expenses stats
+- Category chart
+- Recent transactions
+
+### Transactions
+- Search and filter
+- Transaction list
+- Category badges
+- Balance tracking
+
+### Analytics
+- Monthly trends
+- Category breakdown
+- Source comparison
+- Top categories
+
+## 🔧 Configuration
+
+### Supabase Setup
+1. Create a new Supabase project
+2. Create the transactions table using the schema above
+3. Copy your project URL and anon key to `.env.local`
+
+### PWA Installation
+1. Open the app in Chrome or Safari
+2. Click the share button
+3. Select "Add to Home Screen"
+4. The app will now work offline!
+
+## 📄 License
+
+MIT License - feel free to use this for your personal projects!
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
