@@ -4,6 +4,8 @@ import "./globals.css";
 import Navigation from "@/components/layout/Navigation";
 import ServiceWorkerRegistration from "@/components/ServiceWorkerRegistration";
 
+const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
+
 const publicSans = Public_Sans({
   subsets: ["latin"],
   variable: "--font-public-sans",
