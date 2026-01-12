@@ -21,30 +21,46 @@ import {
     ArrowLeft,
     UserPlus,
 } from 'lucide-react';
-import { ResponsiveContainer, LineChart, Line, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import {
+    ChartContainer,
+    ChartTooltip,
+    ChartTooltipContent,
+    type ChartConfig
+} from '@/components/ui/chart';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
 
 const chartData = [
-    { day: 'Sep 1', amount: 80 },
-    { day: 'Sep 2', amount: 45 },
-    { day: 'Sep 3', amount: 45 },
-    { day: 'Sep 4', amount: 120 },
-    { day: 'Sep 5', amount: 60 },
-    { day: 'Sep 6', amount: 90 },
-    { day: 'Sep 7', amount: 45 },
-    { day: 'Sep 8', amount: 45 },
-    { day: 'Sep 9', amount: 55 },
-    { day: 'Sep 10', amount: 40 },
-    { day: 'Sep 11', amount: 80 },
-    { day: 'Sep 12', amount: 140 },
-    { day: 'Sep 13', amount: 70 },
-    { day: 'Sep 14', amount: 90 },
-    { day: 'Sep 15', amount: 45 },
-    { day: 'Sep 16', amount: 45 },
-    { day: 'Sep 17', amount: 110 },
+    { day: 'Sep 1', spent: 80 },
+    { day: 'Sep 2', spent: 45 },
+    { day: 'Sep 3', spent: 45 },
+    { day: 'Sep 4', spent: 120 },
+    { day: 'Sep 5', spent: 60 },
+    { day: 'Sep 6', spent: 90 },
+    { day: 'Sep 7', spent: 82 },
+    { day: 'Sep 8', spent: 45 },
+    { day: 'Sep 9', spent: 55 },
+    { day: 'Sep 10', spent: 40 },
+    { day: 'Sep 11', spent: 80 },
+    { day: 'Sep 12', spent: 140 },
+    { day: 'Sep 13', spent: 70 },
+    { day: 'Sep 14', spent: 90 },
+    { day: 'Sep 15', spent: 45 },
+    { day: 'Sep 16', spent: 45 },
+    { day: 'Sep 17', spent: 110 },
 ];
+
+const chartConfig = {
+    spent: {
+        label: "Spent",
+        color: "#818cf8",
+    },
+} satisfies ChartConfig;
+
+// Mock monthly income for budget progress
+const MONTHLY_INCOME = 2450;
 
 export default function DashboardPage() {
     return (
@@ -127,84 +143,134 @@ function DashboardContent() {
     };
 
     return (
-        <div className="min-h-screen bg-white dark:bg-black pb-64 pt-[env(safe-area-inset-top,64px)]">
+        <div className="min-h-screen bg-white dark:bg-black pb-72 pt-[env(safe-area-inset-top,20px)]">
             <main className="animate-fade-in-up flex flex-col">
 
                 {/* Spending Summary & Chart */}
-                <section className="px-6 pb-6 pt-4 space-y-10">
+                <section className="px-10 pb-6 pt-6 space-y-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <span className="text-xl font-bold">{currentMonth},</span>
-                            <span className="text-xl text-zinc-400 font-medium">{currentYear}</span>
+                            <span className="text-[20px] font-bold text-black dark:text-white">{currentMonth},</span>
+                            <span className="text-[20px] text-zinc-400 font-medium">{currentYear}</span>
                         </div>
-                        <div className="flex items-center gap-6">
-                            <ChevronLeft className="w-6 h-6 text-zinc-400 active:text-black transition-colors" />
-                            <ChevronRight className="w-6 h-6 text-zinc-400 active:text-black transition-colors" />
+                        <div className="flex items-center gap-3">
+                            <ChevronLeft className="w-5 h-5 text-black dark:text-white cursor-pointer" />
+                            <ChevronRight className="w-5 h-5 text-zinc-300 dark:text-zinc-600 cursor-pointer" />
                         </div>
                     </div>
 
-                    <div className="space-y-1">
-                        <h3 className="text-5xl font-black tracking-tighter">
-                            <span className="text-2xl mr-1 text-zinc-300 font-bold">{CURRENCY_SYMBOL}</span>
-                            {stats.totalSpent.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
-                            <span className="text-[13px] text-zinc-400 ml-3 font-bold uppercase tracking-[0.2em]">Spent</span>
+                    {/* Income vs Spending Progress */}
+                    <div className="space-y-3 bg-gradient-to-br from-zinc-50 to-zinc-100/50 dark:from-zinc-900/50 dark:to-zinc-800/30 rounded-3xl p-4 border border-zinc-100 dark:border-zinc-800">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Monthly Budget</p>
+                                <p className="text-[22px] font-bold text-black dark:text-white mt-1.5">
+                                    {CURRENCY_SYMBOL}{MONTHLY_INCOME.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                                </p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[10px] font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Spent</p>
+                                <p className="text-[22px] font-bold text-indigo-600 dark:text-indigo-400 mt-1.5">
+                                    {CURRENCY_SYMBOL}{stats.totalSpent.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="space-y-2">
+                            <div className="h-2.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-500 ease-out"
+                                    style={{ width: `${Math.min((stats.totalSpent / MONTHLY_INCOME) * 100, 100)}%` }}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between text-[11px] pt-0.5">
+                                <span className="font-semibold text-zinc-600 dark:text-zinc-400">
+                                    {((stats.totalSpent / MONTHLY_INCOME) * 100).toFixed(1)}% of budget used
+                                </span>
+                                <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                                    {CURRENCY_SYMBOL}{(MONTHLY_INCOME - stats.totalSpent).toLocaleString('en-GH', { minimumFractionDigits: 2 })} remaining
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2">
+                        <h3 className="text-[28px] font-bold tracking-tight text-black dark:text-white flex items-baseline leading-none">
+                            Spending Trend
                         </h3>
+                        <p className="text-[13px] text-zinc-500 dark:text-zinc-400">Daily spending activity</p>
                     </div>
 
-                    <div className="h-64 w-full pt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ left: -20, right: 10, top: 20 }}>
+                    <div className="h-56 w-full pt-2 relative">
+                        <ChartContainer config={chartConfig} className="h-full w-full">
+                            <LineChart
+                                data={chartData}
+                                margin={{ left: 0, right: 0, top: 10, bottom: 0 }}
+                            >
+                                <CartesianGrid vertical={false} stroke="#E5E7EB" strokeDasharray="0" opacity={0.4} />
+                                <YAxis hide={true} domain={['dataMin - 10', 'dataMax + 20']} />
+
+                                {/* Spending Line - Indigo/Purple */}
                                 <Line
                                     type="monotone"
-                                    dataKey="amount"
-                                    stroke="#818cf8"
-                                    strokeWidth={4}
+                                    dataKey="spent"
+                                    stroke="var(--color-spent)"
+                                    strokeWidth={2.5}
                                     dot={false}
-                                    activeDot={{ r: 8, fill: '#818cf8', strokeWidth: 0 }}
+                                    activeDot={{ r: 4, fill: 'var(--color-spent)', strokeWidth: 0 }}
                                 />
-                                <Tooltip
-                                    cursor={{ stroke: '#818cf8', strokeWidth: 2, strokeDasharray: '5 5' }}
-                                    content={({ active, payload }) => {
-                                        if (active && payload && payload.length) {
-                                            return (
-                                                <div className="bg-black/95 backdrop-blur-md text-white px-4 py-3 rounded-2xl text-center shadow-2xl border border-white/10">
-                                                    <p className="font-bold text-base">{CURRENCY_SYMBOL}{payload[0].value}</p>
-                                                    <p className="text-xs text-zinc-400 mt-0.5">{payload[0].payload.day}, {currentYear}</p>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    }}
+
+                                <ChartTooltip
+                                    content={
+                                        <ChartTooltipContent
+                                            className="bg-[#121212] border border-white/5 text-white rounded-xl shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+                                            labelFormatter={(value) => `${value}, ${currentYear}`}
+                                            formatter={(value, name) => (
+                                                <>
+                                                    <span className="text-[10px] uppercase tracking-widest font-semibold opacity-70">
+                                                        {name}
+                                                    </span>
+                                                    <span className="font-bold text-[17px] tracking-tight ml-auto">
+                                                        {CURRENCY_SYMBOL}{value}
+                                                    </span>
+                                                </>
+                                            )}
+                                        />
+                                    }
                                 />
                             </LineChart>
-                        </ResponsiveContainer>
-                        <div className="flex items-center justify-between px-2 text-[11px] font-bold text-zinc-300 uppercase tracking-[0.2em] mt-6">
+                        </ChartContainer>
+
+                        <div className="flex items-center justify-between text-[13px] font-medium text-zinc-400 mt-4 pt-2">
                             <span>Sep 1</span>
-                            <span className="text-black dark:text-white font-black bg-zinc-100 dark:bg-zinc-800 px-3 py-1 rounded-full">Sep 7</span>
+                            <span className="text-black dark:text-white font-bold text-[14px]">Sep 7</span>
                             <span>Sep 15</span>
                         </div>
                     </div>
                 </section>
 
-                <div className="py-10">
+
+
+                <div className="py-8 px-10">
                     <div className="h-[1px] bg-zinc-100 dark:bg-zinc-800 w-full" />
                 </div>
 
                 {/* Search & Transactions */}
-                <section className="px-6 space-y-12">
+                <section className="px-10 space-y-8">
                     <div className="relative group">
                         <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 transition-colors group-focus-within:text-indigo-500" />
                         <input
                             type="text"
                             placeholder="Search your spending..."
-                            className="w-full bg-zinc-50 dark:bg-zinc-900 border border-transparent focus:border-indigo-500/20 rounded-[32px] py-6 pl-16 pr-8 text-[17px] font-semibold focus:outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-sm"
+                            className="w-full bg-zinc-50 dark:bg-zinc-900 border border-transparent focus:border-indigo-500/20 rounded-[28px] py-5 pl-14 pr-6 text-[15px] font-semibold focus:outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-sm"
                         />
                     </div>
 
-                    <div className="space-y-8 pb-32">
+                    <div className="space-y-6 pb-40">
                         <div className="flex items-center justify-between px-1">
-                            <h3 className="text-3xl font-black tracking-tight">Activities</h3>
-                            <button className="text-sm font-bold text-indigo-500">View all</button>
+                            <h3 className="text-[26px] font-black tracking-tight">Activities</h3>
+                            <button className="text-[13px] font-bold text-indigo-500">View all</button>
                         </div>
                         <TransactionList
                             transactions={transactions.slice(0, 10)}
