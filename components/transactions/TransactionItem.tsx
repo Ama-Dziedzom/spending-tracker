@@ -1,7 +1,7 @@
 'use client';
 
 import { Transaction, CATEGORIES } from '@/types/transactions';
-import { formatCurrency, formatDateTime, cn } from '@/lib/utils';
+import { formatCurrency, formatShortDate, formatTime, cn } from '@/lib/utils';
 import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 
 interface TransactionItemProps {
@@ -47,7 +47,9 @@ export default function TransactionItem({ transaction, onClick, compact = false 
                 </p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatDateTime(transaction.transaction_date)}
+                        {formatShortDate(transaction.transaction_date)}
+                        <span className="mx-1">•</span>
+                        {formatTime(transaction.transaction_date)}
                     </span>
                     <span className={cn(
                         'text-xs px-2 py-0.5 rounded-full font-medium',
@@ -67,11 +69,11 @@ export default function TransactionItem({ transaction, onClick, compact = false 
                         isCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                     )}
                 >
-                    {isCredit ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                    {isCredit ? '+' : '-'}GH₵{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
                 </p>
                 {!compact && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        Balance: {formatCurrency(transaction.balance)}
+                        Bal: GH₵{transaction.balance.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
                     </p>
                 )}
             </div>
