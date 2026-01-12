@@ -16,6 +16,15 @@ import {
     differenceInHours,
     differenceInMinutes,
 } from 'date-fns';
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+/**
+ * Utility for Tailwind CSS class merging
+ */
+export function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs))
+}
 
 /**
  * Format currency in Ghana Cedis (GHS)
@@ -199,10 +208,6 @@ export function getDateRange(range: string): { start: Date; end: Date } {
         default:
             return { start: startOfMonth(now), end: endOfMonth(now) };
     }
-}
-
-export function cn(...classes: (string | undefined | boolean)[]): string {
-    return classes.filter(Boolean).join(' ');
 }
 
 export function truncateText(text: string, maxLength: number): string {

@@ -1,8 +1,38 @@
 'use client';
 
 import { Transaction, CATEGORIES } from '@/types/transactions';
-import { formatCurrency, formatShortDate, formatTime, cn } from '@/lib/utils';
-import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { formatCurrency, getRelativeTime, cn } from '@/lib/utils';
+import {
+    ShoppingBag,
+    Utensils,
+    Car,
+    Zap,
+    Film,
+    Plus,
+    HeartPulse,
+    GraduationCap,
+    ArrowUpRight,
+    ArrowDownLeft,
+    HandCoins,
+    Banknote,
+    Receipt
+} from 'lucide-react';
+
+const CATEGORY_ICONS: Record<string, any> = {
+    'Food & Dining': Utensils,
+    'Transportation': Car,
+    'Shopping': ShoppingBag,
+    'Utilities & Bills': Zap,
+    'Entertainment': Film,
+    'Health': HeartPulse,
+    'Education': GraduationCap,
+    'Income': ArrowDownLeft,
+    'Transfers': HandCoins,
+    'Cash Withdrawal': Banknote,
+    'Fees & Charges': Receipt,
+    'Church & Charity': Plus,
+    'Other': Receipt,
+};
 
 interface TransactionItemProps {
     transaction: Transaction;
@@ -12,71 +42,52 @@ interface TransactionItemProps {
 
 export default function TransactionItem({ transaction, onClick, compact = false }: TransactionItemProps) {
     const isCredit = transaction.type === 'credit';
-    const category = CATEGORIES[transaction.category] || CATEGORIES['Other'];
+    const IconComponent = CATEGORY_ICONS[transaction.category] || CATEGORY_ICONS['Other'];
+
+    // Formatting date as "Today", "Yesterday", or "DD MMM YYYY"
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 0) return 'Today';
+        if (diffDays === 1) return 'Yesterday';
+
+        return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
 
     return (
         <div
             onClick={onClick}
-            className={cn(
-                'flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700',
-                'hover:shadow-lg hover:shadow-gray-200/50 dark:hover:shadow-gray-900/50',
-                'transition-all duration-200 cursor-pointer group',
-                compact && 'p-3'
-            )}
+            className="flex items-center gap-4 py-4 px-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer group rounded-xl"
         >
-            {/* Icon */}
-            <div
-                className={cn(
-                    'flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110',
-                    isCredit
-                        ? 'bg-gradient-to-br from-emerald-400 to-green-500'
-                        : 'bg-gradient-to-br from-rose-400 to-red-500'
-                )}
-            >
-                {isCredit ? (
-                    <ArrowDownLeft className="w-6 h-6 text-white" />
-                ) : (
-                    <ArrowUpRight className="w-6 h-6 text-white" />
-                )}
+            {/* Circular Icon */}
+            <div className="flex-shrink-0 w-12 h-12 rounded-full border border-gray-100 dark:border-gray-800 flex items-center justify-center bg-white dark:bg-gray-900 shadow-sm">
+                <IconComponent className="w-5 h-5 text-gray-900 dark:text-white" />
             </div>
 
             {/* Details */}
             <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 dark:text-white truncate">
+                <p className="font-semibold text-[15px] text-gray-900 dark:text-white truncate">
                     {transaction.description || 'Transaction'}
                 </p>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatShortDate(transaction.transaction_date)}
-                        <span className="mx-1">•</span>
-                        {formatTime(transaction.transaction_date)}
-                    </span>
-                    <span className={cn(
-                        'text-xs px-2 py-0.5 rounded-full font-medium',
-                        category.bgColor,
-                        category.textColor
-                    )}>
-                        {transaction.category}
-                    </span>
-                </div>
+                <p className="text-xs text-gray-400 mt-0.5">
+                    {formatDate(transaction.transaction_date)}
+                </p>
             </div>
 
-            {/* Amount & Balance */}
+            {/* Amount */}
             <div className="text-right flex-shrink-0">
                 <p
                     className={cn(
-                        'font-bold text-lg',
-                        isCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                        'font-bold text-[15px]',
+                        isCredit ? 'text-[#50E3C2]' : 'text-[#FF4B4B]'
                     )}
                 >
-                    {isCredit ? '+' : '-'}GH₵{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
+                    {isCredit ? '+' : '-'}${Math.abs(transaction.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
-                {!compact && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        Bal: GH₵{transaction.balance.toLocaleString('en-GH', { minimumFractionDigits: 2 })}
-                    </p>
-                )}
             </div>
         </div>
     );
 }
+

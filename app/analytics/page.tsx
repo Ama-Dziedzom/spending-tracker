@@ -174,248 +174,117 @@ export default function AnalyticsPage() {
     };
 
     return (
-        <div className="min-h-screen pb-24 md:pb-8">
-            <Header title="Analytics" subtitle="Insights into your spending habits" />
+        <div className="min-h-screen bg-[#F8F9FB] dark:bg-gray-950 pb-20">
+            <header className="px-6 pt-10 pb-4">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Insights</h1>
+            </header>
 
-            <main className="px-4 md:px-6 py-6 space-y-6">
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white">
-                        <div className="flex items-center gap-2 mb-2">
-                            <ArrowDownRight className="w-4 h-4 opacity-80" />
-                            <span className="text-xs font-medium opacity-80">Total Income</span>
-                        </div>
-                        <p className="text-xl font-bold">
-                            {loading ? '---' : formatCurrency(analytics.totalIncome)}
-                        </p>
-                        <p className="text-xs opacity-60 mt-1">
-                            {analytics.transactionCount.credit} transactions
-                        </p>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white">
-                        <div className="flex items-center gap-2 mb-2">
-                            <ArrowUpRight className="w-4 h-4 opacity-80" />
-                            <span className="text-xs font-medium opacity-80">Total Expenses</span>
-                        </div>
-                        <p className="text-xl font-bold">
-                            {loading ? '---' : formatCurrency(analytics.totalExpenses)}
-                        </p>
-                        <p className="text-xs opacity-60 mt-1">
-                            {analytics.transactionCount.debit} transactions
-                        </p>
-                    </div>
-
-                    <div className={`p-4 rounded-2xl ${analytics.netSavings >= 0
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                            : 'bg-gradient-to-br from-orange-500 to-amber-600'
-                        } text-white`}>
-                        <div className="flex items-center gap-2 mb-2">
-                            <Wallet className="w-4 h-4 opacity-80" />
-                            <span className="text-xs font-medium opacity-80">Net Savings</span>
-                        </div>
-                        <p className="text-xl font-bold">
-                            {loading ? '---' : formatCurrency(analytics.netSavings)}
-                        </p>
-                        <p className="text-xs opacity-60 mt-1">
-                            {analytics.netSavings >= 0 ? 'Great job!' : 'You spent more than earned'}
-                        </p>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 text-white">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Calendar className="w-4 h-4 opacity-80" />
-                            <span className="text-xs font-medium opacity-80">Avg Daily</span>
-                        </div>
-                        <p className="text-xl font-bold">
-                            {loading ? '---' : formatCurrency(analytics.avgDaily)}
-                        </p>
-                        <p className="text-xs opacity-60 mt-1">spending per day</p>
-                    </div>
+            <main className="px-6 space-y-6">
+                {/* Tabs for Daily/Monthly/Yearly */}
+                <div className="bg-gray-100 dark:bg-gray-900 p-1 rounded-full flex justify-between items-center">
+                    <button className="flex-1 py-2 text-sm font-medium text-gray-500">Daily</button>
+                    <button className="flex-1 py-2 text-sm font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-full shadow-sm">Monthly</button>
+                    <button className="flex-1 py-2 text-sm font-medium text-gray-500">Yearly</button>
                 </div>
 
-                {/* Average Spending Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30">
-                                <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Daily Average</p>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white">
-                                    {formatCurrency(analytics.avgDaily)}
-                                </p>
-                            </div>
+                {/* Main Chart Container */}
+                <div className="bg-white dark:bg-gray-900 rounded-[32px] p-6 shadow-sm border border-gray-50 dark:border-gray-800">
+                    <div className="h-64 mb-6 relative">
+                        {/* Tooltip Placeholder matching image style */}
+                        <div className="absolute top-0 left-1/4 bg-black text-white px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-1 z-10">
+                            $6.745,04
+                            <div className="absolute -bottom-1 left-12 w-2 h-2 bg-black rotate-45" />
                         </div>
-                        <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
-                            <div className="h-full w-1/3 bg-blue-500 rounded-full" />
-                        </div>
+
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={analytics.sourceBreakdown.slice(0, 5)} margin={{ top: 20, right: 0, left: -20, bottom: 0 }} barGap={8}>
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fill: '#9CA3AF', fontSize: 10 }}
+                                    dy={10}
+                                />
+                                <Tooltip cursor={{ fill: 'transparent' }} content={() => null} />
+                                <Bar
+                                    dataKey="income"
+                                    fill="#50E3C2"
+                                    radius={[10, 10, 0, 0]}
+                                    barSize={20}
+                                />
+                                <Bar
+                                    dataKey="expenses"
+                                    fill="#E5E7EB"
+                                    radius={[10, 10, 0, 0]}
+                                    barSize={20}
+                                />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
 
-                    <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-3 rounded-xl bg-purple-100 dark:bg-purple-900/30">
-                                <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Weekly Average</p>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white">
-                                    {formatCurrency(analytics.avgWeekly)}
-                                </p>
-                            </div>
+                    {/* Chart Legend */}
+                    <div className="flex justify-center gap-8 mt-4">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#50E3C2]" />
+                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Income</span>
                         </div>
-                        <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
-                            <div className="h-full w-2/3 bg-purple-500 rounded-full" />
-                        </div>
-                    </div>
-
-                    <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-3 rounded-xl bg-teal-100 dark:bg-teal-900/30">
-                                <Calendar className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Monthly Average</p>
-                                <p className="text-xl font-bold text-gray-900 dark:text-white">
-                                    {formatCurrency(analytics.avgMonthly)}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full">
-                            <div className="h-full w-full bg-teal-500 rounded-full" />
+                        <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-[#E5E7EB]" />
+                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Expenditure</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Monthly Trends */}
-                    <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center gap-2 mb-6">
-                            <TrendingUp className="w-5 h-5 text-emerald-500" />
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                Monthly Trends
-                            </h3>
-                        </div>
-                        {loading ? (
-                            <div className="h-64 flex items-center justify-center">
-                                <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+                {/* Recently Used Section */}
+                <div className="space-y-4 pb-10">
+                    <h3 className="text-[17px] font-bold text-gray-900 dark:text-white">Recently Used</h3>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {/* Dribbble Card */}
+                        <div className="bg-white dark:bg-gray-900 p-5 rounded-[24px] shadow-sm border border-gray-50 dark:border-gray-800 space-y-4">
+                            <div className="space-y-1">
+                                <p className="text-[13px] font-bold text-gray-900 dark:text-white">Dribbble Pro</p>
+                                <p className="text-[11px] text-gray-400">Monthly Bill</p>
                             </div>
-                        ) : (
-                            <SpendingChart transactions={transactions} months={6} />
-                        )}
-                    </div>
-
-                    {/* Category Breakdown */}
-                    <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                        <div className="flex items-center gap-2 mb-6">
-                            <PieChart className="w-5 h-5 text-purple-500" />
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                Spending by Category
-                            </h3>
-                        </div>
-                        {loading ? (
-                            <div className="h-64 flex items-center justify-center">
-                                <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
+                            <div className="space-y-2 pt-2 border-t border-gray-50 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-gray-400">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] font-medium">Last Transaction</span>
+                                </div>
+                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">20 July 2024</p>
                             </div>
-                        ) : (
-                            <CategoryChart transactions={transactions} type="debit" />
-                        )}
-                    </div>
-                </div>
-
-                {/* Source Breakdown */}
-                <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                    <div className="flex items-center gap-2 mb-6">
-                        <BarChart3 className="w-5 h-5 text-blue-500" />
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            Spending by Source
-                        </h3>
-                    </div>
-                    {loading ? (
-                        <div className="h-64 flex items-center justify-center">
-                            <RefreshCw className="w-8 h-8 text-gray-400 animate-spin" />
                         </div>
-                    ) : (
-                        <div className="h-80">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={analytics.sourceBreakdown} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" className="dark:stroke-gray-700" />
-                                    <XAxis
-                                        dataKey="name"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                                    />
-                                    <YAxis
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#9CA3AF', fontSize: 12 }}
-                                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                                    />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    <Bar dataKey="income" name="Income" fill="#10B981" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="expenses" name="Expenses" fill="#F43F5E" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+
+                        {/* Spotify Card */}
+                        <div className="bg-white dark:bg-gray-900 p-5 rounded-[24px] shadow-sm border border-gray-50 dark:border-gray-800 space-y-4">
+                            <div className="space-y-1">
+                                <p className="text-[13px] font-bold text-gray-900 dark:text-white">Spotify Premium</p>
+                                <p className="text-[11px] text-gray-400">Monthly Bill</p>
+                            </div>
+                            <div className="space-y-2 pt-2 border-t border-gray-50 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-gray-400">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <span className="text-[10px] font-medium">Last Transaction</span>
+                                </div>
+                                <p className="text-[12px] font-bold text-gray-900 dark:text-white">15 June 2024</p>
+                            </div>
                         </div>
-                    )}
-                </div>
+                    </div>
 
-                {/* Top Categories List */}
-                <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                        Top Spending Categories
-                    </h3>
-                    <div className="space-y-4">
-                        {loading ? (
-                            [...Array(5)].map((_, i) => (
-                                <div key={i} className="h-16 bg-gray-100 dark:bg-gray-700 rounded-xl animate-pulse" />
-                            ))
-                        ) : (
-                            analytics.topCategories.map((cat, index) => {
-                                const percentage = analytics.totalExpenses > 0
-                                    ? (cat.amount / analytics.totalExpenses) * 100
-                                    : 0;
-
-                                return (
-                                    <div
-                                        key={cat.name}
-                                        className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-xl"
-                                    >
-                                        <div
-                                            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                                            style={{ backgroundColor: cat.color }}
-                                        >
-                                            {index + 1}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <span className="font-medium text-gray-900 dark:text-white">
-                                                    {cat.name}
-                                                </span>
-                                                <span className="font-semibold text-gray-900 dark:text-white">
-                                                    {formatCurrency(cat.amount)}
-                                                </span>
-                                            </div>
-                                            <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full transition-all duration-500"
-                                                    style={{
-                                                        width: `${percentage}%`,
-                                                        backgroundColor: cat.color,
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-12 text-right">
-                                            {percentage.toFixed(1)}%
-                                        </span>
-                                    </div>
-                                );
-                            })
-                        )}
+                    {/* Dribbble Item below */}
+                    <div className="bg-white dark:bg-gray-900 p-2 rounded-[24px] shadow-sm border border-gray-50 dark:border-gray-800">
+                        <div className="flex items-center gap-4 p-4">
+                            <div className="w-12 h-12 rounded-full border border-gray-100 dark:border-gray-800 flex items-center justify-center bg-white dark:bg-gray-900">
+                                <Building2 className="w-5 h-5 text-gray-900 dark:text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-[15px] text-gray-900 dark:text-white truncate">Dribbble Pro</p>
+                                <p className="text-xs text-gray-400 mt-0.5">Today</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="font-bold text-[15px] text-[#FF4B4B]">-$8.00</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
