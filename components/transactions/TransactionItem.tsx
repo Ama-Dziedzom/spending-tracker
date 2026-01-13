@@ -41,7 +41,7 @@ export default function TransactionItem({ transaction, onClick, compact = false 
     return (
         <div
             onClick={onClick}
-            className="flex items-center gap-5 py-5 px-1 active:bg-zinc-50 dark:active:bg-zinc-900 transition-colors cursor-pointer rounded-[24px]"
+            className="flex items-center gap-6 py-6 px-2 active:bg-zinc-50 dark:active:bg-zinc-900 transition-colors cursor-pointer rounded-[28px]"
         >
             {/* Rounded Icon */}
             <div className={cn(
