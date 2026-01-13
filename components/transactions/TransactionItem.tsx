@@ -54,10 +54,10 @@ export default function TransactionItem({ transaction, onClick, compact = false 
             {/* Details and Amount merged into one flex-1 container */}
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                    <p className="font-bold text-[16px] text-zinc-900 dark:text-white truncate">
+                    <p className="font-semibold text-[16px] text-zinc-900 dark:text-white truncate">
                         {transaction.description || 'Transaction'}
                     </p>
-                    <p className="font-bold text-[16px] text-zinc-900 dark:text-white">
+                    <p className="font-semibold text-[16px] text-zinc-900 dark:text-white">
                         {CURRENCY_SYMBOL}{Math.abs(transaction.amount).toLocaleString('en-GH', { minimumFractionDigits: 2 })}
                     </p>
                 </div>
