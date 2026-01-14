@@ -1,18 +1,29 @@
 'use client';
 
-import { AlertCircle } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 
 export default function SmartCategoryBanner() {
     return (
-        <div className="p-6 rounded-[32px] bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 flex gap-4">
-            <div className="w-10 h-10 rounded-xl bg-amber-400 flex flex-shrink-0 items-center justify-center">
-                <AlertCircle className="w-6 h-6 text-white" />
+        <div className="relative overflow-hidden p-8 rounded-[40px] bg-gradient-to-br from-indigo-600 to-indigo-800 text-white shadow-2xl shadow-indigo-600/20 group animate-fade-in-up">
+            <div className="absolute top-0 right-0 p-4">
+                <button className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+                    <X className="w-4 h-4" />
+                </button>
             </div>
-            <div className="space-y-1">
-                <h4 className="font-bold text-zinc-900 dark:text-zinc-100">Smart category</h4>
-                <p className="text-[13px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                    We&quot;ve categorized your transaction, you may change here if you want.
-                </p>
+
+            {/* Background sparkle effect */}
+            <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors duration-700" />
+
+            <div className="relative flex items-center gap-6">
+                <div className="w-16 h-16 rounded-[24px] bg-white text-indigo-600 flex flex-shrink-0 items-center justify-center shadow-xl ring-8 ring-white/10">
+                    <Sparkles className="w-8 h-8" />
+                </div>
+                <div className="space-y-1.5 pr-8">
+                    <h4 className="text-xl font-black tracking-tight leading-none">Smart categorization</h4>
+                    <p className="text-sm font-medium text-indigo-100/90 leading-relaxed">
+                        We've automatically categorized your transactions. Review them anytime to improve accuracy.
+                    </p>
+                </div>
             </div>
         </div>
     );

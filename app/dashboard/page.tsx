@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
 import TransactionModal from '@/components/transactions/TransactionModal';
-import { Transaction, CURRENCY_SYMBOL } from '@/types/transactions';
+import { Transaction } from '@/types/transactions';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { type ChartConfig } from '@/components/ui/chart';
 import { useSearchParams } from 'next/navigation';
@@ -37,11 +37,10 @@ const chartData = [
 const chartConfig = {
     spent: {
         label: "Spent",
-        color: "#818cf8",
+        color: "#6366f1",
     },
 } satisfies ChartConfig;
 
-// Mock monthly income for budget progress
 const MONTHLY_INCOME = 2450;
 
 export default function DashboardPage() {
@@ -52,11 +51,9 @@ export default function DashboardPage() {
     );
 }
 
-
 function DashboardContent() {
     const searchParams = useSearchParams();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,28 +76,23 @@ function DashboardContent() {
 
         if (!isSupabaseConfigured()) {
             const mockData = generateMockTransactions();
-            setAllTransactions(mockData);
             setTransactions(mockData);
             setLoading(false);
             return;
         }
 
         try {
-            const { data: allData, error: allError } = await supabase
+            const { data, error } = await supabase
                 .from('transactions')
                 .select('*')
                 .order('transaction_date', { ascending: false })
                 .limit(500);
 
-            if (allError) throw allError;
-
-            setAllTransactions(allData || []);
-            setTransactions(allData || []);
+            if (error) throw error;
+            setTransactions(data || []);
         } catch (error) {
             console.error('Error fetching transactions:', error);
-            const mockData = generateMockTransactions();
-            setAllTransactions(mockData);
-            setTransactions(mockData);
+            setTransactions(generateMockTransactions());
         } finally {
             setLoading(false);
         }
@@ -121,18 +113,15 @@ function DashboardContent() {
     };
 
     return (
-        <div className="min-h-screen bg-[#FDFDFF] dark:bg-black pb-40 grid grid-cols-1 justify-items-center overflow-x-hidden">
-            <Header title="Dashboard" subtitle={`Summary for ${currentMonth}`} />
+        <div className="min-h-screen bg-white dark:bg-black pb-56 pt-40">
+            <Header title="My Wallet" subtitle={`Overview for ${currentMonth}`} />
 
-            <div className="animate-fade-in-up flex flex-col w-[90%] max-w-2xl gap-6 pt-4">
-
-                {/* Section 1: Budget Overview */}
+            <main className="max-w-3xl mx-auto px-8 space-y-20 animate-fade-in-up">
                 <BudgetOverview
                     monthlyIncome={MONTHLY_INCOME}
                     totalSpent={stats.totalSpent}
                 />
 
-                {/* Section 2: Spending Trends & Chart */}
                 <SpendingTrends
                     currentMonth={currentMonth}
                     currentYear={currentYear}
@@ -141,13 +130,12 @@ function DashboardContent() {
                     chartConfig={chartConfig}
                 />
 
-                {/* Section 3: Activities */}
                 <ActivitiesSection
                     transactions={transactions}
                     onTransactionClick={handleTransactionClick}
                     loading={loading}
                 />
-            </div>
+            </main>
 
             <TransactionModal
                 transaction={selectedTransaction}
@@ -163,39 +151,24 @@ function DashboardContent() {
 
 function generateMockTransactions(): Transaction[] {
     const categories = ['Groceries', 'Transport', 'Entertainment', 'Rent & Utilities', 'Shopping', 'Health'];
-    const sources = ['MTN MoMo', 'Bank', 'Cash'];
     const transactions: Transaction[] = [];
     let balance = 3465.80;
-
-    const baseDescriptions = {
-        'Groceries': ['Supermart Groceries', 'Fresh Bakery', 'Corner Shop'],
-        'Transport': ['Uber Ride', 'Bolt', 'Fuel at Shell'],
-        'Entertainment': ['Netflix', 'Spotify', 'Cinema'],
-        'Rent & Utilities': ['ECG Prepaid', 'Water Bill', 'Internet'],
-        'Shopping': ['Melcom', 'Pharmacy', 'Online Store'],
-        'Health': ['Drugstore', 'Clinic', 'Gym'],
-    };
-
     const now = new Date();
 
     for (let i = 0; i < 20; i++) {
         const type = Math.random() > 0.9 ? 'credit' : 'debit';
         const category = type === 'credit' ? 'Income' : categories[Math.floor(Math.random() * categories.length)];
         const amount = Math.floor(Math.random() * 200) + 10;
-
         const date = new Date(now);
-        date.setHours(now.getHours() - i * 2);
-
-        const descriptions = baseDescriptions[category as keyof typeof baseDescriptions] || ['Transaction'];
-        const description = descriptions[Math.floor(Math.random() * descriptions.length)];
+        date.setHours(now.getHours() - i * i);
 
         transactions.push({
             id: `mock-${i}`,
             transaction_date: date.toISOString(),
             amount,
             type,
-            source: sources[Math.floor(Math.random() * sources.length)],
-            description,
+            source: Math.random() > 0.5 ? 'MTN MoMo' : 'Bank Card',
+            description: category + ' Expense',
             balance: balance,
             category: category,
             raw_sms: '',

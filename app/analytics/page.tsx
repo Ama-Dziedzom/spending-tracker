@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import TransactionList from '@/components/transactions/TransactionList';
 import { Transaction } from '@/types/transactions';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { Search } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 
 // Analytics Components
 import Header from '@/components/layout/Header';
@@ -13,6 +13,14 @@ import CategoryDistribution from '@/components/analytics/CategoryDistribution';
 import SmartCategoryBanner from '@/components/analytics/SmartCategoryBanner';
 
 export default function AnalyticsPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+            <AnalyticsContent />
+        </Suspense>
+    );
+}
+
+function AnalyticsContent() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -58,36 +66,45 @@ export default function AnalyticsPage() {
     }, [transactions]);
 
     return (
-        <div className="min-h-screen bg-white dark:bg-black pb-32">
-            <Header title="Spend analysis" subtitle="View your spending habits" />
+        <div className="min-h-screen bg-white dark:bg-black pb-56 pt-40">
+            <Header title="Spend Analysis" subtitle="Detailed breakdown of expenses" />
 
-            <main className="px-6 space-y-8 animate-fade-in-up pt-4">
+            <main className="max-w-3xl mx-auto px-8 space-y-20 animate-fade-in-up">
                 <SpendingSummary totalSpending={stats.totalSpending} />
+
+                <div className="relative group">
+                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 group-focus-within:text-indigo-500 transition-colors" />
+                    <input
+                        type="text"
+                        placeholder="Search for any transaction..."
+                        className="w-full h-16 pl-14 pr-16 rounded-[24px] bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/30 outline-none transition-all text-[15px] font-bold"
+                    />
+                    <button className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                        <Filter className="w-5 h-5" />
+                    </button>
+                </div>
 
                 <CategoryDistribution categorySpending={stats.categorySpending} />
 
                 <SmartCategoryBanner />
 
-                {/* Search Bar */}
-                <div className="relative">
-                    <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
-                    <input
-                        type="text"
-                        placeholder="Search for any transaction"
-                        className="w-full h-16 pl-14 pr-6 rounded-full bg-zinc-50 dark:bg-zinc-900 border-none focus:ring-2 focus:ring-zinc-900 transition-all text-sm font-medium"
-                    />
-                </div>
+                <section className="space-y-6">
+                    <div className="flex items-center justify-between px-2">
+                        <h3 className="text-lg font-extrabold tracking-tight text-zinc-900 dark:text-white leading-none">
+                            Transaction History
+                        </h3>
+                        <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mt-1.5">Latest Transactions</p>
+                    </div>
 
-                {/* Latest Transaction */}
-                <div className="space-y-4">
-                    <h3 className="text-xl font-bold">Latest transaction</h3>
-                    <TransactionList
-                        transactions={transactions.slice(0, 10)}
-                        onTransactionClick={() => { }}
-                        loading={loading}
-                        compact
-                    />
-                </div>
+                    <div className="glass border border-white/40 dark:border-white/5 rounded-[40px] overflow-hidden premium-shadow">
+                        <TransactionList
+                            transactions={transactions.slice(0, 15)}
+                            onTransactionClick={() => { }}
+                            loading={loading}
+                            compact
+                        />
+                    </div>
+                </section>
             </main>
         </div>
     );
@@ -95,45 +112,28 @@ export default function AnalyticsPage() {
 
 function generateMockTransactions(): Transaction[] {
     const categories = ['Groceries', 'Transport', 'Entertainment', 'Rent & Utilities', 'Shopping', 'Health'];
-    const sources = ['MTN MoMo', 'Bank', 'Cash'];
     const transactions: Transaction[] = [];
-    let balance = 3465.80;
-
-    const baseDescriptions = {
-        'Groceries': ['Supermart Groceries', 'Fresh Bakery', 'Corner Shop'],
-        'Transport': ['Uber Ride', 'Bolt', 'Fuel at Shell'],
-        'Entertainment': ['Netflix', 'Spotify', 'Cinema'],
-        'Rent & Utilities': ['ECG Prepaid', 'Water Bill', 'Internet'],
-        'Shopping': ['Melcom', 'Pharmacy', 'Online Store'],
-        'Health': ['Drugstore', 'Clinic', 'Gym'],
-    };
-
     const now = new Date();
 
     for (let i = 0; i < 20; i++) {
         const type = 'debit';
-        const category = categories[Math.floor(Math.random() * 4)]; // Focus on the 4 main ones
+        const category = categories[Math.floor(Math.random() * 4)];
         const amount = Math.floor(Math.random() * 200) + 10;
-
         const date = new Date(now);
         date.setHours(now.getHours() - i * 4);
-
-        const descriptions = baseDescriptions[category as keyof typeof baseDescriptions] || ['Transaction'];
 
         transactions.push({
             id: `mock-ana-${i}`,
             transaction_date: date.toISOString(),
             amount,
             type,
-            source: sources[Math.floor(Math.random() * sources.length)],
-            description: descriptions[Math.floor(Math.random() * descriptions.length)],
-            balance: balance,
+            source: 'Bank Card',
+            description: category + ' Transaction',
+            balance: 0,
             category: category,
             raw_sms: '',
             created_at: date.toISOString()
         });
-
-        balance -= amount;
     }
 
     return transactions;

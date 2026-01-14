@@ -4,43 +4,48 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
     Home,
-    Wallet,
-    Plus,
     LayoutGrid,
-    Target,
+    Plus,
 } from 'lucide-react';
 
 export default function Navigation() {
     const pathname = usePathname();
 
     const navItems = [
-        { href: '/dashboard', icon: Home, label: 'Dashboard' },
-        { href: '/analytics', icon: LayoutGrid, label: 'Analysis' },
+        { href: '/dashboard', icon: Home, label: 'Wallet' },
+        { href: '/analytics', icon: LayoutGrid, label: 'Charts' },
     ];
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-black/95 backdrop-blur-2xl border-t border-zinc-100 dark:border-zinc-800 px-5 pb-12 pt-5 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_-8px_30px_rgb(0,0,0,0.4)]">
-            <div className="max-w-screen-xl mx-auto flex items-center justify-around">
+        <nav className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md">
+            <div className="glass border border-white/20 dark:border-white/5 rounded-[32px] px-4 py-3 pb-4 shadow-2xl flex items-center justify-around relative">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
                         <Link
                             key={item.href}
                             href={item.href}
-                            className={`flex flex-col items-center gap-2 px-6 py-2 transition-all duration-300 ${isActive
-                                ? 'text-indigo-600 dark:text-indigo-400'
-                                : 'text-zinc-400 dark:text-zinc-500'
+                            className={`relative flex flex-col items-center gap-1.5 px-6 py-2 transition-all duration-500 rounded-2xl ${isActive
+                                    ? 'text-indigo-600 dark:text-indigo-400'
+                                    : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300'
                                 }`}
                         >
-                            <div className={`p-2 rounded-2xl transition-all duration-500 ${isActive ? 'bg-indigo-50 dark:bg-indigo-500/10' : 'bg-transparent'}`}>
+                            <div className={`p-2 rounded-xl transition-all duration-500 scale-110`}>
                                 <item.icon className="w-6 h-6" strokeWidth={isActive ? 2.5 : 2} />
                             </div>
-                            <span className={`text-[10px] font-extrabold uppercase tracking-[0.2em] transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-40'}`}>
+                            <span className={`text-[10px] font-black uppercase tracking-[0.15em] transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>
                                 {item.label}
                             </span>
+                            {isActive && (
+                                <div className="absolute -bottom-1 w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+                            )}
                         </Link>
                     );
                 })}
+
+                <button className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-xl shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-110 active:scale-95 transition-all duration-300 ring-4 ring-white dark:ring-zinc-900 ring-offset-0">
+                    <Plus className="w-8 h-8" />
+                </button>
             </div>
         </nav>
     );
