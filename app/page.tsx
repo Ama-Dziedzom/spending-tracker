@@ -16,23 +16,6 @@ export default function Page() {
         },
     });
 
-    if (isLoading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center p-6">
-                <div className="w-full max-w-md space-y-4">
-                    <Skeleton className="h-12 w-3/4 mx-auto" />
-                    <Skeleton className="h-64 w-full rounded-3xl" />
-                    <Skeleton className="h-12 w-full rounded-xl" />
-                </div>
-            </div>
-        );
-    }
-
-    const hasWallets = wallets && wallets.length > 0;
-
-    if (!hasWallets) {
-        return <Onboarding onComplete={() => refetch()} />;
-    }
-
-    return <DashboardContent />;
+    // Force render onboarding for UI design focus
+    return <Onboarding onComplete={() => refetch()} />;
 }
