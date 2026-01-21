@@ -1,63 +1,99 @@
-import { Tabs } from 'expo-router';
 import React from 'react';
-import { Home, Wallet, PieChart, Settings } from 'lucide-react-native';
-import { View, Text } from 'react-native';
+import { Tabs } from 'expo-router';
+import { View, Text, Platform } from 'react-native';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import {
+    Home01Icon,
+    Idea01Icon,
+    Wallet03Icon,
+    Settings02Icon
+} from '@hugeicons/core-free-icons';
 
 export default function TabLayout() {
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopWidth: 1,
-          borderTopColor: '#F1F5F9',
-          height: 88,
-          paddingBottom: 30,
-          paddingTop: 12,
-        },
-        tabBarActiveTintColor: '#0F4CFF',
-        tabBarInactiveTintColor: '#94A3B8',
-        tabBarLabelStyle: {
-          fontFamily: 'Urbanist-Bold',
-          fontSize: 12,
-        },
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => <Home size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
-        }}
-      />
-      <Tabs.Screen
-        name="wallets"
-        options={{
-          title: 'Wallets',
-          tabBarIcon: ({ color, focused }) => <Wallet size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
-        }}
-      />
-      <Tabs.Screen
-        name="insights"
-        options={{
-          title: 'Insights',
-          tabBarIcon: ({ color, focused }) => <PieChart size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, focused }) => <Settings size={24} color={color} strokeWidth={focused ? 2.5 : 2} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          href: null, // Hide the default explore tab
-        }}
-      />
-    </Tabs>
-  );
+    return (
+        <Tabs
+            screenOptions={{
+                headerShown: false,
+                tabBarStyle: {
+                    height: Platform.OS === 'ios' ? 90 : 88,
+                    paddingTop: 12,
+                    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+                    backgroundColor: '#FFFFFF',
+                    borderTopWidth: 0,
+                    elevation: 10,
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: -4 },
+                    shadowOpacity: 0.02,
+                    shadowRadius: 10,
+                },
+                tabBarActiveTintColor: '#1642E5',
+                tabBarInactiveTintColor: '#ADAEAF',
+                tabBarLabelStyle: {
+                    fontFamily: 'Manrope-Medium',
+                    fontSize: 14,
+                },
+            }}
+        >
+            <Tabs.Screen
+                name="index"
+                options={{
+                    title: 'Home',
+                    tabBarIcon: ({ color }) => (
+                        <HugeiconsIcon icon={Home01Icon} size={24} color={color} />
+                    ),
+                    tabBarLabel: ({ color, focused }) => (
+                        <View className="items-center">
+                            <Text style={{ color, fontFamily: 'Manrope-Medium', fontSize: 14 }}>Home</Text>
+                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#1642E5] mt-1" />}
+                        </View>
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="insights"
+                options={{
+                    title: 'Insights',
+                    tabBarIcon: ({ color }) => (
+                        <HugeiconsIcon icon={Idea01Icon} size={24} color={color} />
+                    ),
+                    tabBarLabel: ({ color, focused }) => (
+                        <View className="items-center">
+                            <Text style={{ color, fontFamily: 'Manrope-Medium', fontSize: 14 }}>Insights</Text>
+                            {focused && <View className="w-1 h-1 rounded-full bg-[#1642E5] mt-1" />}
+                        </View>
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="wallets"
+                options={{
+                    title: 'Wallets',
+                    tabBarIcon: ({ color }) => (
+                        <HugeiconsIcon icon={Wallet03Icon} size={24} color={color} />
+                    ),
+                    tabBarLabel: ({ color, focused }) => (
+                        <View className="items-center">
+                            <Text style={{ color, fontFamily: 'Manrope-Medium', fontSize: 14 }}>Wallets</Text>
+                            {focused && <View className="w-1 h-1 rounded-full bg-[#1642E5] mt-1" />}
+                        </View>
+                    ),
+                }}
+            />
+            <Tabs.Screen
+                name="settings"
+                options={{
+                    title: 'Settings',
+                    tabBarIcon: ({ color }) => (
+                        <HugeiconsIcon icon={Settings02Icon} size={24} color={color} />
+                    ),
+                    tabBarLabel: ({ color, focused }) => (
+                        <View className="items-center">
+                            <Text style={{ color, fontFamily: 'Manrope-Medium', fontSize: 14 }}>Settings</Text>
+                            {focused && <View className="w-1 h-1 rounded-full bg-[#1642E5] mt-1" />}
+                        </View>
+                    ),
+                }}
+            />
+        </Tabs>
+    );
 }
-

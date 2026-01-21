@@ -1,200 +1,114 @@
-import { View, Text, Pressable, ScrollView, RefreshControl } from 'react-native';
-import React, { useState, useEffect } from 'react';
+import { View, Text, Image, Pressable, ScrollView, Linking, Platform } from 'react-native';
+import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-  Plus,
-  AlertTriangle,
-  Smartphone,
-  ChevronRight,
-  Wallet as WalletIcon,
-  CreditCard,
-  TrendingUp
-} from 'lucide-react-native';
-import { supabase } from '@/lib/supabase';
-import { Wallet, Transaction, getUnmatchedSources, mapSourceToName, mapSourceToIcon } from '@/lib/wallet-service';
-import { cn } from '@/lib/utils';
-import { WalletCreationSheet } from '@/components/wallet-creation-sheet';
+    Message02Icon,
+    AiMagicIcon,
+    ArrowRight01Icon,
+    AddCircleHalfDotIcon
+} from '@hugeicons/core-free-icons';
 
 export default function Dashboard() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const [wallets, setWallets] = useState<Wallet[]>([]);
-  const [unmatched, setUnmatched] = useState<{ source: string, count: number }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+    const insets = useSafeAreaInsets();
 
-  // Automatic Detection
-  const [showDetectionSheet, setShowDetectionSheet] = useState(false);
-  const [newSource, setNewSource] = useState<string | null>(null);
+    const handleOpenMessages = async () => {
+        const url = Platform.OS === 'ios' ? 'mobilesms://' : 'sms:';
+        try {
+            await Linking.openURL(url);
+        } catch (error) {
+            console.error('Error opening messages:', error);
+        }
+    };
 
-  const fetchData = async () => {
-    try {
-      const { data: walletData } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('is_active', true);
-
-      setWallets(walletData || []);
-
-      const unmatchedSources = await getUnmatchedSources();
-      setUnmatched(unmatchedSources);
-
-      // If we found new sources and no wallets exist yet, show detection
-      if (unmatchedSources.length > 0 && walletData?.length === 0) {
-        setNewSource(unmatchedSources[0].source);
-        setShowDetectionSheet(true);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    fetchData();
-  }, []);
-
-  const totalBalance = wallets.reduce((acc, curr) => acc + curr.current_balance, 0);
-
-  // Empty State Component
-  if (!isLoading && wallets.length === 0 && unmatched.length === 0) {
     return (
-      <View className="flex-1 bg-white items-center justify-center px-8" style={{ paddingTop: insets.top }}>
-        <View className="w-24 h-24 rounded-full bg-[#F5F8FF] items-center justify-center mb-6">
-          <WalletIcon size={40} color="#0F4CFF" />
-        </View>
-        <Text className="text-3xl font-heading text-slate-900 mb-2">No Wallets Yet</Text>
-        <Text className="text-[17px] font-ui text-slate-500 text-center mb-10 leading-[24px]">
-          Get started by logging your first transaction or adding a wallet manually.
-        </Text>
+        <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
+            <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* Header */}
+                <View className="flex-row items-center mt-4 mb-24">
+                    <View className="w-12 h-12 rounded-full overflow-hidden mr-3">
+                        <Image
+                            source={require('../../assets/images/ama-avatar.png')}
+                            className="w-full h-full"
+                        />
+                    </View>
+                    <View>
+                        <Text className="text-[16px] font-manrope text-slate-500">Good morning</Text>
+                        <Text className="text-[24px] font-manrope-bold text-slate-900">Hi, Ama</Text>
+                    </View>
+                </View>
 
-        <View className="w-full gap-4">
-          <Pressable
-            onPress={() => router.push('/onboarding-quick-start')}
-            className="w-full bg-[#0F4CFF] h-[72px] rounded-[32px] flex-row items-center px-8 shadow-xl shadow-blue-500/20"
-          >
-            <View className="w-10 h-10 rounded-xl bg-white/20 items-center justify-center mr-4">
-              <Smartphone size={20} color="white" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-white font-heading text-[18px]">Share a transaction SMS</Text>
-              <Text className="text-white/70 font-ui text-[13px]">We'll create your wallet automatically</Text>
-            </View>
-          </Pressable>
+                {/* Empty State Illustration */}
+                <View className="items-center mb-14">
+                    <View style={{ opacity: 0.51 }}>
+                        <Image
+                            source={require('../../assets/images/no-wallets.png')}
+                            style={{ width: 220, height: 125 }}
+                            resizeMode="contain"
+                        />
+                    </View>
+                    <Text className="text-[24px] font-manrope-semibold text-[#1642E5] mt-[9px]">
+                        No wallets yet
+                    </Text>
+                    <Text className="text-[16px] font-manrope text-[#6887F6] text-center mt-2 px-10">
+                        Track your spending instantly.{"\n"}Get started by:
+                    </Text>
+                </View>
 
-          <Pressable
-            onPress={() => router.push('/onboarding')}
-            className="w-full bg-white border-[1.5px] border-[#DEE6FF] h-[72px] rounded-[32px] flex-row items-center px-8"
-          >
-            <View className="w-10 h-10 rounded-xl bg-slate-50 items-center justify-center mr-4">
-              <Plus size={20} color="#64748B" />
-            </View>
-            <Text className="text-slate-900 font-heading text-[18px]">Add Wallet Manually</Text>
-          </Pressable>
+                {/* Actions */}
+                <View className="gap-8">
+                    {/* Recommended: SMS Tracking */}
+                    <Pressable
+                        onPress={handleOpenMessages}
+                        className="bg-[#1642E5] rounded-[32px] p-6 relative overflow-hidden"
+                    >
+                        {/* Background pattern */}
+                        <View className="absolute -right-16 -top-12 opacity-[0.07]">
+                            <HugeiconsIcon icon={Message02Icon} size={202} color="white" fill="white" />
+                        </View>
+
+                        <View className="flex-row justify-between items-start mb-6">
+                            <View className="w-12 h-12 rounded-full bg-white items-center justify-center">
+                                <HugeiconsIcon icon={Message02Icon} size={24} color="#1642E5" />
+                            </View>
+                            <View className="bg-white/10 rounded-full px-3 py-2 flex-row items-center gap-1">
+                                <HugeiconsIcon icon={AiMagicIcon} size={14} color="white" />
+                                <Text className="text-white text-[12px] font-manrope-semibold">Recommended</Text>
+                            </View>
+                        </View>
+
+                        <View className="flex-row items-end justify-between">
+                            <View className="flex-1 mr-4">
+                                <Text className="text-white text-[20px] font-manrope-bold mb-1">
+                                    Share a transaction SMS
+                                </Text>
+                                <Text className="text-white/80 text-[16px] font-manrope">
+                                    Log SMS transaction to auto-create
+                                </Text>
+                            </View>
+                            <View className="pb-1">
+                                <HugeiconsIcon icon={ArrowRight01Icon} size={24} color="white" />
+                            </View>
+                        </View>
+                    </Pressable>
+
+                    {/* Manual Entry */}
+                    <Pressable
+                        className="border-2 border-dashed border-slate-200 rounded-[24px] p-6 flex-row items-center gap-4"
+                    >
+                        <View className="w-12 h-12 rounded-full bg-slate-50 items-center justify-center">
+                            <HugeiconsIcon icon={AddCircleHalfDotIcon} size={24} color="#64748B" />
+                        </View>
+                        <Text className="text-[18px] font-manrope-semibold text-slate-500">
+                            Add wallet manually
+                        </Text>
+                    </Pressable>
+                </View>
+            </ScrollView>
         </View>
-      </View>
     );
-  }
-
-  return (
-    <ScrollView
-      className="flex-1 bg-[#F8FAFF]"
-      style={{ paddingTop: insets.top }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-    >
-      <View className="px-6 py-8">
-        {/* Header */}
-        <View className="flex-row justify-between items-center mb-8">
-          <View>
-            <Text className="text-slate-400 font-ui text-[15px]">Total Balance</Text>
-            <Text className="text-4xl font-numbers text-slate-900">GHS {totalBalance.toFixed(2)}</Text>
-          </View>
-          <Pressable
-            className="w-12 h-12 rounded-full bg-white border border-[#DEE6FF] items-center justify-center"
-            onPress={() => router.push('/onboarding')}
-          >
-            <Plus size={24} color="#0F4CFF" />
-          </Pressable>
-        </View>
-
-        {/* Unmatched Alert */}
-        {unmatched.length > 0 && (
-          <Pressable
-            onPress={() => router.push('/settings/wallets')} // Assume this route exists or we'll create it
-            className="bg-amber-50 border-[1.5px] border-amber-200 rounded-[32px] p-6 mb-8 flex-row items-center gap-4"
-          >
-            <View className="w-12 h-12 rounded-2xl bg-amber-100 items-center justify-center">
-              <AlertTriangle size={24} color="#D97706" />
-            </View>
-            <View className="flex-1">
-              <Text className="text-amber-900 font-heading text-[17px]">
-                {unmatched.length} Unmatched Transactions
-              </Text>
-              <Text className="text-amber-700 font-ui text-[14px]">
-                {unmatched.map(u => mapSourceToName(u.source)).join(', ')}
-              </Text>
-            </View>
-            <ChevronRight size={20} color="#D97706" />
-          </Pressable>
-        )}
-
-        {/* Wallets Section */}
-        <View className="mb-8">
-          <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl font-heading text-slate-900">My Wallets</Text>
-            <Text className="text-[#0F4CFF] font-heading">See All</Text>
-          </View>
-
-          <View className="gap-4">
-            {wallets.map(wallet => (
-              <Pressable
-                key={wallet.id}
-                className="bg-white border-[1.5px] border-[#DEE6FF] rounded-[32px] p-5 flex-row items-center gap-4 shadow-sm"
-              >
-                <View className="w-14 h-14 rounded-2xl bg-[#F5F8FF] items-center justify-center">
-                  <Text className="text-2xl">{wallet.icon}</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="font-heading text-[18px] text-slate-900">{wallet.name}</Text>
-                  <Text className="font-ui text-[14px] text-slate-400 capitalize">{wallet.type}</Text>
-                </View>
-                <View className="items-end">
-                  <Text className="font-numbers text-[18px] text-slate-900">GHS {wallet.current_balance.toFixed(2)}</Text>
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        {/* Quick Action */}
-        <View className="bg-[#0F4CFF] rounded-[40px] p-8 flex-row items-center justify-between overflow-hidden">
-          <View className="z-10">
-            <Text className="text-white/80 font-ui text-[15px] mb-1">Insights</Text>
-            <Text className="text-white font-heading text-[22px] mb-4">View your spending{"\n"}patterns</Text>
-            <Pressable className="bg-white/20 self-start px-4 py-2 rounded-full backdrop-blur-md">
-              <Text className="text-white font-heading text-[14px]">Try Now</Text>
-            </Pressable>
-          </View>
-          <View className="absolute right-[-20] top-[-20] opacity-20">
-            <TrendingUp size={140} color="white" />
-          </View>
-        </View>
-      </View>
-
-      <WalletCreationSheet
-        visible={showDetectionSheet}
-        source={newSource}
-        onClose={() => setShowDetectionSheet(false)}
-        onCreated={fetchData}
-      />
-    </ScrollView>
-  );
 }

@@ -131,7 +131,7 @@ export default function OnboardingSplash() {
                             >
                                 <Pressable
                                     className="flex-row items-center gap-2"
-                                    onPress={() => router.push('/onboarding')}
+                                    onPress={() => router.push('/onboarding-choice')}
                                 >
                                     <Text className="text-white font-body text-[24px]">Get started</Text>
                                     <ArrowUpRight size={24} color="white" />

@@ -1,88 +1,82 @@
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Smartphone, Settings, ArrowRight, ChevronLeft } from 'lucide-react-native';
-import { cn } from '@/lib/utils';
+import { HugeiconsIcon } from '@hugeicons/react-native';
+import { Message02Icon, Setting07Icon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 
 export default function OnboardingChoice() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const [selectedMethod, setSelectedMethod] = React.useState<'quick' | 'full'>('quick');
 
     return (
         <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-            <View className="flex-row items-center px-6 mb-4">
-                <Pressable onPress={() => router.back()} className="p-2 -ml-2 rounded-full active:bg-slate-100">
-                    <ChevronLeft size={24} color="#0F4CFF" />
-                </Pressable>
-            </View>
-
             <ScrollView
                 className="flex-1"
-                contentContainerStyle={{ paddingHorizontal: 32, paddingBottom: 40 }}
+                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
                 showsVerticalScrollIndicator={false}
             >
+                {/* Illustration Section */}
+                <View className="items-center mt-6 mb-4">
+                    <Image
+                        source={require('../assets/images/onboarding-start.png')}
+                        style={{ width: '100%', height: 200 }}
+                        resizeMode="contain"
+                    />
+                </View>
+
                 {/* Header Section */}
-                <View className="mt-8 mb-12 items-center">
-                    <Text className="text-[38px] font-heading text-[#0F4CFF] text-center leading-[46px] tracking-tight">
-                        How do you want to start?
+                <View className="mb-10 items-center">
+                    <Text className="text-[32px] font-heading text-[#0F4CFF] text-center leading-[40px] tracking-tight">
+                        Where do you want to start?
                     </Text>
                 </View>
 
                 {/* Options */}
-                <View className="gap-6">
+                <View className="gap-5">
                     {/* Quick Start Option */}
                     <Pressable
-                        onPress={() => router.push('/onboarding-quick-start')}
-                        className="w-full rounded-[48px] border-[1.5px] border-[#0F4CFF] bg-[#F5F8FF] p-8 shadow-lg shadow-blue-500/10"
+                        onPress={() => {
+                            setSelectedMethod('quick');
+                            router.push('/onboarding-quick-start');
+                        }}
+                        className={`w-full rounded-[24px] border-[1.5px] p-6 ${selectedMethod === 'quick' ? 'border-[#0F4CFF] bg-white' : 'border-[#F1F5F9] bg-white'}`}
                     >
-                        <View className="flex-row justify-between items-start mb-4">
-                            <View className="w-14 h-14 rounded-2xl bg-white items-center justify-center shadow-sm">
-                                <Smartphone size={32} color="#0F4CFF" />
-                            </View>
-                            <View className="bg-[#0F4CFF] px-4 py-1.5 rounded-full">
-                                <Text className="text-white font-heading text-[12px] uppercase tracking-wider">Recommended</Text>
-                            </View>
+                        <View className={`w-12 h-12 rounded-full items-center justify-center mb-4 ${selectedMethod === 'quick' ? 'bg-[#EBF0FF]' : 'bg-[#F8FAFC]'}`}>
+                            <HugeiconsIcon icon={Message02Icon} size={24} color={selectedMethod === 'quick' ? '#0F4CFF' : '#64748B'} />
                         </View>
 
-                        <Text className="text-2xl font-heading text-[#0F4CFF] mb-2 text-left">Quick Start</Text>
-                        <Text className="text-[17px] font-ui text-slate-600 leading-[24px] mb-6 text-left">
-                            Share a transaction SMS to begin. We'll set up your wallet automatically
+                        <Text className={`text-xl font-heading mb-2 ${selectedMethod === 'quick' ? 'text-slate-900' : 'text-slate-600'}`}>Quick Start</Text>
+                        <Text className="text-[15px] font-body text-slate-400 leading-[22px] mb-6">
+                            Share a transaction SMS to begin tracking instantly. No manual entry required.
                         </Text>
 
                         <View className="flex-row items-center gap-2">
-                            <Text className="text-[#0F4CFF] font-heading text-[18px]">Try This</Text>
-                            <ArrowRight size={20} color="#0F4CFF" />
+                            <Text className="text-[#0F4CFF] font-heading text-[18px]">Try this</Text>
+                            <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#0F4CFF" />
                         </View>
                     </Pressable>
 
                     {/* Full Setup Option */}
                     <Pressable
-                        onPress={() => router.push('/onboarding')}
-                        className="w-full rounded-[48px] border-[1.5px] border-[#DEE6FF] bg-white p-8"
+                        onPress={() => setSelectedMethod('full')}
+                        className={`w-full rounded-[24px] border-[1.5px] p-6 ${selectedMethod === 'full' ? 'border-[#0F4CFF] bg-white' : 'border-[#F1F5F9] bg-white'}`}
                     >
-                        <View className="w-14 h-14 rounded-2xl bg-slate-50 items-center justify-center mb-4">
-                            <Settings size={32} color="#64748B" />
+                        <View className={`w-12 h-12 rounded-full items-center justify-center mb-4 ${selectedMethod === 'full' ? 'bg-[#EBF0FF]' : 'bg-[#F8FAFC]'}`}>
+                            <HugeiconsIcon icon={Setting07Icon} size={24} color={selectedMethod === 'full' ? '#0F4CFF' : '#64748B'} />
                         </View>
 
-                        <Text className="text-2xl font-heading text-slate-900 mb-2 text-left">Full Setup</Text>
-                        <Text className="text-[17px] font-ui text-slate-500 leading-[24px] mb-6 text-left">
-                            Add all your wallets with balances now
+                        <Text className={`text-xl font-heading mb-2 ${selectedMethod === 'full' ? 'text-slate-900' : 'text-slate-600'}`}>Full Setup</Text>
+                        <Text className="text-[15px] font-body text-slate-400 leading-[22px] mb-4">
+                            Connect your accounts and customize your experience from the ground up.
                         </Text>
-
-                        <View className="flex-row items-center gap-2">
-                            <Text className="text-slate-400 font-heading text-[18px]">Set Up Wallets</Text>
-                            <ArrowRight size={20} color="#94A3B8" />
-                        </View>
                     </Pressable>
                 </View>
 
                 {/* Footer Section */}
                 <View className="mt-12 items-center">
-                    <Text className="text-[16px] font-ui text-slate-400 mb-2">
-                        You can always add wallets later
-                    </Text>
-                    <Pressable onPress={() => router.replace('/(tabs)')}>
+                    <Pressable onPress={() => router.push('/(tabs)')}>
                         <Text className="text-[18px] font-heading text-[#0F4CFF]">Skip for now</Text>
                     </Pressable>
                 </View>
@@ -90,3 +84,5 @@ export default function OnboardingChoice() {
         </View>
     );
 }
+
+
