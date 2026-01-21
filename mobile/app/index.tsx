@@ -52,12 +52,12 @@ export default function OnboardingSplash() {
         if (currentScreen < SCREENS.length - 1) {
             setCurrentScreen(prev => prev + 1);
         } else {
-            router.push('/onboarding');
+            router.push('/onboarding-choice');
         }
     };
 
     const handleSkip = () => {
-        router.push('/onboarding');
+        router.push('/onboarding-choice');
     };
 
     return (
@@ -84,7 +84,7 @@ export default function OnboardingSplash() {
                 style={{ paddingTop: insets.top + 24, paddingRight: 24 }}
             >
                 <Pressable onPress={handleSkip}>
-                    <Text className="text-white/80 font-urbanist-light text-[20px]">Skip for now</Text>
+                    <Text className="text-white/80 font-body text-[20px]">Skip for now</Text>
                 </Pressable>
             </View>
 
@@ -99,7 +99,7 @@ export default function OnboardingSplash() {
                             key={`${currentScreen}-${idx}`}
                             entering={FadeIn.duration(400).delay(idx * 100)}
                             exiting={FadeOut.duration(200)}
-                            className="text-[64px] text-white font-urbanist-semibold tracking-tighter leading-[1.05]"
+                            className="text-[64px] text-white font-heading tracking-tighter leading-[1.05]"
                         >
                             {line}
                         </AnimatedText>
@@ -133,7 +133,7 @@ export default function OnboardingSplash() {
                                     className="flex-row items-center gap-2"
                                     onPress={() => router.push('/onboarding')}
                                 >
-                                    <Text className="text-white font-urbanist-light text-[24px]">Get started</Text>
+                                    <Text className="text-white font-body text-[24px]">Get started</Text>
                                     <ArrowUpRight size={24} color="white" />
                                 </Pressable>
                             </AnimatedView>

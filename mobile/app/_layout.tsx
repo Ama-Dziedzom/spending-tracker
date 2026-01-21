@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import { Urbanist_300Light, Urbanist_400Regular, Urbanist_500Medium, Urbanist_600SemiBold, Urbanist_700Bold, useFonts } from '@expo-google-fonts/urbanist';
+import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, useFonts } from '@expo-google-fonts/manrope';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
@@ -19,11 +19,10 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [loaded, error] = useFonts({
-    Urbanist: Urbanist_400Regular,
-    'Urbanist-Light': Urbanist_300Light,
-    'Urbanist-Medium': Urbanist_500Medium,
-    'Urbanist-SemiBold': Urbanist_600SemiBold,
-    'Urbanist-Bold': Urbanist_700Bold,
+    'Manrope-Regular': Manrope_400Regular,
+    'Manrope-Medium': Manrope_500Medium,
+    'Manrope-SemiBold': Manrope_600SemiBold,
+    'Manrope-Bold': Manrope_700Bold,
   });
 
   useEffect(() => {
@@ -40,8 +39,12 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding-choice" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding-quick-start" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding-income" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="settings/wallets" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />

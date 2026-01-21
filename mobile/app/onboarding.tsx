@@ -45,10 +45,10 @@ export default function OnboardingWallets() {
             >
                 {/* Header Section */}
                 <View className="mt-14 mb-10 items-center">
-                    <Text className="text-[38px] font-urbanist-bold text-[#0F4CFF] text-center leading-[46px] tracking-tight">
+                    <Text className="text-[38px] font-heading text-[#0F4CFF] text-center leading-[46px] tracking-tight">
                         Connect your Money
                     </Text>
-                    <Text className="mt-2 text-[19px] font-urbanist-medium text-[#799CFF] text-center px-4 leading-[28px]">
+                    <Text className="mt-2 text-[19px] font-ui text-[#799CFF] text-center px-4 leading-[28px]">
                         Select the wallets you use most often to start tracking your spending automatically
                     </Text>
                 </View>
@@ -76,7 +76,7 @@ export default function OnboardingWallets() {
                                         <Text className="text-3xl">{option.icon}</Text>
                                     </View>
                                     <Text className={cn(
-                                        "font-urbanist-bold text-[20px]",
+                                        "font-heading text-[20px]",
                                         isSelected ? "text-[#0F4CFF]" : "text-slate-900"
                                     )}>{option.name}</Text>
 
@@ -97,7 +97,7 @@ export default function OnboardingWallets() {
                         className="w-full h-[100px] rounded-[48px] border-[1.5px] border-dashed border-slate-200 items-center justify-center"
                         onPress={() => { }}
                     >
-                        <Text className="text-slate-400 font-urbanist-semibold text-[17px]">Add another account</Text>
+                        <Text className="text-slate-400 font-numbers text-[17px]">Add another account</Text>
                     </Pressable> */}
                 </View>
             </ScrollView>
@@ -108,14 +108,14 @@ export default function OnboardingWallets() {
                     className="w-full h-[50px] rounded-[32px] bg-[#1A51FF] items-center justify-center shadow-xl shadow-blue-500/20 active:scale-[0.98]"
                     onPress={() => router.push('/onboarding-income')}
                 >
-                    <Text className="text-white text-[20px] font-urbanist-bold leading-tight">Continue</Text>
+                    <Text className="text-white text-[20px] font-heading leading-tight">Continue</Text>
                 </Pressable>
 
                 <Pressable
                     className="w-full py-2 items-center"
                     onPress={() => router.push('/(tabs)')}
                 >
-                    <Text className="text-[18px] font-urbanist-bold text-[#0F4CFF]">Skip for now</Text>
+                    <Text className="text-[18px] font-heading text-[#0F4CFF]">Skip for now</Text>
                 </Pressable>
             </View>
         </View>

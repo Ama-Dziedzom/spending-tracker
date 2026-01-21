@@ -6,11 +6,15 @@ module.exports = {
     theme: {
         extend: {
             fontFamily: {
-                urbanist: ["Urbanist"],
-                "urbanist-light": ["Urbanist-Light"],
-                "urbanist-bold": ["Urbanist-Bold"],
-                "urbanist-medium": ["Urbanist-Medium"],
-                "urbanist-semibold": ["Urbanist-SemiBold"],
+                manrope: ["Manrope-Regular"],
+                "manrope-medium": ["Manrope-Medium"],
+                "manrope-semibold": ["Manrope-SemiBold"],
+                "manrope-bold": ["Manrope-Bold"],
+                heading: ["Manrope-Bold"],
+                body: ["Manrope-Regular"],
+                numbers: ["Manrope-SemiBold"],
+                ui: ["Manrope-Medium"],
+                caption: ["Manrope-Regular"],
             },
         },
     },

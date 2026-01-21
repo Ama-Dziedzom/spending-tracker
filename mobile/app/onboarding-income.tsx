@@ -31,23 +31,23 @@ export default function OnboardingIncome() {
                 <Pressable onPress={() => router.back()} className="p-2 -ml-2 rounded-full active:bg-slate-100">
                     <ChevronLeft size={24} color="#000" />
                 </Pressable>
-                <Text className="text-xl font-urbanist-bold text-[#0F4CFF]">Track Income</Text>
+                <Text className="text-xl font-heading text-[#0F4CFF]">Track Income</Text>
                 <View style={{ width: 40 }} />
             </View>
 
             <ScrollView className="flex-1 px-8">
-                <Text className="text-center text-[17px] text-[#6388FF] font-urbanist-medium mb-10 mt-[-8] self-center max-w-[300] leading-[24px]">
+                <Text className="text-center text-[17px] text-[#6388FF] font-ui mb-10 mt-[-8] self-center max-w-[300] leading-[24px]">
                     Enter your current balance or expected monthly income to start tracking.
                 </Text>
 
                 <View className="items-center mb-16">
                     <View className="flex-row items-baseline gap-4">
-                        <Text className="text-2xl font-urbanist-bold text-[#10B981]">GHS</Text>
+                        <Text className="text-2xl font-numbers text-[#10B981]">GHS</Text>
                         <TextInput
                             value={amount}
                             onChangeText={setAmount}
                             keyboardType="decimal-pad"
-                            className="text-7xl font-urbanist-bold tracking-tighter text-[#10B981] min-w-[200] text-center"
+                            className="text-7xl font-numbers tracking-tighter text-[#10B981] min-w-[200] text-center"
                             placeholderTextColor="#10B98140"
                         />
                     </View>
@@ -56,7 +56,7 @@ export default function OnboardingIncome() {
 
                 <View className="gap-8">
                     <View className="gap-4">
-                        <Text className="text-sm font-urbanist-bold text-slate-500 ml-1 tracking-wider uppercase">Source</Text>
+                        <Text className="text-sm font-heading text-slate-500 ml-1 tracking-wider uppercase">Source</Text>
                         <View className="flex-row gap-4">
                             {INCOME_SOURCES.map((item) => (
                                 <Pressable
@@ -70,7 +70,7 @@ export default function OnboardingIncome() {
                                     )}
                                 >
                                     <item.icon size={20} color={source === item.id ? "#0F4CFF" : "#94A3B8"} />
-                                    <Text className={cn("font-urbanist-bold text-[15px]", source === item.id ? "text-[#0F4CFF]" : "text-slate-500")}>
+                                    <Text className={cn("font-heading text-[15px]", source === item.id ? "text-[#0F4CFF]" : "text-slate-500")}>
                                         {item.label}
                                     </Text>
                                 </Pressable>
@@ -84,8 +84,8 @@ export default function OnboardingIncome() {
                                 <Calendar size={22} color="#0F4CFF" />
                             </View>
                             <View>
-                                <Text className="text-[17px] font-urbanist-bold text-slate-900">Recurring</Text>
-                                <Text className="text-xs font-urbanist-medium text-slate-400">Monthly tracking</Text>
+                                <Text className="text-[17px] font-heading text-slate-900">Recurring</Text>
+                                <Text className="text-xs font-ui text-slate-400">Monthly tracking</Text>
                             </View>
                         </View>
                         <Pressable
@@ -97,12 +97,12 @@ export default function OnboardingIncome() {
                     </View>
 
                     <View className="gap-3">
-                        <Text className="text-sm font-urbanist-bold text-slate-500 ml-1 tracking-wider uppercase">Note (Optional)</Text>
+                        <Text className="text-sm font-heading text-slate-500 ml-1 tracking-wider uppercase">Note (Optional)</Text>
                         <TextInput
                             placeholder="e.g. Monthly salary"
                             value={note}
                             onChangeText={setNote}
-                            className="h-[68px] rounded-3xl border-[1.5px] border-slate-100 px-6 font-urbanist-medium text-slate-900 text-[17px]"
+                            className="h-[68px] rounded-3xl border-[1.5px] border-slate-100 px-6 font-ui text-slate-900 text-[17px]"
                             placeholderTextColor="#CBD5E1"
                         />
                     </View>
@@ -114,7 +114,7 @@ export default function OnboardingIncome() {
                     className="w-full h-[64px] rounded-[32px] bg-[#1A51FF] items-center justify-center shadow-xl shadow-blue-500/20 active:scale-[0.98]"
                     onPress={handleFinish}
                 >
-                    <Text className="text-white text-[20px] font-urbanist-bold">Finish Setup</Text>
+                    <Text className="text-white text-[20px] font-heading">Finish Setup</Text>
                 </Pressable>
             </View>
         </View>
