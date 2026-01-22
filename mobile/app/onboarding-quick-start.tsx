@@ -30,7 +30,7 @@ export default function OnboardingQuickStart() {
     };
 
     const handleSkip = () => {
-        router.push('/onboarding-link-wallet');
+        router.push('/(tabs)');
     };
 
     const steps = [
