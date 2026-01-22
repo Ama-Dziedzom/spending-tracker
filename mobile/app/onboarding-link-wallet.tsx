@@ -7,15 +7,17 @@ import {
     Tick02Icon,
     Wallet01Icon,
     BankIcon,
-    Coins01Icon,
-    ArrowRight02Icon
+    Money01Icon,
+    ArrowRight02Icon,
+    Wallet03Icon
 } from '@hugeicons/core-free-icons';
+import { ConfigureWalletBottomSheet } from '../components/configure-wallet-bottom-sheet';
 
 const WALLETS = [
     {
         id: 'momo',
         name: 'Mobile Money Wallet',
-        icon: Wallet01Icon,
+        icon: Wallet03Icon,
     },
     {
         id: 'bank',
@@ -25,7 +27,7 @@ const WALLETS = [
     {
         id: 'cash',
         name: 'Cash Wallet',
-        icon: Coins01Icon,
+        icon: Money01Icon,
     }
 ];
 
@@ -33,13 +35,23 @@ export default function OnboardingLinkWallet() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [selectedWallets, setSelectedWallets] = useState<string[]>([]);
+    const [isMomoSheetVisible, setIsMomoSheetVisible] = useState(false);
 
     const toggleWallet = (id: string) => {
-        if (selectedWallets.includes(id)) {
+        const isSelected = selectedWallets.includes(id);
+
+        if (isSelected) {
             setSelectedWallets(selectedWallets.filter(w => w !== id));
         } else {
             setSelectedWallets([...selectedWallets, id]);
+            if (id === 'momo') {
+                setIsMomoSheetVisible(true);
+            }
         }
+    };
+
+    const handleMomoConfigure = (provider: string) => {
+        setIsMomoSheetVisible(false);
     };
 
     return (
@@ -51,10 +63,10 @@ export default function OnboardingLinkWallet() {
             >
                 {/* Header Section */}
                 <View className="mt-12 mb-4 items-center">
-                    <Text className="text-[24px] font-manrope-semibold text-[#1642E5] text-center">
+                    <Text className="text-[32px] font-manrope-semibold text-[#1642E5] text-center">
                         Connect your Money
                     </Text>
-                    <Text className="text-[14px] font-manrope text-[#6887F6] text-center mt-2 px-6">
+                    <Text className="text-[16px] font-manrope text-[#6887F6] text-center mt-2 px-6">
                         Select the wallets you use most often to start tracking your spending automatically
                     </Text>
                 </View>
@@ -84,12 +96,15 @@ export default function OnboardingLinkWallet() {
                                 </View>
 
                                 {/* Icon Container */}
-                                <View className="w-12 h-12 rounded-full bg-[#ECF0FF] items-center justify-center mr-4">
-                                    <HugeiconsIcon icon={wallet.icon} size={24} color="#1642E5" />
+                                <View
+                                    className="w-12 h-12 rounded-full bg-[#ECF0FF] items-center justify-center mr-4"
+                                    style={{ overflow: 'visible' }}
+                                >
+                                    <HugeiconsIcon icon={wallet.icon} size={22} color="#1642E5" />
                                 </View>
 
                                 {/* Label */}
-                                <Text className="text-[16px] font-manrope-medium text-[#64748B] flex-1">
+                                <Text className="text-[18px] font-manrope-medium text-[#64748B] flex-1">
                                     {wallet.name}
                                 </Text>
                             </Pressable>
@@ -102,9 +117,9 @@ export default function OnboardingLinkWallet() {
             {/* Footer Actions - Pinned to bottom */}
             <View
                 className="px-6 bg-white pt-4 items-center"
-                style={{ paddingBottom: Math.max(insets.bottom, 24) }}
+                style={{ paddingBottom: Math.max(insets.bottom, 24) + 20 }}
             >
-                <Pressable
+                {/* <Pressable
                     onPress={() => router.push('/(tabs)')}
                     className="bg-[#1642E5] w-full h-[56px] rounded-[20px] flex-row items-center justify-center gap-2 mb-6"
                     style={{
@@ -115,18 +130,24 @@ export default function OnboardingLinkWallet() {
                         elevation: 4
                     }}
                 >
-                    <Text className="text-white text-[18px] font-manrope-semibold">
+                    <Text className="text-white text-[20px] font-manrope-semibold">
                         Continue
                     </Text>
                     <HugeiconsIcon icon={ArrowRight02Icon} size={20} color="white" />
-                </Pressable>
+                </Pressable> */}
 
                 <Pressable onPress={() => router.push('/(tabs)')}>
-                    <Text className="text-[16px] font-manrope text-[#6887F6]">
+                    <Text className="text-[18px] font-manrope-semibold text-[#6887F6]">
                         Skip for now
                     </Text>
                 </Pressable>
             </View>
+
+            <ConfigureWalletBottomSheet
+                isVisible={isMomoSheetVisible}
+                onClose={() => setIsMomoSheetVisible(false)}
+                onConfigure={handleMomoConfigure}
+            />
         </View>
     );
 }

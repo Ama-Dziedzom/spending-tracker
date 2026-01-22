@@ -1,5 +1,5 @@
-import { View, Text, Image, Pressable, ScrollView, Linking, Platform } from 'react-native';
-import React from 'react';
+import { View, Text, Image, Pressable, ScrollView, Linking, Platform, RefreshControl } from 'react-native';
+import React, { useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -7,12 +7,29 @@ import {
     Message02Icon,
     AiMagicIcon,
     ArrowRight01Icon,
-    AddCircleHalfDotIcon
+    AddCircleHalfDotIcon,
 } from '@hugeicons/core-free-icons';
+
+// Get greeting based on time of day
+function getGreeting(): string {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+}
 
 export default function Dashboard() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = useCallback(() => {
+        setRefreshing(true);
+        // Simulate refresh - replace with actual API call later
+        setTimeout(() => {
+            setRefreshing(false);
+        }, 1500);
+    }, []);
 
     const handleOpenMessages = async () => {
         try {
@@ -29,7 +46,6 @@ export default function Dashboard() {
             }
         } catch (error) {
             console.error('Error opening messages:', error);
-            // Final fallback
             Linking.openURL('sms:').catch(() => { });
         }
     };
@@ -40,9 +56,17 @@ export default function Dashboard() {
                 className="flex-1"
                 contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor="#1642E5"
+                        colors={['#1642E5']}
+                    />
+                }
             >
                 {/* Header */}
-                <View className="flex-row items-center mt-4 mb-24">
+                <View className="flex-row items-center mt-4 mb-8">
                     <View className="w-12 h-12 rounded-full overflow-hidden mr-3">
                         <Image
                             source={require('../../assets/images/ama-avatar.png')}
@@ -50,13 +74,13 @@ export default function Dashboard() {
                         />
                     </View>
                     <View>
-                        <Text className="text-[16px] font-manrope text-slate-500">Good morning</Text>
+                        <Text className="text-[16px] font-manrope text-slate-500">{getGreeting()}</Text>
                         <Text className="text-[24px] font-manrope-bold text-slate-900">Hi, Ama</Text>
                     </View>
                 </View>
 
                 {/* Empty State Illustration */}
-                <View className="items-center mb-14">
+                <View className="items-center mb-14 mt-16">
                     <View style={{ opacity: 0.51 }}>
                         <Image
                             source={require('../../assets/images/no-wallets.png')}
