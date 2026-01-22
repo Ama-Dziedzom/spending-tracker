@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Spending Tracker
 
-## Getting Started
+A personal spending tracker mobile app built with **React Native** and **Expo**.
 
-First, run the development server:
+## 📱 Active Project
+
+The main codebase is in the `mobile/` directory.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd mobile
+npm install
+npx expo start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📂 Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+spending-tracker/
+├── mobile/           # 📱 Active React Native app (Expo)
+├── database.sql      # 🗄️ Supabase database schema
+└── archive/          # 🗄️ Archived Next.js PWA (for reference)
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🗄️ Database
 
-## Learn More
+The app uses Supabase for backend services. See `database.sql` for the schema.
 
-To learn more about Next.js, take a look at the following resources:
+## 📜 Archive
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The original Next.js PWA implementation has been archived in `archive/nextjs-pwa/`. 
+This was migrated to React Native for a native mobile experience.
