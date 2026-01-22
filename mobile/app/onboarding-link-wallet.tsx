@@ -44,14 +44,12 @@ export default function OnboardingLinkWallet() {
             setSelectedWallets(selectedWallets.filter(w => w !== id));
         } else {
             setSelectedWallets([...selectedWallets, id]);
-            if (id === 'momo') {
-                setIsMomoSheetVisible(true);
-            }
         }
     };
 
-    const handleMomoConfigure = (provider: string) => {
+    const handleMomoConfigure = (data: any) => {
         setIsMomoSheetVisible(false);
+        router.push('/(tabs)');
     };
 
     return (
@@ -119,9 +117,16 @@ export default function OnboardingLinkWallet() {
                 className="px-6 bg-white pt-4 items-center"
                 style={{ paddingBottom: Math.max(insets.bottom, 24) + 20 }}
             >
-                {/* <Pressable
-                    onPress={() => router.push('/(tabs)')}
-                    className="bg-[#1642E5] w-full h-[56px] rounded-[20px] flex-row items-center justify-center gap-2 mb-6"
+                <Pressable
+                    onPress={() => {
+                        if (selectedWallets.length > 0) {
+                            setIsMomoSheetVisible(true);
+                        } else {
+                            router.push('/(tabs)');
+                        }
+                    }}
+                    className={`bg-[#1642E5] w-full h-[56px] rounded-[20px] flex-row items-center justify-center gap-2 mb-6 ${selectedWallets.length === 0 ? 'opacity-50' : ''}`}
+                    disabled={selectedWallets.length === 0}
                     style={{
                         shadowColor: '#1642E5',
                         shadowOffset: { width: 0, height: 4 },
@@ -134,7 +139,7 @@ export default function OnboardingLinkWallet() {
                         Continue
                     </Text>
                     <HugeiconsIcon icon={ArrowRight02Icon} size={20} color="white" />
-                </Pressable> */}
+                </Pressable>
 
                 <Pressable onPress={() => router.push('/(tabs)')}>
                     <Text className="text-[18px] font-manrope-semibold text-[#6887F6]">
@@ -145,6 +150,7 @@ export default function OnboardingLinkWallet() {
 
             <ConfigureWalletBottomSheet
                 isVisible={isMomoSheetVisible}
+                selectedWallets={selectedWallets}
                 onClose={() => setIsMomoSheetVisible(false)}
                 onConfigure={handleMomoConfigure}
             />
