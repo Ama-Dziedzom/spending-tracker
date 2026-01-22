@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Environment files (keep .env.example)
+.env*.local
+
+# Misc
+.DS_Store
+*.pem
+npm-debug.log*
+
+# Turbopack
+.turbo
