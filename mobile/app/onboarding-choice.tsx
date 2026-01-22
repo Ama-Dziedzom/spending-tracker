@@ -60,7 +60,10 @@ export default function OnboardingChoice() {
 
                     {/* Full Setup Option */}
                     <Pressable
-                        onPress={() => setSelectedMethod('full')}
+                        onPress={() => {
+                            setSelectedMethod('full');
+                            router.push('/onboarding-link-wallet');
+                        }}
                         className={`w-full rounded-[24px] border-[1.5px] p-6 ${selectedMethod === 'full' ? 'border-[#0F4CFF] bg-white' : 'border-[#F1F5F9] bg-white'}`}
                     >
                         <View className={`w-12 h-12 rounded-full items-center justify-center mb-4 ${selectedMethod === 'full' ? 'bg-[#EBF0FF]' : 'bg-[#F8FAFC]'}`}>

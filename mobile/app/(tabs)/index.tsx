@@ -1,5 +1,6 @@
 import { View, Text, Image, Pressable, ScrollView, Linking, Platform } from 'react-native';
 import React from 'react';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -10,14 +11,26 @@ import {
 } from '@hugeicons/core-free-icons';
 
 export default function Dashboard() {
+    const router = useRouter();
     const insets = useSafeAreaInsets();
 
     const handleOpenMessages = async () => {
-        const url = Platform.OS === 'ios' ? 'mobilesms://' : 'sms:';
         try {
-            await Linking.openURL(url);
+            if (Platform.OS === 'ios') {
+                const messagesUrl = 'messages://';
+                const canOpen = await Linking.canOpenURL(messagesUrl);
+                if (canOpen) {
+                    await Linking.openURL(messagesUrl);
+                } else {
+                    await Linking.openURL('sms:');
+                }
+            } else {
+                await Linking.openURL('sms:');
+            }
         } catch (error) {
             console.error('Error opening messages:', error);
+            // Final fallback
+            Linking.openURL('sms:').catch(() => { });
         }
     };
 
@@ -98,6 +111,7 @@ export default function Dashboard() {
 
                     {/* Manual Entry */}
                     <Pressable
+                        onPress={() => router.push('/onboarding-link-wallet')}
                         className="border-2 border-dashed border-slate-200 rounded-[24px] p-6 flex-row items-center gap-4"
                     >
                         <View className="w-12 h-12 rounded-full bg-slate-50 items-center justify-center">

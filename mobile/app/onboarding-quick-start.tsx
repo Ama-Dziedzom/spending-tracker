@@ -10,11 +10,22 @@ export default function OnboardingQuickStart() {
     const insets = useSafeAreaInsets();
 
     const handleOpenMessages = async () => {
-        const url = Platform.OS === 'ios' ? 'mobilesms://' : 'sms:';
         try {
-            await Linking.openURL(url);
+            if (Platform.OS === 'ios') {
+                const messagesUrl = 'messages://';
+                const canOpen = await Linking.canOpenURL(messagesUrl);
+                if (canOpen) {
+                    await Linking.openURL(messagesUrl);
+                } else {
+                    await Linking.openURL('sms:');
+                }
+            } else {
+                await Linking.openURL('sms:');
+            }
         } catch (error) {
             console.error('Error opening messages:', error);
+            // Final fallback
+            Linking.openURL('sms:').catch(() => { });
         }
     };
 
