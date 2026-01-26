@@ -188,9 +188,11 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                         onBlur={() => setMomoBalance(formatAmount(momoBalance))}
                         selection={momoSelection}
                         keyboardType="decimal-pad"
-                        className={`text-[80px] font-manrope-semibold ${hasMomoBalance ? 'text-[#1642E5]' : 'text-[#DAE2FF]'}`}
+                        style={{ fontSize: Math.min(80, Math.max(30, 80 * (8 / Math.max(8, momoBalance.length)))) }}
+                        className={`font-manrope-semibold flex-1 ${hasMomoBalance ? 'text-[#1642E5]' : 'text-[#DAE2FF]'}`}
                         placeholder="0.00"
                         placeholderTextColor="#DAE2FF"
+                        numberOfLines={1}
                     />
                 </View>
             </View>
@@ -276,9 +278,11 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                         onBlur={() => setBankBalance(formatAmount(bankBalance))}
                         selection={bankSelection}
                         keyboardType="decimal-pad"
-                        className={`text-[80px] font-manrope-semibold ${hasBankBalance ? 'text-[#1642E5]' : 'text-[#DAE2FF]'}`}
+                        style={{ fontSize: Math.min(80, Math.max(30, 80 * (8 / Math.max(8, bankBalance.length)))) }}
+                        className={`font-manrope-semibold flex-1 ${hasBankBalance ? 'text-[#1642E5]' : 'text-[#DAE2FF]'}`}
                         placeholder="0.00"
                         placeholderTextColor="#DAE2FF"
+                        numberOfLines={1}
                     />
                 </View>
             </View>
@@ -364,9 +368,11 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                         onBlur={() => setCashBalance(formatAmount(cashBalance))}
                         selection={cashSelection}
                         keyboardType="decimal-pad"
-                        className={`text-[80px] font-manrope-semibold ${hasCashBalance ? 'text-[#1642E5]' : 'text-[#DAE2FF]'}`}
+                        style={{ fontSize: Math.min(80, Math.max(30, 80 * (8 / Math.max(8, cashBalance.length)))) }}
+                        className={`font-manrope-semibold flex-1 ${hasCashBalance ? 'text-[#1642E5]' : 'text-[#DAE2FF]'}`}
                         placeholder="0.00"
                         placeholderTextColor="#DAE2FF"
+                        numberOfLines={1}
                     />
                 </View>
             </View>
@@ -408,22 +414,29 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                     resizeMode="contain"
                 />
             </View>
-            <Text className="text-[24px] font-manrope-semibold text-[#1642E5] mb-2">All Set!</Text>
-            <Text className="text-[14px] font-manrope-medium text-[#7C7D80] text-center px-10 mb-8">
+            <Text className="text-[32px] font-manrope-bold text-[#1642E5] mb-2">All Set!</Text>
+            <Text className="text-[20px] font-manrope-medium text-[#7C7D80] text-center px-10 mb-8">
                 Your accounts are linked securely and ready for action.
             </Text>
 
             <View className="items-center mb-8">
-                <Text className="text-[12px] font-manrope-bold text-[#ADAEAF] uppercase">TOTAL BALANCE</Text>
-                <Text className="text-[64px] font-manrope-semibold text-[#1340DF]">{totalBalance.toFixed(2)}</Text>
+                <Text className="text-[14px] font-manrope-bold text-[#ADAEAF] uppercase">TOTAL BALANCE</Text>
+                <Text
+                    style={{ width: '100%', textAlign: 'center' }}
+                    className="text-[72px] font-manrope-bold text-[#1340DF]"
+                    adjustsFontSizeToFit
+                    numberOfLines={1}
+                >
+                    {totalBalance.toFixed(2)}
+                </Text>
             </View>
 
             <View className="w-full bg-white border-[1.5px] border-[#F1F1F1] rounded-[20px] p-5 mb-8">
                 {/* Momo Wallet */}
                 {selectedWallets.includes('momo') && (
-                    <View className="flex-row items-center justify-between mb-6">
-                        <View className="flex-row items-center gap-4">
-                            <View className="w-10 h-10 rounded-full bg-[#F1F4FF] items-center justify-center">
+                    <View className="flex-row items-center justify-between mb-6 gap-2">
+                        <View className="flex-row items-center gap-4 flex-1">
+                            <View className="w-10 h-10 rounded-full bg-[#F1F4FF] items-center justify-center shrink-0">
                                 {momoProvider && (
                                     <Image
                                         source={PROVIDERS.find(p => p.id === momoProvider)?.image}
@@ -432,35 +445,71 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                                     />
                                 )}
                             </View>
-                            <Text className="text-[14px] font-manrope-medium text-[#7C7D80]">Mobile Money Wallet</Text>
+                            <Text
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                                className="text-[18px] font-manrope-medium text-[#7C7D80] flex-1"
+                            >
+                                {PROVIDERS.find(p => p.id === momoProvider)?.name ? `${PROVIDERS.find(p => p.id === momoProvider)?.name} Wallet` : 'Mobile Money Wallet'}
+                            </Text>
                         </View>
-                        <Text className="text-[14px] font-manrope-semibold text-[#7C7D80]">GHS {formatAmount(momoBalance)}</Text>
+                        <Text
+                            className="text-[20px] font-manrope-bold text-[#7C7D80] shrink-0"
+                            adjustsFontSizeToFit
+                            numberOfLines={1}
+                        >
+                            GHS {formatAmount(momoBalance)}
+                        </Text>
                     </View>
                 )}
 
                 {/* Bank Wallet */}
                 {selectedWallets.includes('bank') && (
-                    <View className="flex-row items-center justify-between mb-6">
-                        <View className="flex-row items-center gap-4">
-                            <View className="w-10 h-10 rounded-full bg-[#F1F4FF] items-center justify-center">
+                    <View className="flex-row items-center justify-between mb-6 gap-2">
+                        <View className="flex-row items-center gap-4 flex-1">
+                            <View className="w-10 h-10 rounded-full bg-[#F1F4FF] items-center justify-center shrink-0">
                                 <HugeiconsIcon icon={BankIcon} size={20} color="#1642E5" />
                             </View>
-                            <Text className="text-[14px] font-manrope-medium text-[#7C7D80]">Bank Wallet</Text>
+                            <Text
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                                className="text-[18px] font-manrope-medium text-[#7C7D80] flex-1"
+                            >
+                                {bankName || 'Bank Wallet'}
+                            </Text>
                         </View>
-                        <Text className="text-[14px] font-manrope-semibold text-[#7C7D80]">GHS {formatAmount(bankBalance)}</Text>
+                        <Text
+                            className="text-[20px] font-manrope-bold text-[#7C7D80] shrink-0"
+                            adjustsFontSizeToFit
+                            numberOfLines={1}
+                        >
+                            GHS {formatAmount(bankBalance)}
+                        </Text>
                     </View>
                 )}
 
                 {/* Cash Wallet */}
                 {selectedWallets.includes('cash') && (
-                    <View className="flex-row items-center justify-between">
-                        <View className="flex-row items-center gap-4">
-                            <View className="w-10 h-10 rounded-full bg-[#F1F4FF] items-center justify-center">
+                    <View className="flex-row items-center justify-between gap-2">
+                        <View className="flex-row items-center gap-4 flex-1">
+                            <View className="w-10 h-10 rounded-full bg-[#F1F4FF] items-center justify-center shrink-0">
                                 <HugeiconsIcon icon={Wallet01Icon} size={20} color="#1642E5" />
                             </View>
-                            <Text className="text-[14px] font-manrope-medium text-[#7C7D80]">Cash Wallet</Text>
+                            <Text
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                                className="text-[18px] font-manrope-medium text-[#7C7D80] flex-1"
+                            >
+                                {cashName || 'Cash Wallet'}
+                            </Text>
                         </View>
-                        <Text className="text-[14px] font-manrope-semibold text-[#7C7D80]">GHS {formatAmount(cashBalance)}</Text>
+                        <Text
+                            className="text-[20px] font-manrope-bold text-[#7C7D80] shrink-0"
+                            adjustsFontSizeToFit
+                            numberOfLines={1}
+                        >
+                            GHS {formatAmount(cashBalance)}
+                        </Text>
                     </View>
                 )}
             </View>
@@ -474,15 +523,15 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                 className="w-full h-[60px] bg-[#1642E5] rounded-full flex-row items-center justify-center gap-2 mb-4"
             >
                 <Text className="text-[20px] font-manrope-semibold text-white">Go to dashboard</Text>
-                <HugeiconsIcon icon={ArrowRight02Icon} size={20} color="white" />
+                <HugeiconsIcon icon={ArrowRight02Icon} size={24} color="white" />
             </Pressable>
 
             <Pressable
                 onPress={() => setCurrentStep(stepSequence[0])}
                 className="flex-row items-center gap-2"
             >
-                <HugeiconsIcon icon={Edit01Icon} size={20} color="#1642E5" />
-                <Text className="text-[14px] font-manrope-semibold text-[#1642E5]">Edit wallets</Text>
+                <HugeiconsIcon icon={Edit01Icon} size={24} color="#1642E5" />
+                <Text className="text-[20px] font-manrope-semibold text-[#1642E5]">Edit wallets</Text>
             </Pressable>
         </View>
     );
