@@ -19,12 +19,27 @@ export interface Transaction {
     id: string;
     description: string;
     amount: number;
-    type: 'expense' | 'income';
+    type: 'expense' | 'income' | 'credit' | 'debit';
     category?: string;
     wallet_id?: string;
+    transfer_id?: string;
+    transfer_side?: 'from' | 'to' | 'fee';
+    balance_snapshot?: number;
     created_at: string;
     updated_at?: string;
     is_transfer?: boolean;
+}
+
+export interface Transfer {
+    id: string;
+    user_id: string;
+    from_wallet_id: string;
+    to_wallet_id: string;
+    amount: number;
+    status: 'pending' | 'completed' | 'cancelled';
+    notes?: string;
+    created_at: string;
+    completed_at?: string;
 }
 
 export interface Wallet {

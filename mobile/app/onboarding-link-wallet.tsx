@@ -12,6 +12,8 @@ import {
     Wallet03Icon
 } from '@hugeicons/core-free-icons';
 import { ConfigureWalletBottomSheet } from '../components/configure-wallet-bottom-sheet';
+import { createWallets, CreateWalletInput } from '../lib/wallet-service';
+import { Alert, ActivityIndicator } from 'react-native';
 
 const WALLETS = [
     {
@@ -36,6 +38,7 @@ export default function OnboardingLinkWallet() {
     const insets = useSafeAreaInsets();
     const [selectedWallets, setSelectedWallets] = useState<string[]>([]);
     const [isMomoSheetVisible, setIsMomoSheetVisible] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const toggleWallet = (id: string) => {
         const isSelected = selectedWallets.includes(id);
@@ -47,9 +50,54 @@ export default function OnboardingLinkWallet() {
         }
     };
 
-    const handleMomoConfigure = (data: any) => {
-        setIsMomoSheetVisible(false);
-        router.push('/(tabs)');
+    const handleMomoConfigure = async (data: any) => {
+        setIsSaving(true);
+        try {
+            const walletsToCreate: CreateWalletInput[] = [];
+
+            if (data.momo) {
+                walletsToCreate.push({
+                    name: 'Mobile Money',
+                    type: 'momo',
+                    icon: 'wallet-03', // We'll map these icons in the UI
+                    color: '#1642E5',
+                    initial_balance: parseFloat(data.momo.balance) || 0,
+                    source_identifier: data.momo.provider,
+                });
+            }
+
+            if (data.bank) {
+                walletsToCreate.push({
+                    name: data.bank.name || 'Bank Wallet',
+                    type: 'bank',
+                    icon: 'bank',
+                    color: '#1642E5',
+                    initial_balance: parseFloat(data.bank.balance) || 0,
+                });
+            }
+
+            if (data.cash) {
+                walletsToCreate.push({
+                    name: data.cash.name || 'Cash Wallet',
+                    type: 'cash',
+                    icon: 'money-01',
+                    color: '#1642E5',
+                    initial_balance: parseFloat(data.cash.balance) || 0,
+                });
+            }
+
+            if (walletsToCreate.length > 0) {
+                await createWallets(walletsToCreate);
+            }
+
+            setIsMomoSheetVisible(false);
+            router.push('/(tabs)');
+        } catch (error) {
+            console.error('Error saving wallets:', error);
+            Alert.alert('Error', 'Failed to save your wallets. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -153,6 +201,7 @@ export default function OnboardingLinkWallet() {
                 selectedWallets={selectedWallets}
                 onClose={() => setIsMomoSheetVisible(false)}
                 onConfigure={handleMomoConfigure}
+                isLoading={isSaving}
             />
         </View>
     );

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, Image, StyleSheet, Switch, ScrollView } from 'react-native';
+import { View, Text, Pressable, Image, StyleSheet, Switch, ScrollView, ActivityIndicator } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -9,12 +9,15 @@ import {
     Wallet01Icon,
     Edit01Icon
 } from '@hugeicons/core-free-icons';
+import { createWallets, CreateWalletInput } from '../lib/wallet-service';
 
 interface Props {
     isVisible: boolean;
     selectedWallets: string[];
     onClose: () => void;
     onConfigure: (data: any) => void;
+    isLoading?: boolean;
+    initialBalanceFromTransaction?: string;
 }
 
 const PROVIDERS = [
@@ -37,7 +40,7 @@ const PROVIDERS = [
 
 type Step = 'momo' | 'bank' | 'cash' | 'preview';
 
-export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose, onConfigure }: Props) {
+export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose, onConfigure, isLoading, initialBalanceFromTransaction }: Props) {
     const bottomSheetRef = useRef<BottomSheet>(null);
     const [currentStep, setCurrentStep] = useState<Step>('momo');
     const snapPoints = useMemo(() => ['70%', '98%'], []);
@@ -100,11 +103,26 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
     React.useEffect(() => {
         if (isVisible) {
             bottomSheetRef.current?.snapToIndex(0);
-            setCurrentStep(stepSequence[0]);
+            const firstStep = stepSequence[0];
+            setCurrentStep(firstStep);
+
+            // Pre-fill initial balance if provided
+            if (initialBalanceFromTransaction) {
+                const formatted = parseFloat(initialBalanceFromTransaction).toFixed(2);
+                if (firstStep === 'momo') setMomoBalance(formatted);
+                else if (firstStep === 'bank') setBankBalance(formatted);
+                else if (firstStep === 'cash') setCashBalance(formatted);
+            }
         } else {
             bottomSheetRef.current?.close();
+            // Reset states when closing
+            if (!initialBalanceFromTransaction) {
+                setMomoBalance('0.00');
+                setBankBalance('0.00');
+                setCashBalance('0.00');
+            }
         }
-    }, [isVisible, stepSequence]);
+    }, [isVisible, stepSequence, initialBalanceFromTransaction]);
 
     const formatAmount = (val: string) => {
         const num = parseFloat(val);
@@ -520,10 +538,17 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                     bank: selectedWallets.includes('bank') ? { name: bankName, balance: bankBalance, isIncome: bankIsIncome } : null,
                     cash: selectedWallets.includes('cash') ? { name: cashName, balance: cashBalance, isIncome: cashIsIncome } : null
                 })}
-                className="w-full h-[60px] bg-[#1642E5] rounded-full flex-row items-center justify-center gap-2 mb-4"
+                disabled={isLoading}
+                className={`w-full h-[60px] rounded-full flex-row items-center justify-center gap-2 mb-4 ${isLoading ? 'bg-[#7C7D80]' : 'bg-[#1642E5]'}`}
             >
-                <Text className="text-[20px] font-manrope-semibold text-white">Go to dashboard</Text>
-                <HugeiconsIcon icon={ArrowRight02Icon} size={24} color="white" />
+                {isLoading ? (
+                    <ActivityIndicator color="white" />
+                ) : (
+                    <>
+                        <Text className="text-[20px] font-manrope-semibold text-white">Go to dashboard</Text>
+                        <HugeiconsIcon icon={ArrowRight02Icon} size={24} color="white" />
+                    </>
+                )}
             </Pressable>
 
             <Pressable
