@@ -25,9 +25,11 @@ export interface Transaction {
     transfer_id?: string;
     transfer_side?: 'from' | 'to' | 'fee';
     balance_snapshot?: number;
+    transaction_date: string;
     created_at: string;
     updated_at?: string;
     is_transfer?: boolean;
+    source?: 'sms' | 'manual' | 'transfer';
 }
 
 export interface Transfer {

@@ -15,12 +15,13 @@ import {
     Notification01Icon,
 } from '@hugeicons/core-free-icons';
 import { getWallets, getTotalBalance } from '../../lib/wallet-service';
-import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime } from '../../lib/transaction-service';
+import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName } from '../../lib/transaction-service';
 import { Wallet, supabase, Transaction } from '../../lib/supabase';
 import { ActivityIndicator, Alert } from 'react-native';
 import { LinkTransactionsBottomSheet } from '../../components/link-transactions-bottom-sheet';
 import { SelectWalletTypeBottomSheet } from '../../components/select-wallet-type-bottom-sheet';
 import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bottom-sheet';
+import { TransactionDetailBottomSheet } from '../../components/transaction-detail-bottom-sheet';
 import { createWallets, CreateWalletInput } from '../../lib/wallet-service';
 import { assignTransactionToWallet } from '../../lib/transaction-service';
 
@@ -49,6 +50,11 @@ export default function Dashboard() {
     const [selectedWalletTypes, setSelectedWalletTypes] = useState<string[]>([]);
     const [isSavingWallet, setIsSavingWallet] = useState(false);
     const [activeTransaction, setActiveTransaction] = useState<Transaction | null>(null);
+    const [transferState, setTransferState] = useState<{ isTransfer: boolean, sourceId: string | null } | null>(null);
+
+    // Transaction Detail State
+    const [selectedTransactionForDetail, setSelectedTransactionForDetail] = useState<TransactionWithWallet | null>(null);
+    const [isTransactionDetailVisible, setIsTransactionDetailVisible] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -106,8 +112,9 @@ export default function Dashboard() {
         }
     };
 
-    const handleCreateWalletFromLink = (tx: Transaction) => {
+    const handleCreateWalletFromLink = (tx: Transaction, isTransfer?: boolean, sourceId?: string | null) => {
         setActiveTransaction(tx);
+        setTransferState(isTransfer ? { isTransfer, sourceId: sourceId || null } : null);
         setIsLinkSheetVisible(false);
         // Delay to allow link sheet to close
         setTimeout(() => {
@@ -211,13 +218,33 @@ export default function Dashboard() {
                     else if (!isMomo && bankWallet) targetWallet = bankWallet;
                 }
 
-                await assignTransactionToWallet(activeTransaction.id, targetWallet.id);
+                if (transferState?.isTransfer) {
+                    // Logic: If source was already selected, this new wallet is the DESTINATION.
+                    // If source was NOT selected, this new wallet is the SOURCE.
+                    // However, usually they create a wallet because it's the one that RECEIVED or SENT the money.
+
+                    if (transferState.sourceId) {
+                        // We have a source, so this is to the NEW wallet
+                        await processTransfer(
+                            activeTransaction.id,
+                            transferState.sourceId,
+                            targetWallet.id,
+                            Number(activeTransaction.amount),
+                            activeTransaction.description
+                        );
+                    } else {
+                        // This new wallet is the source, but we don't have a destination yet.
+                        // In this case, maybe we should just assign it?
+                        // Or better: for now, assume single assignment if flow is interrupted.
+                        // But let's try to be smart: if it's a transfer, we usually need the other side.
+                        await assignTransactionToWallet(activeTransaction.id, targetWallet.id);
+                    }
+                } else {
+                    await assignTransactionToWallet(activeTransaction.id, targetWallet.id);
+                }
             }
 
-            // First close the sheet
-            setIsConfigureSheetVisible(false);
-
-            // Then handle success message and cleanup
+            // First handle success message and cleanup
             if (activeTransaction && createdWallets.length > 0) {
                 // Small delay to allow sheet closing animation to start
                 setTimeout(() => {
@@ -226,6 +253,7 @@ export default function Dashboard() {
             }
 
             setActiveTransaction(null);
+            setTransferState(null);
 
             // Wait for sheet to be mostly closed before refreshing data to avoid layout jumps/stuck backdrop
             setTimeout(() => {
@@ -297,14 +325,14 @@ export default function Dashboard() {
                     </View>
                 ) : wallets.length === 0 ? (
                     <View className="items-center mb-14 mt-16">
-                        <View style={{ opacity: 0.51 }}>
+                        <View style={{ opacity: 1 }}>
                             <Image
                                 source={require('../../assets/images/no-wallets.png')}
-                                style={{ width: 220, height: 125 }}
+                                style={{ width: 220, height: 125, marginBottom: 24 }}
                                 resizeMode="contain"
                             />
                         </View>
-                        <Text className="text-[24px] font-manrope-semibold text-[#1642E5] mt-[9px]">
+                        <Text className="text-[24px] font-manrope-semibold text-[#1642E5] mt-2">
                             No wallets yet
                         </Text>
                         <Text className="text-[16px] font-manrope text-[#6887F6] text-center mt-2 px-10">
@@ -375,37 +403,55 @@ export default function Dashboard() {
                     <View className="mb-10">
                         <View className="flex-row justify-between items-center mb-6">
                             <Text className="text-[20px] font-manrope-bold text-slate-900">Recent Transactions</Text>
-                            <Pressable onPress={() => { /* Navigate to transactions */ }}>
+                            <Pressable onPress={() => router.push('/transactions')}>
                                 <Text className="text-[#1642E5] font-manrope-semibold">See all</Text>
                             </Pressable>
                         </View>
                         <View className="gap-4">
                             {transactions.map((tx) => (
-                                <View
+                                <Pressable
                                     key={tx.id}
+                                    onPress={() => {
+                                        setSelectedTransactionForDetail(tx);
+                                        setIsTransactionDetailVisible(true);
+                                    }}
                                     className="flex-row items-center justify-between p-4 bg-white border-[1px] border-slate-100 rounded-[20px]"
+                                    style={{
+                                        shadowColor: '#000',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.02,
+                                        shadowRadius: 4,
+                                        elevation: 1,
+                                    }}
                                 >
-                                    <View className="flex-row items-center gap-3">
-                                        <View className="w-10 h-10 rounded-full bg-slate-50 items-center justify-center">
+                                    <View className="flex-row items-center gap-3 flex-1 mr-3">
+                                        <View
+                                            className="w-10 h-10 rounded-full items-center justify-center"
+                                            style={{
+                                                backgroundColor: getCategoryByIdOrName(tx.category)?.color
+                                                    ? `${getCategoryByIdOrName(tx.category)?.color}15`
+                                                    : 'rgba(244, 63, 94, 0.05)'
+                                            }}
+                                        >
                                             <HugeiconsIcon
-                                                icon={tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon}
+                                                icon={getCategoryByIdOrName(tx.category)?.icon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
                                                 size={20}
-                                                color={(tx.type === 'income' || tx.type === 'credit') ? '#10B981' : '#F43F5E'}
+                                                color={(tx.type === 'income' || tx.type === 'credit') ? '#10B981' : (getCategoryByIdOrName(tx.category)?.color || '#F43F5E')}
                                             />
                                         </View>
-                                        <View>
+                                        <View className="flex-1">
                                             <Text className="text-[14px] font-manrope-bold text-slate-900" numberOfLines={1}>
                                                 {tx.description}
                                             </Text>
                                             <Text className="text-[12px] font-manrope text-slate-500">
-                                                {formatTransactionDate(tx.created_at)} • {tx.wallet?.name || 'Manual'}
+                                                {formatTransactionDate(tx.created_at)} • {tx.wallet?.name || 'Manual'}{getCategoryByIdOrName(tx.category) ? ` • ${getCategoryByIdOrName(tx.category)?.name}` : ''}
                                             </Text>
                                         </View>
                                     </View>
                                     <Text className={`text-[16px] font-manrope-bold ${(tx.type === 'income' || tx.type === 'credit') ? 'text-emerald-500' : 'text-slate-900'}`}>
                                         {(tx.type === 'income' || tx.type === 'credit') ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '')}
                                     </Text>
-                                </View>
+                                </Pressable>
                             ))}
                         </View>
                     </View>
@@ -485,8 +531,23 @@ export default function Dashboard() {
                 selectedWallets={selectedWalletTypes}
                 onClose={() => setIsConfigureSheetVisible(false)}
                 onConfigure={handleConfigureWallet}
+                onFinish={() => {
+                    setIsConfigureSheetVisible(false);
+                    // Small delay before refresh
+                    setTimeout(() => fetchData(), 500);
+                }}
                 isLoading={isSavingWallet}
                 initialBalanceFromTransaction={activeTransaction?.amount?.toString()}
+            />
+
+            <TransactionDetailBottomSheet
+                isVisible={isTransactionDetailVisible}
+                transaction={selectedTransactionForDetail}
+                onClose={() => {
+                    setIsTransactionDetailVisible(false);
+                    setSelectedTransactionForDetail(null);
+                }}
+                onCategoryUpdated={fetchData}
             />
         </View>
     );

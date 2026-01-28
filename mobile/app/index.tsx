@@ -11,6 +11,7 @@ import Animated, {
     withSpring
 } from 'react-native-reanimated';
 import { ArrowUpRight } from 'lucide-react-native';
+import { supabase } from '../lib/supabase';
 
 const AnimatedText = Animated.Text as any;
 const AnimatedView = Animated.View as any;
@@ -33,8 +34,29 @@ export default function OnboardingSplash() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [currentScreen, setCurrentScreen] = useState(0);
+    const [checkingAuth, setCheckingAuth] = useState(true);
 
     React.useEffect(() => {
+        checkUser();
+    }, []);
+
+    const checkUser = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                router.replace('/(tabs)');
+                return;
+            }
+        } catch (e) {
+            console.error('Auth check error', e);
+        } finally {
+            setCheckingAuth(false);
+        }
+    };
+
+    React.useEffect(() => {
+        if (checkingAuth) return;
+
         const timer = setInterval(() => {
             setCurrentScreen((prev) => {
                 if (prev < SCREENS.length - 1) {
@@ -46,7 +68,11 @@ export default function OnboardingSplash() {
         }, 2500); // 2.5 seconds per screen
 
         return () => clearInterval(timer);
-    }, []);
+    }, [checkingAuth]);
+
+    if (checkingAuth) {
+        return <View className="flex-1 bg-[#0F4CFF]" />;
+    }
 
     const handleNext = () => {
         if (currentScreen < SCREENS.length - 1) {
@@ -80,11 +106,14 @@ export default function OnboardingSplash() {
 
             {/* Skip Button */}
             <View
-                className="absolute top-0 right-0 z-10"
+                className="absolute top-0 right-0 z-10 flex-row items-center"
                 style={{ paddingTop: insets.top + 24, paddingRight: 24 }}
             >
+                <Pressable onPress={() => router.push('/login')} className="mr-6">
+                    <Text className="text-white font-heading text-[20px]">Log in</Text>
+                </Pressable>
                 <Pressable onPress={handleSkip}>
-                    <Text className="text-white/80 font-body text-[20px]">Skip for now</Text>
+                    <Text className="text-white/60 font-body text-[20px]">Skip</Text>
                 </Pressable>
             </View>
 
@@ -94,7 +123,7 @@ export default function OnboardingSplash() {
             >
                 {/* Text Content */}
                 <View className="mb-10 px-2">
-                    {SCREENS[currentScreen].lines.map((line, idx) => (
+                    {SCREENS[currentScreen]?.lines?.map((line, idx) => (
                         <AnimatedText
                             key={`${currentScreen}-${idx}`}
                             entering={FadeIn.duration(400).delay(idx * 100)}
@@ -131,7 +160,7 @@ export default function OnboardingSplash() {
                             >
                                 <Pressable
                                     className="flex-row items-center gap-2"
-                                    onPress={() => router.push('/onboarding-choice')}
+                                    onPress={() => router.push('/signup')}
                                 >
                                     <Text className="text-white font-body text-[24px]">Get started</Text>
                                     <ArrowUpRight size={24} color="white" />

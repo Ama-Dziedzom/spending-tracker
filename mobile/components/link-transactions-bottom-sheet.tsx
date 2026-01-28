@@ -20,7 +20,7 @@ interface Props {
     isVisible: boolean;
     onClose: () => void;
     onSuccess: () => void;
-    onCreateWallet?: (tx: Transaction) => void;
+    onCreateWallet?: (tx: Transaction, isTransfer?: boolean, sourceId?: string | null) => void;
 }
 
 export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onCreateWallet }: Props) {
@@ -79,36 +79,14 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
             let success = false;
 
             if (isTransferMode) {
-                // If it's a transfer, we need to decide which is FROM and which is TO.
-                // Usually the detected SMS is the "Arrival" (TO) or the "Departure" (FROM).
-                // Let's assume the wallet the user selects in the list is the OTHER side.
-                const info = detectTransferInfo(selectedTx.description);
-
-                // If the description mentions "credited" or "received", the current tx is likely the 'TO' side.
-                const isToSide = /credit|received|inflow/i.test(selectedTx.description.toLowerCase()) || selectedTx.type === 'income' || selectedTx.type === 'credit';
-
-                const fromId = isToSide ? walletId : 'unknown'; // This logic needs refinement but let's start simple
-                const toId = isToSide ? 'placeholder' : walletId;
-
-                // For now, let's just use the processTransfer with a simplified assumption:
-                // The wallet selected in the list is the "Source" (from) if it's an income transaction, 
-                // and the "Destination" (to) if it's an expense transaction.
-                // Actually, let's just make the user select the "Other" wallet.
-
-                // To be robust: we need to know WHICH wallet the original transaction belongs to.
-                // But it hasn't been assigned yet! That's the whole point of this sheet.
-                // So in Transfer Mode, the user must select TWO wallets?
-                // Or: Select Wallet A (where the SMS happened), then Select Wallet B (the other side).
-
-                // Let's stick to the current UI: User selects ONE wallet.
-                // If isTransferMode is ON, we'll ask them to select the TRANSACTION'S wallet first,
-                // then the OTHER wallet.
-
                 if (!targetWalletId) {
+                    console.log('Setting source wallet:', walletId);
                     setTargetWalletId(walletId);
                     setIsProcessing(false);
                     return;
                 }
+
+                console.log(`Processing transfer: TxId=${selectedTx.id}, From=${targetWalletId}, To=${walletId}`);
 
                 // First selection (targetWalletId) is SOURCE
                 // Second selection (walletId) is DESTINATION
@@ -116,14 +94,16 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                     selectedTx.id,
                     targetWalletId,
                     walletId,
-                    selectedTx.amount,
+                    Number(selectedTx.amount),
                     selectedTx.description
                 );
             } else {
+                console.log(`Assigning single transaction: TxId=${selectedTx.id}, Wallet=${walletId}`);
                 success = await assignTransactionToWallet(selectedTx.id, walletId);
             }
 
             if (success) {
+                console.log('Operation successful, refreshing state...');
                 // Refresh local state
                 const remaining = unmatchedTxs.filter(t => t.id !== selectedTx.id);
                 setUnmatchedTxs(remaining);
@@ -138,11 +118,12 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                     onSuccess(); // Update dashboard in background
                 }
             } else {
-                Alert.alert('Error', 'Failed to link transaction.');
+                console.error('Operation failed according to service response');
+                Alert.alert('Error', 'Failed to link transaction. Please check console.');
             }
         } catch (error) {
             console.error('Error in handleAssign:', error);
-            Alert.alert('Error', 'An unexpected error occurred.');
+            Alert.alert('Error', `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsProcessing(false);
         }
@@ -285,7 +266,7 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                                         <Pressable
                                             onPress={() => {
                                                 if (onCreateWallet && selectedTx) {
-                                                    onCreateWallet(selectedTx);
+                                                    onCreateWallet(selectedTx, isTransferMode, targetWalletId);
                                                 } else {
                                                     onClose();
                                                     router.push('/wallets');
@@ -302,7 +283,7 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                                     <Pressable
                                         onPress={() => {
                                             if (onCreateWallet && selectedTx) {
-                                                onCreateWallet(selectedTx);
+                                                onCreateWallet(selectedTx, isTransferMode, targetWalletId);
                                             } else {
                                                 onClose();
                                                 router.push('/wallets');

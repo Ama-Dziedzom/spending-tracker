@@ -90,8 +90,6 @@ export default function OnboardingLinkWallet() {
                 await createWallets(walletsToCreate);
             }
 
-            setIsMomoSheetVisible(false);
-            router.push('/(tabs)');
         } catch (error) {
             console.error('Error saving wallets:', error);
             Alert.alert('Error', 'Failed to save your wallets. Please try again.');
@@ -201,6 +199,10 @@ export default function OnboardingLinkWallet() {
                 selectedWallets={selectedWallets}
                 onClose={() => setIsMomoSheetVisible(false)}
                 onConfigure={handleMomoConfigure}
+                onFinish={() => {
+                    setIsMomoSheetVisible(false);
+                    router.push('/(tabs)');
+                }}
                 isLoading={isSaving}
             />
         </View>

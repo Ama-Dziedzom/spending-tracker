@@ -18,6 +18,7 @@ interface Props {
     onConfigure: (data: any) => void;
     isLoading?: boolean;
     initialBalanceFromTransaction?: string;
+    onFinish: () => void;
 }
 
 const PROVIDERS = [
@@ -38,11 +39,14 @@ const PROVIDERS = [
     }
 ];
 
-type Step = 'momo' | 'bank' | 'cash' | 'preview';
+type Step = 'momo' | 'bank' | 'cash' | 'linking' | 'preview';
 
-export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose, onConfigure, isLoading, initialBalanceFromTransaction }: Props) {
+export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose, onConfigure, onFinish, isLoading, initialBalanceFromTransaction }: Props) {
     const bottomSheetRef = useRef<BottomSheet>(null);
     const [currentStep, setCurrentStep] = useState<Step>('momo');
+    const [hasStartedLinking, setHasStartedLinking] = useState(false);
+    const [lastVisible, setLastVisible] = useState(false);
+    const wasConfigureCalled = useRef(false);
     const snapPoints = useMemo(() => ['70%', '98%'], []);
 
     // State for all wallets
@@ -67,19 +71,36 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
     const stepSequence = useMemo(() => {
         const order: Step[] = ['momo', 'bank', 'cash'];
         const filtered = order.filter(s => selectedWallets.includes(s));
-        return [...filtered, 'preview' as Step];
+        return [...filtered, 'linking' as Step, 'preview' as Step];
     }, [selectedWallets]);
 
     const currentStepIndex = stepSequence.indexOf(currentStep);
-    const totalSteps = stepSequence.length - 1; // Exclude preview from "Step X of Y" count
-    const stepLabel = currentStep === 'preview' ? '' : `Step ${currentStepIndex + 1} of ${totalSteps}`;
+    const totalSteps = stepSequence.length - 2; // Exclude linking and preview from "Step X of Y" count
+    const stepLabel = (currentStep === 'preview' || currentStep === 'linking') ? '' : `Step ${currentStepIndex + 1} of ${totalSteps}`;
 
     const handleNext = () => {
         const nextStep = stepSequence[currentStepIndex + 1];
         if (nextStep) {
             setCurrentStep(nextStep);
+
+            // If we've reached the linking step, trigger the actual configuration save
+            if (nextStep === 'linking') {
+                setHasStartedLinking(true);
+            }
         }
     };
+
+    // Trigger configuration save when entering linking step
+    React.useEffect(() => {
+        if (currentStep === 'linking' && hasStartedLinking && !wasConfigureCalled.current) {
+            wasConfigureCalled.current = true;
+            onConfigure({
+                momo: selectedWallets.includes('momo') ? { provider: momoProvider, balance: momoBalance, isIncome: momoIsIncome } : null,
+                bank: selectedWallets.includes('bank') ? { name: bankName, balance: bankBalance, isIncome: bankIsIncome } : null,
+                cash: selectedWallets.includes('cash') ? { name: cashName, balance: cashBalance, isIncome: cashIsIncome } : null
+            });
+        }
+    }, [currentStep, hasStartedLinking, onConfigure, selectedWallets, momoProvider, momoBalance, momoIsIncome, bankName, bankBalance, bankIsIncome, cashName, cashBalance, cashIsIncome]);
 
     const handleSheetChanges = useCallback((index: number) => {
         if (index === -1) {
@@ -101,7 +122,8 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
     );
 
     React.useEffect(() => {
-        if (isVisible) {
+        if (isVisible && !lastVisible) {
+            // Only reset to step 0 when FIRST becoming visible
             bottomSheetRef.current?.snapToIndex(0);
             const firstStep = stepSequence[0];
             setCurrentStep(firstStep);
@@ -113,7 +135,9 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                 else if (firstStep === 'bank') setBankBalance(formatted);
                 else if (firstStep === 'cash') setCashBalance(formatted);
             }
-        } else {
+            setHasStartedLinking(false);
+            wasConfigureCalled.current = false;
+        } else if (!isVisible && lastVisible) {
             bottomSheetRef.current?.close();
             // Reset states when closing
             if (!initialBalanceFromTransaction) {
@@ -121,8 +145,21 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                 setBankBalance('0.00');
                 setCashBalance('0.00');
             }
+            setHasStartedLinking(false);
+            wasConfigureCalled.current = false;
         }
-    }, [isVisible, stepSequence, initialBalanceFromTransaction]);
+        setLastVisible(isVisible);
+    }, [isVisible, stepSequence, initialBalanceFromTransaction, lastVisible]);
+
+    React.useEffect(() => {
+        if (currentStep === 'linking' && hasStartedLinking && !isLoading) {
+            // Give a minimum of 1.5 seconds for the linking animation even if save is fast
+            const timer = setTimeout(() => {
+                setCurrentStep('preview');
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [currentStep, isLoading, hasStartedLinking]);
 
     const formatAmount = (val: string) => {
         const num = parseFloat(val);
@@ -236,7 +273,9 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                     disabled={!momoProvider}
                     className={`w-[342px] h-[60px] rounded-full flex-row items-center justify-center gap-2 ${momoProvider ? 'bg-[#1642E5]' : 'bg-[#DAE2FF]'}`}
                 >
-                    <Text className={`text-[20px] font-manrope-semibold ${momoProvider ? 'text-white' : 'text-[#A5B4FC]'}`}>Next</Text>
+                    <Text className={`text-[20px] font-manrope-semibold ${momoProvider ? 'text-white' : 'text-[#A5B4FC]'}`}>
+                        {currentStepIndex === totalSteps - 1 ? 'Link Wallets' : 'Next'}
+                    </Text>
                     <HugeiconsIcon icon={ArrowRight02Icon} size={20} color={momoProvider ? "white" : "#A5B4FC"} />
                 </Pressable>
             </View>
@@ -326,7 +365,9 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                     disabled={!bankName}
                     className={`w-[342px] h-[60px] rounded-full flex-row items-center justify-center gap-2 ${bankName ? 'bg-[#1642E5]' : 'bg-[#DAE2FF]'}`}
                 >
-                    <Text className={`text-[20px] font-manrope-semibold ${bankName ? 'text-white' : 'text-[#A5B4FC]'}`}>Next</Text>
+                    <Text className={`text-[20px] font-manrope-semibold ${bankName ? 'text-white' : 'text-[#A5B4FC]'}`}>
+                        {currentStepIndex === totalSteps - 1 ? 'Link Wallets' : 'Next'}
+                    </Text>
                     <HugeiconsIcon icon={ArrowRight02Icon} size={20} color={bankName ? "white" : "#A5B4FC"} />
                 </Pressable>
             </View>
@@ -416,10 +457,24 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                     disabled={!cashName}
                     className={`w-[342px] h-[60px] rounded-full flex-row items-center justify-center gap-2 ${cashName ? 'bg-[#1642E5]' : 'bg-[#DAE2FF]'}`}
                 >
-                    <Text className={`text-[20px] font-manrope-semibold ${cashName ? 'text-white' : 'text-[#A5B4FC]'}`}>Next</Text>
+                    <Text className={`text-[20px] font-manrope-semibold ${cashName ? 'text-white' : 'text-[#A5B4FC]'}`}>
+                        {currentStepIndex === totalSteps - 1 ? 'Link Wallets' : 'Next'}
+                    </Text>
                     <HugeiconsIcon icon={ArrowRight02Icon} size={20} color={cashName ? "white" : "#A5B4FC"} />
                 </Pressable>
             </View>
+        </View>
+    );
+
+    const renderLinkingStep = () => (
+        <View className="flex-1 items-center justify-center pt-20">
+            <ActivityIndicator size="large" color="#1642E5" />
+            <Text className="text-[20px] font-manrope-semibold text-[#1642E5] mt-8 text-center px-10">
+                Securely linking your wallets...
+            </Text>
+            <Text className="text-[14px] font-manrope text-[#7C7D80] mt-2 text-center px-10">
+                This will only take a moment.
+            </Text>
         </View>
     );
 
@@ -533,26 +588,18 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
             </View>
 
             <Pressable
-                onPress={() => onConfigure({
-                    momo: selectedWallets.includes('momo') ? { provider: momoProvider, balance: momoBalance, isIncome: momoIsIncome } : null,
-                    bank: selectedWallets.includes('bank') ? { name: bankName, balance: bankBalance, isIncome: bankIsIncome } : null,
-                    cash: selectedWallets.includes('cash') ? { name: cashName, balance: cashBalance, isIncome: cashIsIncome } : null
-                })}
-                disabled={isLoading}
-                className={`w-full h-[60px] rounded-full flex-row items-center justify-center gap-2 mb-4 ${isLoading ? 'bg-[#7C7D80]' : 'bg-[#1642E5]'}`}
+                onPress={onFinish}
+                className="w-full h-[60px] rounded-full flex-row items-center justify-center gap-2 mb-4 bg-[#1642E5]"
             >
-                {isLoading ? (
-                    <ActivityIndicator color="white" />
-                ) : (
-                    <>
-                        <Text className="text-[20px] font-manrope-semibold text-white">Go to dashboard</Text>
-                        <HugeiconsIcon icon={ArrowRight02Icon} size={24} color="white" />
-                    </>
-                )}
+                <Text className="text-[20px] font-manrope-semibold text-white">Go to dashboard</Text>
+                <HugeiconsIcon icon={ArrowRight02Icon} size={24} color="white" />
             </Pressable>
 
             <Pressable
-                onPress={() => setCurrentStep(stepSequence[0])}
+                onPress={() => {
+                    wasConfigureCalled.current = false;
+                    setCurrentStep(stepSequence[0]);
+                }}
                 className="flex-row items-center gap-2"
             >
                 <HugeiconsIcon icon={Edit01Icon} size={24} color="#1642E5" />
@@ -578,6 +625,7 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
                 {currentStep === 'momo' && renderMomoStep()}
                 {currentStep === 'bank' && renderBankStep()}
                 {currentStep === 'cash' && renderCashStep()}
+                {currentStep === 'linking' && renderLinkingStep()}
                 {currentStep === 'preview' && renderPreviewStep()}
             </BottomSheetView>
         </BottomSheet>
