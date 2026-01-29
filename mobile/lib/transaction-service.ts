@@ -4,6 +4,10 @@ import { COLORS, TRANSACTION_TYPES } from '../constants/theme';
 
 export interface TransactionWithWallet extends Transaction {
     wallet?: Wallet;
+    transfer?: Transfer & {
+        from_wallet?: Wallet;
+        to_wallet?: Wallet;
+    };
 }
 
 // Re-export category utilities for convenience
@@ -46,7 +50,12 @@ export async function getTransactionById(transactionId: string): Promise<Transac
         .from('transactions')
         .select(`
             *,
-            wallet:wallets(*)
+            wallet:wallets(*),
+            transfer:transfers(
+                *,
+                from_wallet:wallets!from_wallet_id(*),
+                to_wallet:wallets!to_wallet_id(*)
+            )
         `)
         .eq('id', transactionId)
         .single();
@@ -65,7 +74,12 @@ export async function getRecentTransactions(limit: number = 10): Promise<Transac
         .from('transactions')
         .select(`
             *,
-            wallet:wallets(*)
+            wallet:wallets(*),
+            transfer:transfers(
+                *,
+                from_wallet:wallets!from_wallet_id(*),
+                to_wallet:wallets!to_wallet_id(*)
+            )
         `)
         .order('created_at', { ascending: false })
         .limit(limit);
@@ -100,7 +114,12 @@ export async function getTransactionsByWallet(walletId: string, limit: number = 
         .from('transactions')
         .select(`
             *,
-            wallet:wallets(*)
+            wallet:wallets(*),
+            transfer:transfers(
+                *,
+                from_wallet:wallets!from_wallet_id(*),
+                to_wallet:wallets!to_wallet_id(*)
+            )
         `)
         .eq('wallet_id', walletId)
         .order('transaction_date', { ascending: false })
@@ -326,8 +345,8 @@ export async function getWalletAnalytics(walletId: string): Promise<WalletAnalyt
 
     const categoryMap: Record<string, number> = {};
     expenses.forEach(tx => {
-        // Force 'transfer' category if it's a transfer but doesn't have the category set
-        const effectiveCategory = (tx.is_transfer) ? 'transfer' : tx.category;
+        // Use the transaction's category if it's not 'transfer' or null, otherwise default to 'transfer' for transfers
+        const effectiveCategory = (tx.is_transfer && (!tx.category || tx.category === 'transfer')) ? 'transfer' : (tx.category || 'other');
         const catObj = getCategoryByIdOrName(effectiveCategory);
         const catName = catObj?.name || effectiveCategory || 'Uncategorized';
         categoryMap[catName] = (categoryMap[catName] || 0) + Number(tx.amount);
@@ -375,8 +394,17 @@ export async function getGlobalAnalytics(period: 'week' | 'month' | 'year' = 'mo
         return { totalSpent: 0, totalInflow: 0, netCashflow: 0, categorySpending: [], spendingHistory: [] };
     }
 
-    const expenses = transactions?.filter(tx => (tx.type === TRANSACTION_TYPES.EXPENSE || tx.type === TRANSACTION_TYPES.DEBIT) && !tx.is_transfer) || [];
-    const incomes = transactions?.filter(tx => (tx.type === TRANSACTION_TYPES.INCOME || tx.type === TRANSACTION_TYPES.CREDIT) && !tx.is_transfer) || [];
+    // Include expenses and "from" transfers that have a specific spending category
+    const expenses = transactions?.filter(tx =>
+        ((tx.type === TRANSACTION_TYPES.EXPENSE || tx.type === TRANSACTION_TYPES.DEBIT) && !tx.is_transfer) ||
+        (tx.is_transfer && tx.transfer_side === 'from' && tx.category && tx.category !== 'transfer')
+    ) || [];
+
+    // Include incomes and "to" transfers that have a specific income category
+    const incomes = transactions?.filter(tx =>
+        ((tx.type === TRANSACTION_TYPES.INCOME || tx.type === TRANSACTION_TYPES.CREDIT) && !tx.is_transfer) ||
+        (tx.is_transfer && tx.transfer_side === 'to' && tx.category && tx.category !== 'transfer' && tx.category !== 'income')
+    ) || [];
 
     const totalSpent = expenses.reduce((sum, tx) => sum + Number(tx.amount), 0);
     const totalInflow = incomes.reduce((sum, tx) => sum + Number(tx.amount), 0);

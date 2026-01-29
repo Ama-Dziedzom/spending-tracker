@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl, Image, Modal, Dimensions } from 'react-native';
+import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl, Image, Dimensions } from 'react-native';
 import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,29 +10,18 @@ import {
     ArrowRight01Icon,
     AddCircleHalfDotIcon,
     Wallet03Icon,
-    Cancel01Icon,
-    ArrowUp02Icon,
-    ArrowDown02Icon,
-    ShoppingBag01Icon,
-    Home01Icon,
-    Car01Icon,
-    RestaurantIcon,
-    PackageIcon,
-    Tick01Icon,
-    ArrowLeft02Icon,
     ArrowUpRight03Icon,
 } from '@hugeicons/core-free-icons';
 import { getWallets, createWallets, CreateWalletInput, getTotalBalance } from '../../lib/wallet-service';
-import { assignTransactionToWallet, getWalletAnalytics, WalletAnalytics, getTransactionsByWallet } from '../../lib/transaction-service';
-import { getCategoryIcon, getCategoryColor, getCategoryByName } from '../../lib/categories';
-import { Wallet, supabase } from '../../lib/supabase';
+import { assignTransactionToWallet } from '../../lib/transaction-service';
+import { Wallet } from '../../lib/supabase';
 import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bottom-sheet';
 import { SelectWalletTypeBottomSheet } from '../../components/select-wallet-type-bottom-sheet';
 import { EditWalletBottomSheet } from '../../components/edit-wallet-bottom-sheet';
 import { Alert } from 'react-native';
-import Animated, { FadeIn, FadeInDown, SlideInRight, SlideOutRight } from 'react-native-reanimated';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 const formatMoney = (val: number | string | undefined | null) => {
     if (val === undefined || val === null) return '0.00';
@@ -60,22 +49,10 @@ export default function Wallets() {
     const [isConfigureSheetVisible, setIsConfigureSheetVisible] = React.useState(false);
     const [isEditSheetVisible, setIsEditSheetVisible] = React.useState(false);
     const [selectedWalletForEdit, setSelectedWalletForEdit] = React.useState<Wallet | null>(null);
-    const [selectedWalletForDetail, setSelectedWalletForDetail] = React.useState<Wallet | null>(null);
-    const [walletAnalytics, setWalletAnalytics] = React.useState<WalletAnalytics | null>(null);
-    const [walletTransactions, setWalletTransactions] = React.useState<any[]>([]);
-    const [isLoadingAnalytics, setIsLoadingAnalytics] = React.useState(false);
     const [selectedWalletTypes, setSelectedWalletTypes] = React.useState<string[]>([]);
     const [isSaving, setIsSaving] = React.useState(false);
 
-    // If we have a transaction ID in the params, open the creation flow automatically
-    React.useEffect(() => {
-        if (params.fromTransactionId && !isConfigureSheetVisible && !isSelectTypeSheetVisible) {
-            // Keep the context of the transaction
-            setIsSelectTypeSheetVisible(true);
-        }
-    }, [params.fromTransactionId]);
-
-    const fetchWallets = async () => {
+    const fetchWallets = React.useCallback(async () => {
         try {
             const [walletsData, balanceData] = await Promise.all([
                 getWallets(),
@@ -89,11 +66,18 @@ export default function Wallets() {
             setIsLoading(false);
             setRefreshing(false);
         }
-    };
+    }, []);
 
     React.useEffect(() => {
         fetchWallets();
-    }, []);
+    }, [fetchWallets]);
+
+    // If we have a transaction ID in the params, open the creation flow automatically
+    React.useEffect(() => {
+        if (params.fromTransactionId && !isConfigureSheetVisible && !isSelectTypeSheetVisible) {
+            setIsSelectTypeSheetVisible(true);
+        }
+    }, [params.fromTransactionId]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -103,28 +87,16 @@ export default function Wallets() {
     const handleSelectType = (types: string[]) => {
         setSelectedWalletTypes(types);
         setIsSelectTypeSheetVisible(false);
-        // Ensure the first sheet is fully closed before opening the second one
-        // Increase timeout to 800ms to allow for the full animation of the first sheet
         setTimeout(() => {
             setIsConfigureSheetVisible(true);
         }, 800);
     };
 
-    const handleWalletPress = async (wallet: Wallet) => {
-        setSelectedWalletForDetail(wallet);
-        setIsLoadingAnalytics(true);
-        try {
-            const [analytics, transactions] = await Promise.all([
-                getWalletAnalytics(wallet.id),
-                getTransactionsByWallet(wallet.id)
-            ]);
-            setWalletAnalytics(analytics);
-            setWalletTransactions(transactions);
-        } catch (error) {
-            console.error('Error fetching wallet details:', error);
-        } finally {
-            setIsLoadingAnalytics(false);
-        }
+    const handleWalletPress = (wallet: Wallet) => {
+        router.push({
+            pathname: '/wallet-details',
+            params: { walletId: wallet.id }
+        });
     };
 
     const handleEditWallet = (wallet: Wallet) => {
@@ -173,26 +145,13 @@ export default function Wallets() {
                 createdWallets = await createWallets(walletsToCreate);
             }
 
-            // If we are coming from a detected transaction, link it to the most relevant wallet
             if (params.fromTransactionId && createdWallets.length > 0) {
-                // Find the best wallet to link to
                 let targetWallet = createdWallets[0];
-                const initialAmount = params.initialAmount || '';
-                const txType = params.transactionType || '';
-
-                // We'll fetch the transaction to check description if needed, or just use the first created wallet if only one exists
                 if (createdWallets.length > 1) {
-                    // Try to guess based on created types
                     const momoWallet = createdWallets.find(w => w.type === 'momo');
-                    const bankWallet = createdWallets.find(w => w.type === 'bank');
-
-                    // Simple logic: if it came from MoMo detecting logic, it should go to MoMo
                     if (momoWallet) targetWallet = momoWallet;
                 }
-
                 await assignTransactionToWallet(params.fromTransactionId, targetWallet.id);
-
-                // Clear params after linking
                 router.setParams({ fromTransactionId: undefined, initialAmount: undefined, transactionType: undefined });
             }
 
@@ -207,18 +166,8 @@ export default function Wallets() {
         }
     };
 
-    const getWalletIcon = (type: string) => {
-        switch (type) {
-            case 'bank': return BankIcon;
-            case 'momo': return Wallet03Icon;
-            case 'cash': return Wallet01Icon;
-            default: return Wallet01Icon;
-        }
-    };
-
     return (
         <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-            {/* Header Area - Simplified */}
             <View className="px-6 pt-8 pb-4">
                 <Text className="text-[#1642E5] font-manrope-bold text-[28px]">My Wallets</Text>
             </View>
@@ -235,7 +184,6 @@ export default function Wallets() {
                     />
                 }
             >
-                {/* Wallets List Section */}
                 <View className="mt-2">
                     {isLoading ? (
                         <View className="py-20 items-center">
@@ -289,7 +237,6 @@ export default function Wallets() {
                                 </Animated.View>
                             ))}
 
-                            {/* Add New Wallet Button */}
                             <Pressable
                                 onPress={() => setIsSelectTypeSheetVisible(true)}
                                 className="mt-4 py-5 px-6 rounded-[20px] flex-row items-center"
@@ -347,219 +294,6 @@ export default function Wallets() {
                 }}
                 onSuccess={fetchWallets}
             />
-
-            {/* Expanded Wallet Detail View */}
-            <Modal
-                visible={!!selectedWalletForDetail}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setSelectedWalletForDetail(null)}
-            >
-                {selectedWalletForDetail && (
-                    <View className="flex-1 bg-[#0F4CFF]">
-                        {/* Top section with Splash color / Gradient */}
-                        <LinearGradient
-                            colors={['#0F4CFF', '#1642E5', '#0E1F5B']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            className="pb-20"
-                            style={{ height: Dimensions.get('window').height * 0.45, paddingTop: insets.top + 16 }}
-                        >
-                            {/* Header Nav */}
-                            <View className="flex-row items-center justify-between mb-10 px-8">
-                                <Pressable
-                                    onPress={() => setSelectedWalletForDetail(null)}
-                                    className="w-11 h-11 bg-white/15 rounded-full items-center justify-center -ml-[11px]"
-                                >
-                                    <HugeiconsIcon icon={ArrowLeft02Icon} size={22} color="#FFFFFF" />
-                                </Pressable>
-                            </View>
-
-                            <View className="items-center px-8">
-                                <Text className="text-white/80 text-[16px] font-manrope-bold mb-0.5 uppercase tracking-widest text-center">
-                                    {selectedWalletForDetail.name} Balance
-                                </Text>
-                                <Text className="text-white text-[60px] font-manrope-bold mb-6 tracking-tight text-center">
-                                    GHS {formatMoney(selectedWalletForDetail.current_balance)}
-                                </Text>
-
-                                <View className="flex-row items-center justify-center gap-8 w-full">
-                                    <View className="items-center">
-                                        <View className="flex-row items-center gap-2 mb-1">
-                                            <View className="w-2 h-2 rounded-full bg-emerald-400" />
-                                            <Text className="text-white text-[18px] font-manrope-bold">
-                                                GHS {formatMoney(walletAnalytics?.totalInflow)}
-                                            </Text>
-                                        </View>
-                                        <Text className="text-white/60 text-[12px] font-manrope-semibold uppercase tracking-wider">Total Inflow</Text>
-                                    </View>
-
-                                    <View className="w-[1px] h-6 bg-white/10" />
-
-                                    <View className="items-center">
-                                        <View className="flex-row items-center gap-2 mb-1">
-                                            <View className="w-2 h-2 rounded-full bg-rose-400" />
-                                            <Text className="text-white text-[18px] font-manrope-bold">
-                                                GHS {formatMoney(walletAnalytics?.totalSpent)}
-                                            </Text>
-                                        </View>
-                                        <Text className="text-white/60 text-[12px] font-manrope-semibold uppercase tracking-wider">Total Outflow</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </LinearGradient>
-
-                        {/* Bottom Sheet Section */}
-                        <View
-                            className="flex-1 bg-white -mt-12 rounded-t-[48px] pt-8 px-6 pb-10"
-                            style={{
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: -10 },
-                                shadowOpacity: 0.2,
-                                shadowRadius: 30,
-                                elevation: 20
-                            }}
-                        >
-                            {/* Handle Bar */}
-                            <View className="w-14 h-1.5 bg-slate-100 rounded-full self-center mb-8" />
-
-                            <View className="flex-row items-center justify-between mb-8 px-2">
-                                <View>
-                                    <Text className="text-[24px] font-manrope-bold text-slate-900">Spent Category</Text>
-                                    <Text className="text-slate-400 font-manrope-medium text-[14px]">
-                                        Breakdown of your expenses
-                                    </Text>
-                                </View>
-                                <Pressable className="bg-slate-50 px-4 py-2 rounded-2xl flex-row items-center gap-2">
-                                    <Text className="text-slate-600 text-[14px] font-manrope-semibold">Daily</Text>
-                                    <HugeiconsIcon icon={ArrowDown02Icon} size={16} color="#475569" />
-                                </Pressable>
-                            </View>
-
-                            {isLoadingAnalytics ? (
-                                <View className="py-20 items-center justify-center flex-1">
-                                    <ActivityIndicator size="large" color="#0F4CFF" />
-                                </View>
-                            ) : (
-                                <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-                                    {(walletAnalytics?.categorySpending.length || 0) > 0 ? (
-                                        <View className="gap-6">
-                                            {walletAnalytics?.categorySpending.map((item, index) => (
-                                                <Animated.View
-                                                    key={item.category}
-                                                    {...{ entering: FadeInDown.delay(index * 100) } as any}
-                                                    className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-50 mb-2"
-                                                >
-                                                    <View className="flex-row items-start justify-between mb-6">
-                                                        <View className="flex-row items-center gap-4">
-                                                            <View
-                                                                className="w-14 h-14 rounded-full items-center justify-center"
-                                                                style={{ backgroundColor: `${getCategoryColor(item.category)}15` }}
-                                                            >
-                                                                <HugeiconsIcon
-                                                                    icon={getCategoryIcon(item.category)}
-                                                                    size={26}
-                                                                    color={getCategoryColor(item.category)}
-                                                                />
-                                                            </View>
-                                                            <View>
-                                                                <Text className="text-[18px] font-manrope-bold text-slate-900">{item.category}</Text>
-                                                                <Text className="text-slate-400 font-manrope-medium text-[15px]">
-                                                                    GHS {formatMoney(item.amount)}
-                                                                </Text>
-                                                            </View>
-                                                        </View>
-
-                                                        <View className="flex-row items-center gap-2">
-                                                            <View
-                                                                className="px-3 py-2 rounded-2xl"
-                                                                style={{ backgroundColor: `${getCategoryColor(item.category)}15` }}
-                                                            >
-                                                                <Text
-                                                                    className="text-[13px] font-manrope-bold"
-                                                                    style={{ color: getCategoryColor(item.category) }}
-                                                                >
-                                                                    {item.percentage.toFixed(1)}%
-                                                                </Text>
-                                                            </View>
-                                                        </View>
-                                                    </View>
-
-                                                    <View className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                        <View
-                                                            className="h-full rounded-full"
-                                                            style={{
-                                                                width: `${item.percentage}%`,
-                                                                backgroundColor: getCategoryColor(item.category)
-                                                            }}
-                                                        />
-                                                    </View>
-                                                </Animated.View>
-                                            ))}
-                                        </View>
-                                    ) : (
-                                        <View className="py-20 items-center bg-slate-50 rounded-[32px] border border-dashed border-slate-200">
-                                            <Text className="text-[16px] text-slate-400 font-manrope">No tracked spending yet</Text>
-                                        </View>
-                                    )}
-
-                                    {/* Recent Activity Section */}
-                                    <View className="mt-12 mb-6">
-                                        <Text className="text-[24px] font-manrope-bold text-slate-900 mb-2 px-2">Wallet Activity</Text>
-                                        <Text className="text-slate-400 font-manrope-medium text-[14px] mb-6 px-2">
-                                            List of your recent transactions
-                                        </Text>
-
-                                        {walletTransactions.length > 0 ? (
-                                            <View className="gap-3">
-                                                {walletTransactions.map((tx, index) => (
-                                                    <Animated.View
-                                                        key={tx.id}
-                                                        {...{ entering: FadeInDown.delay(index * 50) } as any}
-                                                        className="bg-white rounded-[24px] p-4 flex-row items-center justify-between border border-slate-50 shadow-sm"
-                                                    >
-                                                        <View className="flex-row items-center gap-4 flex-1">
-                                                            <View
-                                                                className="w-12 h-12 rounded-full items-center justify-center"
-                                                                style={{ backgroundColor: `${getCategoryColor(tx.is_transfer ? 'transfer' : tx.category)}15` }}
-                                                            >
-                                                                <HugeiconsIcon
-                                                                    icon={getCategoryIcon(tx.is_transfer ? 'transfer' : tx.category)}
-                                                                    size={22}
-                                                                    color={getCategoryColor(tx.is_transfer ? 'transfer' : tx.category)}
-                                                                />
-                                                            </View>
-                                                            <View className="flex-1">
-                                                                <Text className="text-[16px] font-manrope-bold text-slate-900" numberOfLines={1}>
-                                                                    {tx.description}
-                                                                </Text>
-                                                                <Text className="text-slate-400 font-manrope-medium text-[13px]">
-                                                                    {new Date(tx.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                                                </Text>
-                                                            </View>
-                                                        </View>
-                                                        <Text className={`text-[16px] font-manrope-bold ${(tx.type === 'income' || tx.type === 'credit' || (tx.is_transfer && tx.transfer_side === 'to'))
-                                                                ? 'text-emerald-500'
-                                                                : 'text-slate-900'
-                                                            }`}>
-                                                            {(tx.type === 'income' || tx.type === 'credit' || (tx.is_transfer && tx.transfer_side === 'to')) ? '+' : '-'}
-                                                            GHS {formatMoney(tx.amount)}
-                                                        </Text>
-                                                    </Animated.View>
-                                                ))}
-                                            </View>
-                                        ) : (
-                                            <View className="py-10 items-center">
-                                                <Text className="text-slate-400 font-manrope">No transactions found</Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                </ScrollView>
-                            )}
-                        </View>
-                    </View>
-                )}
-            </Modal>
         </View>
     );
 }

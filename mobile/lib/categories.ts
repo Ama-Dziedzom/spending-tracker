@@ -122,12 +122,19 @@ export const CATEGORIES: Category[] = [
         keywords: ['salary', 'payment received', 'credit', 'deposit', 'wage', 'bonus', 'refund']
     },
     {
+        id: 'subscription',
+        name: 'Subscription',
+        icon: Invoice02Icon,
+        color: '#6366F1',
+        keywords: ['subscription', 'renew', 'recurring', 'payment', 'bill', 'utility', 'prepaid', 'postpaid', 'airtime', 'bundle']
+    },
+    {
         id: 'other',
         name: 'Other',
         icon: MoreHorizontalCircle01Icon,
         color: '#94A3B8',
         keywords: []
-    },
+    },  
 ];
 
 // O(1) Lookups
@@ -179,18 +186,16 @@ export function suggestCategory(description: string, transactionType?: string): 
         return CATEGORY_MAP.get('income') || getDefaultCategory();
     }
 
-    // Check for transfer patterns first (high priority)
+    // Check for transfer patterns
     const transferKeywords = ['transfer', 'sent to', 'send to', 'instant pay', 'received from'];
-    if (transferKeywords.some(kw => desc.includes(kw))) {
-        return CATEGORY_MAP.get('transfer') || getDefaultCategory();
-    }
+    const describesTransfer = transferKeywords.some(kw => desc.includes(kw));
 
     // Score each category based on keyword matches
     let bestMatch: Category | null = null;
     let bestScore = 0;
 
     for (const category of CATEGORIES) {
-        if (category.id === 'other' || category.id === 'income') continue;
+        if (category.id === 'other' || category.id === 'income' || category.id === 'transfer') continue;
 
         let score = 0;
         for (const keyword of category.keywords) {
@@ -203,6 +208,16 @@ export function suggestCategory(description: string, transactionType?: string): 
             bestScore = score;
             bestMatch = category;
         }
+    }
+
+    // If we have a good spending/utility match, use it even if it's a transfer
+    if (bestMatch && bestScore > 0) {
+        return bestMatch;
+    }
+
+    // If no specific match but it's a transfer, return "Transfer"
+    if (describesTransfer) {
+        return CATEGORY_MAP.get('transfer') || getDefaultCategory();
     }
 
     return bestMatch || getDefaultCategory();

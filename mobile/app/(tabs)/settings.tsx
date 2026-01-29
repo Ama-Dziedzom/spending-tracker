@@ -1,4 +1,4 @@
-import { View, Text, Pressable, Alert, ScrollView, Switch, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable, Alert, ScrollView, Switch, Modal, TouchableOpacity, RefreshControl } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,7 @@ import {
     UserIcon,
     ArrowRight01Icon,
     SecurityIcon,
-    ArrowLeft01Icon,
+    ArrowLeft02Icon,
     Mail01Icon,
     DollarCircleIcon,
     MessageNotification01Icon,
@@ -144,6 +144,7 @@ export default function Settings() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [user, setUser] = useState<any>(null);
+    const [refreshing, setRefreshing] = useState(false);
 
     // Collapsible States
     const [collapsedSections, setCollapsedSections] = useState({
@@ -182,6 +183,13 @@ export default function Settings() {
         setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
+
+    const onRefresh = React.useCallback(async () => {
+        setRefreshing(true);
+        const { data } = await supabase.auth.getUser();
+        setUser(data.user);
+        setRefreshing(false);
+    }, []);
 
     const onLogout = async () => {
         const { error } = await supabase.auth.signOut();
@@ -226,7 +234,7 @@ export default function Settings() {
                     onPress={() => router.back()}
                     className="w-10 h-10 items-center justify-center -ml-2"
                 >
-                    <HugeiconsIcon icon={ArrowLeft01Icon} size={24} color="#0F172A" />
+                    <HugeiconsIcon icon={ArrowLeft02Icon} size={24} color="#0F172A" />
                 </Pressable>
                 <Text className="text-[20px] font-heading text-slate-900 ml-2">Settings</Text>
             </View>
@@ -235,6 +243,13 @@ export default function Settings() {
                 className="flex-1"
                 contentContainerStyle={{ paddingVertical: 24, paddingBottom: insets.bottom + 40 }}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor="#0F4CFF"
+                    />
+                }
             >
                 {/* Account & Profile */}
                 <SettingsSection

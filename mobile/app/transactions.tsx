@@ -58,6 +58,8 @@ function formatSectionDate(dateString: string): string {
     }
 }
 
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
 export default function TransactionsPage() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
@@ -81,7 +83,12 @@ export default function TransactionsPage() {
                 .from('transactions')
                 .select(`
                     *,
-                    wallet:wallets(*)
+                    wallet:wallets(*),
+                    transfer:transfers(
+                        *,
+                        from_wallet:wallets!from_wallet_id(*),
+                        to_wallet:wallets!to_wallet_id(*)
+                    )
                 `, { count: 'exact' })
                 .order('created_at', { ascending: false })
                 .range(from, to);
@@ -142,10 +149,13 @@ export default function TransactionsPage() {
 
     const groupedTransactions = groupTransactionsByDate(transactions);
 
-    const renderTransactionItem = (tx: TransactionWithWallet) => {
-        const category = getCategoryByIdOrName(tx.category);
+    const renderTransactionItem = useCallback((tx: TransactionWithWallet) => {
+        const effectiveCategory = (tx.is_transfer && (!tx.category || tx.category === 'transfer')) ? 'transfer' : (tx.category || 'other');
+        const category = getCategoryByIdOrName(effectiveCategory);
         const categoryColor = category?.color;
         const categoryIcon = category?.icon;
+
+        const isIncome = tx.type === 'income' || tx.type === 'credit' || (tx.is_transfer && tx.transfer_side === 'to');
 
         return (
             <Pressable
@@ -171,7 +181,7 @@ export default function TransactionsPage() {
                         <HugeiconsIcon
                             icon={categoryIcon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
                             size={20}
-                            color={(tx.type === 'income' || tx.type === 'credit') ? '#10B981' : (categoryColor || '#64748B')}
+                            color={isIncome ? '#10B981' : (categoryColor || '#64748B')}
                         />
                     </View>
                     <View className="flex-1">
@@ -183,101 +193,103 @@ export default function TransactionsPage() {
                         </Text>
                     </View>
                 </View>
-                <Text className={`text-[16px] font-manrope-bold ${(tx.type === 'income' || tx.type === 'credit') ? 'text-emerald-500' : 'text-slate-900'}`}>
-                    {(tx.type === 'income' || tx.type === 'credit') ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '')}
+                <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-emerald-500' : 'text-slate-900'}`}>
+                    {isIncome ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '')}
                 </Text>
             </Pressable>
         );
-    };
+    }, [setSelectedTransaction, setIsDetailVisible]);
 
     return (
-        <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-            {/* Header */}
-            <View className="px-6 pt-4 pb-4">
-                <View className="flex-row items-center gap-4">
-                    <Pressable
-                        onPress={() => router.back()}
-                        className="w-10 h-10 rounded-full bg-slate-100 items-center justify-center"
-                    >
-                        <HugeiconsIcon icon={ArrowLeft02Icon} size={20} color="#1642E5" />
-                    </Pressable>
-                    <Text className="text-[#1642E5] font-manrope-bold text-[28px]">Transactions</Text>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#1642E5" />
-                </View>
-            ) : transactions.length === 0 ? (
-                <View className="flex-1 items-center justify-center px-6">
-                    <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center mb-4">
-                        <HugeiconsIcon icon={Calendar01Icon} size={32} color="#94A3B8" />
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
+                {/* Header */}
+                <View className="px-6 pt-4 pb-4">
+                    <View className="flex-row items-center gap-4">
+                        <Pressable
+                            onPress={() => router.back()}
+                            className="w-10 h-10 rounded-full bg-slate-100 items-center justify-center"
+                        >
+                            <HugeiconsIcon icon={ArrowLeft02Icon} size={20} color="#1642E5" />
+                        </Pressable>
+                        <Text className="text-[#1642E5] font-manrope-bold text-[28px]">Transactions</Text>
                     </View>
-                    <Text className="text-[20px] font-manrope-bold text-slate-900 mb-2">No transactions yet</Text>
-                    <Text className="text-[16px] font-manrope text-slate-500 text-center">
-                        Your transactions will appear here once you start tracking
-                    </Text>
                 </View>
-            ) : (
-                <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 16 }}
-                    showsVerticalScrollIndicator={false}
-                    onScroll={handleScroll}
-                    scrollEventThrottle={400}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor="#1642E5"
-                            colors={['#1642E5']}
-                        />
-                    }
-                >
-                    {groupedTransactions.map((group) => (
-                        <View key={group.date} className="mb-6">
-                            {/* Date Header */}
-                            <View className="flex-row items-center gap-2 mb-4">
-                                <HugeiconsIcon icon={Calendar01Icon} size={16} color="#94A3B8" />
-                                <Text className="text-[14px] font-manrope-semibold text-slate-500">
-                                    {formatSectionDate(group.date)}
+
+                {isLoading ? (
+                    <View className="flex-1 items-center justify-center">
+                        <ActivityIndicator size="large" color="#1642E5" />
+                    </View>
+                ) : transactions.length === 0 ? (
+                    <View className="flex-1 items-center justify-center px-6">
+                        <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center mb-4">
+                            <HugeiconsIcon icon={Calendar01Icon} size={32} color="#94A3B8" />
+                        </View>
+                        <Text className="text-[20px] font-manrope-bold text-slate-900 mb-2">No transactions yet</Text>
+                        <Text className="text-[16px] font-manrope text-slate-500 text-center">
+                            Your transactions will appear here once you start tracking
+                        </Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        className="flex-1"
+                        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 16 }}
+                        showsVerticalScrollIndicator={false}
+                        onScroll={handleScroll}
+                        scrollEventThrottle={400}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor="#1642E5"
+                                colors={['#1642E5']}
+                            />
+                        }
+                    >
+                        {groupedTransactions.map((group) => (
+                            <View key={group.date} className="mb-6">
+                                {/* Date Header */}
+                                <View className="flex-row items-center gap-2 mb-4">
+                                    <HugeiconsIcon icon={Calendar01Icon} size={16} color="#94A3B8" />
+                                    <Text className="text-[14px] font-manrope-semibold text-slate-500">
+                                        {formatSectionDate(group.date)}
+                                    </Text>
+                                </View>
+
+                                {/* Transactions for this date */}
+                                <View className="gap-3">
+                                    {group.transactions.map(renderTransactionItem)}
+                                </View>
+                            </View>
+                        ))}
+
+                        {/* Load More Indicator */}
+                        {isLoadingMore && (
+                            <View className="py-4 items-center">
+                                <ActivityIndicator size="small" color="#1642E5" />
+                            </View>
+                        )}
+
+                        {!hasMore && transactions.length > 0 && (
+                            <View className="py-4 items-center">
+                                <Text className="text-[14px] font-manrope text-slate-400">
+                                    You've reached the end
                                 </Text>
                             </View>
+                        )}
+                    </ScrollView>
+                )}
 
-                            {/* Transactions for this date */}
-                            <View className="gap-3">
-                                {group.transactions.map(renderTransactionItem)}
-                            </View>
-                        </View>
-                    ))}
-
-                    {/* Load More Indicator */}
-                    {isLoadingMore && (
-                        <View className="py-4 items-center">
-                            <ActivityIndicator size="small" color="#1642E5" />
-                        </View>
-                    )}
-
-                    {!hasMore && transactions.length > 0 && (
-                        <View className="py-4 items-center">
-                            <Text className="text-[14px] font-manrope text-slate-400">
-                                You've reached the end
-                            </Text>
-                        </View>
-                    )}
-                </ScrollView>
-            )}
-
-            <TransactionDetailBottomSheet
-                isVisible={isDetailVisible}
-                transaction={selectedTransaction}
-                onClose={() => {
-                    setIsDetailVisible(false);
-                    setSelectedTransaction(null);
-                }}
-                onCategoryUpdated={() => fetchTransactions(0)}
-            />
-        </View>
+                <TransactionDetailBottomSheet
+                    isVisible={isDetailVisible}
+                    transaction={selectedTransaction}
+                    onClose={() => {
+                        setIsDetailVisible(false);
+                        setSelectedTransaction(null);
+                    }}
+                    onCategoryUpdated={() => fetchTransactions(0)}
+                />
+            </View>
+        </GestureHandlerRootView>
     );
 }
