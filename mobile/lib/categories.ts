@@ -130,25 +130,29 @@ export const CATEGORIES: Category[] = [
     },
 ];
 
+// O(1) Lookups
+const CATEGORY_MAP = new Map(CATEGORIES.map(cat => [cat.id, cat]));
+const CATEGORY_NAME_MAP = new Map(CATEGORIES.map(cat => [cat.name.toLowerCase(), cat]));
+
 /**
  * Get a category by its ID
  */
 export function getCategoryById(id: string): Category | undefined {
-    return CATEGORIES.find(cat => cat.id === id);
+    return CATEGORY_MAP.get(id);
 }
 
 /**
  * Get a category by its display name
  */
 export function getCategoryByName(name: string): Category | undefined {
-    return CATEGORIES.find(cat => cat.name.toLowerCase() === name.toLowerCase());
+    return CATEGORY_NAME_MAP.get(name.toLowerCase());
 }
 
 /**
  * Get the default "Other" category
  */
 export function getDefaultCategory(): Category {
-    return CATEGORIES.find(cat => cat.id === 'other') || CATEGORIES[CATEGORIES.length - 1];
+    return CATEGORY_MAP.get('other')!;
 }
 
 /**
@@ -168,21 +172,17 @@ export function suggestCategory(description: string, transactionType?: string): 
 
     // If it's an income transaction, suggest the income category
     if (transactionType === 'income' || transactionType === 'credit') {
-        // Check if it's specifically a transfer
-        const transferCategory = CATEGORIES.find(cat => cat.id === 'transfer');
+        const transferCategory = CATEGORY_MAP.get('transfer');
         if (transferCategory && transferCategory.keywords.some(kw => desc.includes(kw))) {
             return transferCategory;
         }
-        // Otherwise return income
-        const incomeCategory = CATEGORIES.find(cat => cat.id === 'income');
-        if (incomeCategory) return incomeCategory;
+        return CATEGORY_MAP.get('income') || getDefaultCategory();
     }
 
     // Check for transfer patterns first (high priority)
     const transferKeywords = ['transfer', 'sent to', 'send to', 'instant pay', 'received from'];
     if (transferKeywords.some(kw => desc.includes(kw))) {
-        const transferCategory = CATEGORIES.find(cat => cat.id === 'transfer');
-        if (transferCategory) return transferCategory;
+        return CATEGORY_MAP.get('transfer') || getDefaultCategory();
     }
 
     // Score each category based on keyword matches
@@ -190,12 +190,11 @@ export function suggestCategory(description: string, transactionType?: string): 
     let bestScore = 0;
 
     for (const category of CATEGORIES) {
-        if (category.id === 'other' || category.id === 'income') continue; // Skip fallback categories
+        if (category.id === 'other' || category.id === 'income') continue;
 
         let score = 0;
         for (const keyword of category.keywords) {
             if (desc.includes(keyword.toLowerCase())) {
-                // Longer keywords get higher scores (more specific matches)
                 score += keyword.length;
             }
         }
@@ -224,17 +223,18 @@ export function getSelectableCategories(): Category[] {
 }
 
 /**
- * Get category color by ID (useful for charts)
+ * Get category color by ID or name
  */
 export function getCategoryColor(categoryIdOrName: string): string {
-    const category = getCategoryById(categoryIdOrName) || getCategoryByName(categoryIdOrName);
-    return category?.color || '#94A3B8'; // Default gray
+    const category = getCategoryByIdOrName(categoryIdOrName);
+    return category?.color || '#94A3B8';
 }
 
 /**
  * Get category icon by ID or name
  */
 export function getCategoryIcon(categoryIdOrName: string): any {
-    const category = getCategoryById(categoryIdOrName) || getCategoryByName(categoryIdOrName);
+    const category = getCategoryByIdOrName(categoryIdOrName);
     return category?.icon || MoreHorizontalCircle01Icon;
 }
+

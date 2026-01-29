@@ -1,5 +1,6 @@
 import { supabase, Transaction, Wallet, Transfer } from './supabase';
-import { getCategoryById, suggestCategory, getCategoryColor, getCategoryIcon, getCategoryByIdOrName } from './categories';
+import { getCategoryById, suggestCategory, getCategoryByIdOrName } from './categories';
+import { COLORS, TRANSACTION_TYPES } from '../constants/theme';
 
 export interface TransactionWithWallet extends Transaction {
     wallet?: Wallet;
@@ -93,6 +94,26 @@ export async function getWallets(): Promise<Wallet[]> {
     return data || [];
 }
 
+// Get transactions for a specific wallet
+export async function getTransactionsByWallet(walletId: string, limit: number = 20): Promise<TransactionWithWallet[]> {
+    const { data, error } = await supabase
+        .from('transactions')
+        .select(`
+            *,
+            wallet:wallets(*)
+        `)
+        .eq('wallet_id', walletId)
+        .order('transaction_date', { ascending: false })
+        .limit(limit);
+
+    if (error) {
+        console.error('Error fetching wallet transactions:', error);
+        return [];
+    }
+
+    return data || [];
+}
+
 // Check if user has any wallets set up
 export async function hasWalletsConfigured(): Promise<boolean> {
     const { count, error } = await supabase
@@ -124,139 +145,48 @@ export async function getUnmatchedTransactions(): Promise<Transaction[]> {
     return data || [];
 }
 
-// Assign a transaction to a wallet and update the wallet balance
+// Assign a transaction to a wallet and update the wallet balance atomically via RPC
 export async function assignTransactionToWallet(transactionId: string, walletId: string): Promise<boolean> {
-    // 1. Get the transaction details
-    const { data: transaction, error: txError } = await supabase
+    const { data: transaction, error: fetchError } = await supabase
         .from('transactions')
-        .select('*')
+        .select('description, type')
         .eq('id', transactionId)
         .single();
 
-    if (txError || !transaction) {
-        console.error('Error fetching transaction for assignment:', txError);
-        return false;
-    }
+    if (fetchError || !transaction) return false;
 
-    // 2. Get the wallet details
-    const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('id', walletId)
-        .single();
-
-    if (walletError || !wallet) {
-        console.error('Error fetching wallet for assignment:', walletError);
-        return false;
-    }
-
-    // 3. Calculate new balance
-    const amount = Number(transaction.amount);
-    const isIncome = transaction.type === 'income' || transaction.type === 'credit';
-
-    // Extract snapshot if not in DB but in description
-    const info = detectTransferInfo(transaction.description);
-    const snapshot = transaction.balance_snapshot || info.balanceSnapshot;
-
-    let newBalance: number;
-    if (snapshot !== null && snapshot !== undefined) {
-        newBalance = snapshot;
-    } else {
-        newBalance = isIncome
-            ? Number(wallet.current_balance) + amount
-            : Number(wallet.current_balance) - amount;
-    }
-
-    // 4. Suggest category if not already set
     const suggestedCat = suggestCategory(transaction.description, transaction.type);
 
-    // 5. Update transaction and wallet in a "transaction"
-    const { error: updateTxError } = await supabase
-        .from('transactions')
-        .update({
-            wallet_id: walletId,
-            category: transaction.category || suggestedCat.id
-        })
-        .eq('id', transactionId);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
 
-    if (updateTxError) {
-        console.error('Error updating transaction:', updateTxError);
-        return false;
-    }
+    const { error } = await supabase.rpc('assign_transaction_to_wallet', {
+        p_transaction_id: transactionId,
+        p_wallet_id: walletId,
+        p_category_id: suggestedCat.id,
+        p_user_id: user.id
+    });
 
-    const { error: updateWalletError } = await supabase
-        .from('wallets')
-        .update({ current_balance: newBalance })
-        .eq('id', walletId);
-
-    if (updateWalletError) {
-        console.error('Error updating wallet balance:', updateWalletError);
-        // Warning: This could lead to inconsistency if it fails after tx update. 
-        // In a real app, we'd use a database function (RPC) to ensure atomicity.
+    if (error) {
+        console.error('Error in assign_transaction_to_wallet RPC:', JSON.stringify(error, null, 2));
         return false;
     }
 
     return true;
 }
 
+import { parseSmsDescription, ParsedTransactionInfo } from './parser-utils';
+
 /**
  * Detects if a transaction description indicates a transfer
  * and attempts to identify source/destination types.
  */
-export function detectTransferInfo(description: string) {
-    const desc = description.toLowerCase();
-
-    // Patterns for Bank Inflows from MoMo (StanChart example)
-    const bankFromMomo = /instant pay: (\d+)|from \d+/i;
-    // Patterns for MoMo Inflows from Bank (Emergent example)
-    const momoFromBank = /payment received.*from (emergent|bank|transfer)/i;
-    // Patterns for MTN to Bank
-    const mtnToBank = /transfer.*to (bank|acc|account)/i;
-
-    // Balance extraction patterns
-    const momoBalanceRegex = /current balance: ghs\s*([0-9,.]+)/i;
-    const bankBalanceRegex = /available balance is now ghs\s*([0-9,.]+)/i;
-
-    const isTransferLikely = bankFromMomo.test(desc) ||
-        momoFromBank.test(desc) ||
-        mtnToBank.test(desc) ||
-        desc.includes('transfer to') ||
-        desc.includes('transferred to');
-
-    let suggestedSourceType: Wallet['type'] | null = null;
-    let suggestedDestType: Wallet['type'] | null = null;
-    let balanceSnapshot: number | null = null;
-
-    if (bankFromMomo.test(desc)) {
-        suggestedSourceType = 'momo';
-        suggestedDestType = 'bank';
-    } else if (momoFromBank.test(desc)) {
-        suggestedSourceType = 'bank';
-        suggestedDestType = 'momo';
-    } else if (mtnToBank.test(desc)) {
-        suggestedSourceType = 'momo';
-        suggestedDestType = 'bank';
-    }
-
-    // Extract balance if present
-    const momoMatch = description.match(momoBalanceRegex);
-    const bankMatch = description.match(bankBalanceRegex);
-    const balanceStr = (momoMatch || bankMatch)?.[1];
-
-    if (balanceStr) {
-        balanceSnapshot = parseFloat(balanceStr.replace(/,/g, ''));
-    }
-
-    return {
-        isTransferLikely,
-        suggestedSourceType,
-        suggestedDestType,
-        balanceSnapshot
-    };
+export function detectTransferInfo(description: string): ParsedTransactionInfo {
+    return parseSmsDescription(description);
 }
 
 /**
- * Process a transfer between two wallets
+ * Process a transfer between two wallets atomically via RPC
  */
 export async function processTransfer(
     transactionId: string,
@@ -265,209 +195,30 @@ export async function processTransfer(
     amount: number,
     notes?: string
 ): Promise<boolean> {
-    console.log(`Starting processTransfer: ${amount} from ${fromWalletId} to ${toWalletId}`);
     try {
-        // 1. Get user id (essential for the transfers table not-null constraint)
-        let userId: string | null = null;
-
-        // Try getting session first (often faster/more reliable in mobile)
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            userId = session.user.id;
-        } else {
-            // Fallback to getUser() which is more thorough
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                userId = user.id;
-            }
-        }
-
-        if (userId) {
-            console.log('Using userId for transfer:', userId);
-        } else {
-            console.warn('No authenticated user found for transfer. The "transfers" table requires a user_id.');
-            // If we are in development and can't find a user, we might be in trouble
-            // but let's try to proceed. The DB will ultimately decide.
-        }
-
-        // 2. Create the Transfer record
-        const transferPayload: any = {
-            from_wallet_id: fromWalletId,
-            to_wallet_id: toWalletId,
-            amount: amount,
-            status: 'completed' as const,
-            notes: notes,
-            completed_at: new Date().toISOString()
-        };
-
-        if (userId) {
-            transferPayload.user_id = userId;
-        }
-
-        const { data: transfer, error: transferError } = await supabase
-            .from('transfers')
-            .insert(transferPayload)
-            .select()
-            .single();
-
-        if (transferError) {
-            console.error('Error creating transfer record:', transferError);
-
-            // Check if it's the specific user_id not-null constraint error
-            if (transferError.code === '23502' && transferError.message?.includes('user_id')) {
-                console.error('CRITICAL: Cannot create transfer because no user is logged in and the database requires user_id.');
-                return false;
-            }
-
-            // Try inserting without completed_at if it failed (fallback for older schema)
-            if (transferError.message?.includes('completed_at')) {
-                console.log('Retrying transfer insert without completed_at...');
-                const retryPayload: any = {
-                    from_wallet_id: fromWalletId,
-                    to_wallet_id: toWalletId,
-                    amount: amount,
-                    status: 'completed',
-                    notes: notes
-                };
-
-                if (userId) {
-                    retryPayload.user_id = userId;
-                }
-
-                const { data: retryData, error: retryError } = await supabase
-                    .from('transfers')
-                    .insert(retryPayload)
-                    .select()
-                    .single();
-
-                if (retryError) {
-                    console.error('Retry insert also failed:', retryError);
-                    return false;
-                }
-
-                // If we get here, retryData is what we want
-                const actualTransfer = retryData;
-                if (!actualTransfer) {
-                    console.error('Transfer retried but no data returned');
-                    return false;
-                }
-                console.log('Transfer record created (retry):', actualTransfer.id);
-
-                // Continue with processing
-                return await finalizeTransfer(transactionId, fromWalletId, toWalletId, amount, notes, actualTransfer);
-            } else {
-                return false;
-            }
-        }
-
-        const actualTransfer = transfer;
-        if (!actualTransfer) {
-            console.error('Transfer created but no data returned');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            console.error('User must be logged in to process transfers');
             return false;
         }
 
-        console.log('Transfer record created:', actualTransfer.id);
-        return await finalizeTransfer(transactionId, fromWalletId, toWalletId, amount, notes, actualTransfer);
-    } catch (error) {
-        console.error('Unexpected error in processTransfer:', error);
-        return false;
-    }
-}
+        const { error } = await supabase.rpc('process_wallet_transfer', {
+            p_transaction_id: transactionId,
+            p_from_wallet_id: fromWalletId,
+            p_to_wallet_id: toWalletId,
+            p_amount: amount,
+            p_notes: notes || '',
+            p_user_id: user.id
+        });
 
-/**
- * Helper function to finalize the transfer process (updates transactions and balances)
- */
-async function finalizeTransfer(
-    transactionId: string,
-    fromWalletId: string,
-    toWalletId: string,
-    amount: number,
-    notes: string | undefined,
-    actualTransfer: any
-): Promise<boolean> {
-    try {
-        // 3. Update the original transaction (the one detected from SMS)
-        const { data: existingTx, error: fetchTxError } = await supabase
-            .from('transactions')
-            .select('wallet_id, type, balance_snapshot, description, transaction_date')
-            .eq('id', transactionId)
-            .single();
-
-        if (fetchTxError) {
-            console.error('Error fetching existing transaction:', fetchTxError);
-        }
-
-        // Determine which side of the transfer this transaction represents
-        const isOutflow = existingTx?.type === 'expense' || existingTx?.type === 'debit';
-        const side: 'from' | 'to' = isOutflow ? 'from' : 'to';
-
-        console.log(`Transaction ${transactionId} identified as ${side} side of transfer`);
-
-        const { error: updateTxError } = await supabase
-            .from('transactions')
-            .update({
-                wallet_id: side === 'from' ? fromWalletId : toWalletId,
-                transfer_id: actualTransfer.id,
-                transfer_side: side,
-                is_transfer: true
-            })
-            .eq('id', transactionId);
-
-        if (updateTxError) {
-            console.error('Error updating original transaction:', updateTxError);
-        }
-
-        // 4. Create the "Shadow" transaction for the other side
-        const otherSide = side === 'from' ? 'to' : 'from';
-        const otherWalletId = side === 'from' ? toWalletId : fromWalletId;
-        const otherType = side === 'from' ? 'income' : 'expense';
-        const shadowDesc = `Transfer ${side === 'from' ? 'to' : 'from'} ${notes || 'Wallet'}`;
-
-        console.log(`Creating shadow transaction for ${otherSide} side on wallet ${otherWalletId}`);
-
-        const { error: shadowTxError } = await supabase
-            .from('transactions')
-            .insert({
-                description: shadowDesc,
-                amount: amount,
-                type: otherType,
-                wallet_id: otherWalletId,
-                transfer_id: actualTransfer.id,
-                transfer_side: otherSide,
-                is_transfer: true,
-                transaction_date: existingTx?.transaction_date || new Date().toISOString(),
-                created_at: new Date().toISOString(),
-                source: 'transfer' // Required non-null field for shadow transactions
-            });
-
-        if (shadowTxError) {
-            console.error('Error creating shadow transaction:', shadowTxError);
-        }
-
-        // 5. Update Wallet Balances
-        // Subtract from source
-        const { data: fromWallet } = await supabase.from('wallets').select('current_balance').eq('id', fromWalletId).single();
-        if (fromWallet) {
-            const newFromBalance = Number(fromWallet.current_balance) - amount;
-            await supabase.from('wallets')
-                .update({ current_balance: newFromBalance })
-                .eq('id', fromWalletId);
-            console.log(`Updated source wallet ${fromWalletId} balance to ${newFromBalance}`);
-        }
-
-        // Add to destination
-        const { data: toWallet } = await supabase.from('wallets').select('current_balance').eq('id', toWalletId).single();
-        if (toWallet) {
-            const newToBalance = Number(toWallet.current_balance) + amount;
-            await supabase.from('wallets')
-                .update({ current_balance: newToBalance })
-                .eq('id', toWalletId);
-            console.log(`Updated destination wallet ${toWalletId} balance to ${newToBalance}`);
+        if (error) {
+            console.error('Error in process_wallet_transfer RPC:', JSON.stringify(error, null, 2));
+            return false;
         }
 
         return true;
     } catch (error) {
-        console.error('Error finalizing transfer:', error);
+        console.error('Unexpected error in processTransfer:', error);
         return false;
     }
 }
@@ -551,7 +302,7 @@ export interface AIInsight {
 export async function getWalletAnalytics(walletId: string): Promise<WalletAnalytics> {
     const { data: transactions, error } = await supabase
         .from('transactions')
-        .select('amount, category, type')
+        .select('amount, category, type, is_transfer, transfer_side')
         .eq('wallet_id', walletId);
 
     if (error) {
@@ -559,20 +310,39 @@ export async function getWalletAnalytics(walletId: string): Promise<WalletAnalyt
         return { totalSpent: 0, totalInflow: 0, categorySpending: [] };
     }
 
-    const expenses = transactions?.filter(tx => tx.type === 'expense' || tx.type === 'debit') || [];
-    const incomes = transactions?.filter(tx => tx.type === 'income' || tx.type === 'credit') || [];
+    const expenses = transactions?.filter(tx =>
+        tx.type === TRANSACTION_TYPES.EXPENSE ||
+        tx.type === TRANSACTION_TYPES.DEBIT ||
+        (tx.is_transfer && tx.transfer_side === 'from')
+    ) || [];
+    const incomes = transactions?.filter(tx =>
+        tx.type === TRANSACTION_TYPES.INCOME ||
+        tx.type === TRANSACTION_TYPES.CREDIT ||
+        (tx.is_transfer && tx.transfer_side === 'to')
+    ) || [];
 
     const totalSpent = expenses.reduce((sum, tx) => sum + Number(tx.amount), 0);
     const totalInflow = incomes.reduce((sum, tx) => sum + Number(tx.amount), 0);
 
     const categoryMap: Record<string, number> = {};
     expenses.forEach(tx => {
-        const catObj = getCategoryByIdOrName(tx.category);
-        const catName = catObj?.name || tx.category || 'Uncategorized';
+        // Force 'transfer' category if it's a transfer but doesn't have the category set
+        const effectiveCategory = (tx.is_transfer) ? 'transfer' : tx.category;
+        const catObj = getCategoryByIdOrName(effectiveCategory);
+        const catName = catObj?.name || effectiveCategory || 'Uncategorized';
         categoryMap[catName] = (categoryMap[catName] || 0) + Number(tx.amount);
     });
 
-    const categoryColors = ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#F43F5E', '#6B7280'];
+    const categoryColors = [
+        COLORS.primary,
+        COLORS.error,
+        COLORS.warning,
+        COLORS.success,
+        '#8B5CF6',
+        '#EC4899',
+        '#06B6D4',
+        '#6B7280'
+    ];
 
     const categorySpending = Object.entries(categoryMap).map(([category, amount], index) => ({
         category,
@@ -597,7 +367,7 @@ export async function getGlobalAnalytics(period: 'week' | 'month' | 'year' = 'mo
 
     const { data: transactions, error } = await supabase
         .from('transactions')
-        .select('amount, category, type, transaction_date')
+        .select('amount, category, type, transaction_date, is_transfer, transfer_side')
         .gte('transaction_date', startDate.toISOString());
 
     if (error) {
@@ -605,8 +375,8 @@ export async function getGlobalAnalytics(period: 'week' | 'month' | 'year' = 'mo
         return { totalSpent: 0, totalInflow: 0, netCashflow: 0, categorySpending: [], spendingHistory: [] };
     }
 
-    const expenses = transactions?.filter(tx => tx.type === 'expense' || tx.type === 'debit') || [];
-    const incomes = transactions?.filter(tx => tx.type === 'income' || tx.type === 'credit') || [];
+    const expenses = transactions?.filter(tx => (tx.type === TRANSACTION_TYPES.EXPENSE || tx.type === TRANSACTION_TYPES.DEBIT) && !tx.is_transfer) || [];
+    const incomes = transactions?.filter(tx => (tx.type === TRANSACTION_TYPES.INCOME || tx.type === TRANSACTION_TYPES.CREDIT) && !tx.is_transfer) || [];
 
     const totalSpent = expenses.reduce((sum, tx) => sum + Number(tx.amount), 0);
     const totalInflow = incomes.reduce((sum, tx) => sum + Number(tx.amount), 0);
@@ -620,7 +390,16 @@ export async function getGlobalAnalytics(period: 'week' | 'month' | 'year' = 'mo
         categoryMap[catName] = (categoryMap[catName] || 0) + Number(tx.amount);
     });
 
-    const categoryColors = ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#F43F5E', '#6B7280'];
+    const categoryColors = [
+        COLORS.primary,
+        COLORS.error,
+        COLORS.warning,
+        COLORS.success,
+        '#8B5CF6',
+        '#EC4899',
+        '#06B6D4',
+        '#6B7280'
+    ];
 
     const categorySpending = Object.entries(categoryMap).map(([category, amount], index) => ({
         category,

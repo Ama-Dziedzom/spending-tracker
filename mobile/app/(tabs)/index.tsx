@@ -25,6 +25,8 @@ import { TransactionDetailBottomSheet } from '../../components/transaction-detai
 import { createWallets, CreateWalletInput } from '../../lib/wallet-service';
 import { assignTransactionToWallet } from '../../lib/transaction-service';
 
+import { COLORS } from '../../constants/theme';
+
 // Get greeting based on time of day
 function getGreeting(): string {
     const hour = new Date().getHours();
@@ -108,7 +110,7 @@ export default function Dashboard() {
             }
         } catch (error) {
             console.error('Error opening messages:', error);
-            Linking.openURL('sms:').catch(() => { });
+            Alert.alert('Error', 'Could not open messages app. Please open it manually to copy your transaction SMS.');
         }
     };
 
@@ -255,11 +257,6 @@ export default function Dashboard() {
             setActiveTransaction(null);
             setTransferState(null);
 
-            // Wait for sheet to be mostly closed before refreshing data to avoid layout jumps/stuck backdrop
-            setTimeout(() => {
-                fetchData();
-            }, 800);
-
         } catch (error) {
             console.error('Error saving wallet:', error);
             Alert.alert('Error', 'Failed to save your wallet. Please try again.');
@@ -278,8 +275,8 @@ export default function Dashboard() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#1642E5"
-                        colors={['#1642E5']}
+                        tintColor={COLORS.primary}
+                        colors={[COLORS.primary]}
                     />
                 }
             >
@@ -321,7 +318,7 @@ export default function Dashboard() {
                 {/* Balance Section or Empty State */}
                 {isLoading ? (
                     <View className="py-20 items-center">
-                        <ActivityIndicator size="large" color="#1642E5" />
+                        <ActivityIndicator size="large" color={COLORS.primary} />
                     </View>
                 ) : wallets.length === 0 ? (
                     <View className="items-center mb-14 mt-16">
@@ -363,7 +360,7 @@ export default function Dashboard() {
                         <View className="flex-row justify-between items-center mb-6">
                             <Text className="text-[20px] font-manrope-bold text-slate-900">My Wallets</Text>
                             <Pressable onPress={() => router.push('/wallets')}>
-                                <Text className="text-[#1642E5] font-manrope-semibold">See all</Text>
+                                <Text className="font-manrope-semibold" style={{ color: COLORS.primary }}>See all</Text>
                             </Pressable>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-6 px-6">
@@ -383,7 +380,7 @@ export default function Dashboard() {
                                         <HugeiconsIcon
                                             icon={wallet.type === 'bank' ? BankIcon : wallet.type === 'momo' ? Wallet03Icon : Wallet01Icon}
                                             size={20}
-                                            color="#1642E5"
+                                            color={COLORS.primary}
                                         />
                                     </View>
                                     <Text className="text-[12px] font-manrope-medium text-[#7C7D80] mb-1 leading-tight" numberOfLines={1}>
@@ -404,55 +401,59 @@ export default function Dashboard() {
                         <View className="flex-row justify-between items-center mb-6">
                             <Text className="text-[20px] font-manrope-bold text-slate-900">Recent Transactions</Text>
                             <Pressable onPress={() => router.push('/transactions')}>
-                                <Text className="text-[#1642E5] font-manrope-semibold">See all</Text>
+                                <Text className="font-manrope-semibold" style={{ color: COLORS.primary }}>See all</Text>
                             </Pressable>
                         </View>
                         <View className="gap-4">
-                            {transactions.map((tx) => (
-                                <Pressable
-                                    key={tx.id}
-                                    onPress={() => {
-                                        setSelectedTransactionForDetail(tx);
-                                        setIsTransactionDetailVisible(true);
-                                    }}
-                                    className="flex-row items-center justify-between p-4 bg-white border-[1px] border-slate-100 rounded-[20px]"
-                                    style={{
-                                        shadowColor: '#000',
-                                        shadowOffset: { width: 0, height: 1 },
-                                        shadowOpacity: 0.02,
-                                        shadowRadius: 4,
-                                        elevation: 1,
-                                    }}
-                                >
-                                    <View className="flex-row items-center gap-3 flex-1 mr-3">
-                                        <View
-                                            className="w-10 h-10 rounded-full items-center justify-center"
-                                            style={{
-                                                backgroundColor: getCategoryByIdOrName(tx.category)?.color
-                                                    ? `${getCategoryByIdOrName(tx.category)?.color}15`
-                                                    : 'rgba(244, 63, 94, 0.05)'
-                                            }}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={getCategoryByIdOrName(tx.category)?.icon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
-                                                size={20}
-                                                color={(tx.type === 'income' || tx.type === 'credit') ? '#10B981' : (getCategoryByIdOrName(tx.category)?.color || '#F43F5E')}
-                                            />
+                            {transactions.map((tx) => {
+                                const category = getCategoryByIdOrName(tx.category);
+                                const isIncome = tx.type === 'income' || tx.type === 'credit';
+                                const categoryColor = category?.color || '#F43F5E';
+
+                                return (
+                                    <Pressable
+                                        key={tx.id}
+                                        onPress={() => {
+                                            setSelectedTransactionForDetail(tx);
+                                            setIsTransactionDetailVisible(true);
+                                        }}
+                                        className="flex-row items-center justify-between p-4 bg-white border-[1px] border-slate-100 rounded-[20px]"
+                                        style={{
+                                            shadowColor: '#000',
+                                            shadowOffset: { width: 0, height: 1 },
+                                            shadowOpacity: 0.02,
+                                            shadowRadius: 4,
+                                            elevation: 1,
+                                        }}
+                                    >
+                                        <View className="flex-row items-center gap-3 flex-1 mr-3">
+                                            <View
+                                                className="w-10 h-10 rounded-full items-center justify-center"
+                                                style={{
+                                                    backgroundColor: `${categoryColor}15`
+                                                }}
+                                            >
+                                                <HugeiconsIcon
+                                                    icon={category?.icon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
+                                                    size={20}
+                                                    color={isIncome ? '#10B981' : categoryColor}
+                                                />
+                                            </View>
+                                            <View className="flex-1">
+                                                <Text className="text-[14px] font-manrope-bold text-slate-900" numberOfLines={1}>
+                                                    {tx.description}
+                                                </Text>
+                                                <Text className="text-[12px] font-manrope text-slate-500">
+                                                    {formatTransactionDate(tx.created_at)} • {tx.wallet?.name || 'Manual'}{category ? ` • ${category.name}` : ''}
+                                                </Text>
+                                            </View>
                                         </View>
-                                        <View className="flex-1">
-                                            <Text className="text-[14px] font-manrope-bold text-slate-900" numberOfLines={1}>
-                                                {tx.description}
-                                            </Text>
-                                            <Text className="text-[12px] font-manrope text-slate-500">
-                                                {formatTransactionDate(tx.created_at)} • {tx.wallet?.name || 'Manual'}{getCategoryByIdOrName(tx.category) ? ` • ${getCategoryByIdOrName(tx.category)?.name}` : ''}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <Text className={`text-[16px] font-manrope-bold ${(tx.type === 'income' || tx.type === 'credit') ? 'text-emerald-500' : 'text-slate-900'}`}>
-                                        {(tx.type === 'income' || tx.type === 'credit') ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '')}
-                                    </Text>
-                                </Pressable>
-                            ))}
+                                        <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-emerald-500' : 'text-slate-900'}`}>
+                                            {isIncome ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '')}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
                         </View>
                     </View>
                 )}
@@ -533,8 +534,8 @@ export default function Dashboard() {
                 onConfigure={handleConfigureWallet}
                 onFinish={() => {
                     setIsConfigureSheetVisible(false);
-                    // Small delay before refresh
-                    setTimeout(() => fetchData(), 500);
+                    // Refresh data ONLY when finished
+                    fetchData();
                 }}
                 isLoading={isSavingWallet}
                 initialBalanceFromTransaction={activeTransaction?.amount?.toString()}

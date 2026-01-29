@@ -118,8 +118,8 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                     onSuccess(); // Update dashboard in background
                 }
             } else {
-                console.error('Operation failed according to service response');
-                Alert.alert('Error', 'Failed to link transaction. Please check console.');
+                console.error(`Operation failed: ${isTransferMode ? 'Transfer' : 'Assignment'} failed for Tx ID ${selectedTx.id}`);
+                Alert.alert('Error', 'Failed to link transaction. Please check the console logs for details.');
             }
         } catch (error) {
             console.error('Error in handleAssign:', error);

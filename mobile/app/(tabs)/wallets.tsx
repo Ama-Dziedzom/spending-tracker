@@ -23,7 +23,7 @@ import {
     ArrowUpRight03Icon,
 } from '@hugeicons/core-free-icons';
 import { getWallets, createWallets, CreateWalletInput, getTotalBalance } from '../../lib/wallet-service';
-import { assignTransactionToWallet, getWalletAnalytics, WalletAnalytics } from '../../lib/transaction-service';
+import { assignTransactionToWallet, getWalletAnalytics, WalletAnalytics, getTransactionsByWallet } from '../../lib/transaction-service';
 import { getCategoryIcon, getCategoryColor, getCategoryByName } from '../../lib/categories';
 import { Wallet, supabase } from '../../lib/supabase';
 import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bottom-sheet';
@@ -62,6 +62,7 @@ export default function Wallets() {
     const [selectedWalletForEdit, setSelectedWalletForEdit] = React.useState<Wallet | null>(null);
     const [selectedWalletForDetail, setSelectedWalletForDetail] = React.useState<Wallet | null>(null);
     const [walletAnalytics, setWalletAnalytics] = React.useState<WalletAnalytics | null>(null);
+    const [walletTransactions, setWalletTransactions] = React.useState<any[]>([]);
     const [isLoadingAnalytics, setIsLoadingAnalytics] = React.useState(false);
     const [selectedWalletTypes, setSelectedWalletTypes] = React.useState<string[]>([]);
     const [isSaving, setIsSaving] = React.useState(false);
@@ -113,10 +114,14 @@ export default function Wallets() {
         setSelectedWalletForDetail(wallet);
         setIsLoadingAnalytics(true);
         try {
-            const analytics = await getWalletAnalytics(wallet.id);
+            const [analytics, transactions] = await Promise.all([
+                getWalletAnalytics(wallet.id),
+                getTransactionsByWallet(wallet.id)
+            ]);
             setWalletAnalytics(analytics);
+            setWalletTransactions(transactions);
         } catch (error) {
-            console.error('Error fetching wallet analytics:', error);
+            console.error('Error fetching wallet details:', error);
         } finally {
             setIsLoadingAnalytics(false);
         }
@@ -497,6 +502,58 @@ export default function Wallets() {
                                             <Text className="text-[16px] text-slate-400 font-manrope">No tracked spending yet</Text>
                                         </View>
                                     )}
+
+                                    {/* Recent Activity Section */}
+                                    <View className="mt-12 mb-6">
+                                        <Text className="text-[24px] font-manrope-bold text-slate-900 mb-2 px-2">Wallet Activity</Text>
+                                        <Text className="text-slate-400 font-manrope-medium text-[14px] mb-6 px-2">
+                                            List of your recent transactions
+                                        </Text>
+
+                                        {walletTransactions.length > 0 ? (
+                                            <View className="gap-3">
+                                                {walletTransactions.map((tx, index) => (
+                                                    <Animated.View
+                                                        key={tx.id}
+                                                        {...{ entering: FadeInDown.delay(index * 50) } as any}
+                                                        className="bg-white rounded-[24px] p-4 flex-row items-center justify-between border border-slate-50 shadow-sm"
+                                                    >
+                                                        <View className="flex-row items-center gap-4 flex-1">
+                                                            <View
+                                                                className="w-12 h-12 rounded-full items-center justify-center"
+                                                                style={{ backgroundColor: `${getCategoryColor(tx.is_transfer ? 'transfer' : tx.category)}15` }}
+                                                            >
+                                                                <HugeiconsIcon
+                                                                    icon={getCategoryIcon(tx.is_transfer ? 'transfer' : tx.category)}
+                                                                    size={22}
+                                                                    color={getCategoryColor(tx.is_transfer ? 'transfer' : tx.category)}
+                                                                />
+                                                            </View>
+                                                            <View className="flex-1">
+                                                                <Text className="text-[16px] font-manrope-bold text-slate-900" numberOfLines={1}>
+                                                                    {tx.description}
+                                                                </Text>
+                                                                <Text className="text-slate-400 font-manrope-medium text-[13px]">
+                                                                    {new Date(tx.transaction_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+                                                        <Text className={`text-[16px] font-manrope-bold ${(tx.type === 'income' || tx.type === 'credit' || (tx.is_transfer && tx.transfer_side === 'to'))
+                                                                ? 'text-emerald-500'
+                                                                : 'text-slate-900'
+                                                            }`}>
+                                                            {(tx.type === 'income' || tx.type === 'credit' || (tx.is_transfer && tx.transfer_side === 'to')) ? '+' : '-'}
+                                                            GHS {formatMoney(tx.amount)}
+                                                        </Text>
+                                                    </Animated.View>
+                                                ))}
+                                            </View>
+                                        ) : (
+                                            <View className="py-10 items-center">
+                                                <Text className="text-slate-400 font-manrope">No transactions found</Text>
+                                            </View>
+                                        )}
+                                    </View>
                                 </ScrollView>
                             )}
                         </View>
