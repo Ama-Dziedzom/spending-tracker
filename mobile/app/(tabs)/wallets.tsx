@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl, Image, Dimensions } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -168,6 +169,7 @@ export default function Wallets() {
 
     return (
         <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
+            <StatusBar style="dark" />
             <View className="px-6 pt-8 pb-4">
                 <Text className="text-[#1642E5] font-manrope-bold text-[28px]">My Wallets</Text>
             </View>

@@ -50,6 +50,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="transactions" options={{ headerShown: false }} />
           <Stack.Screen name="wallet-details" options={{ headerShown: false }} />
+          <Stack.Screen name="notifications" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="dark" />
       </ThemeProvider>

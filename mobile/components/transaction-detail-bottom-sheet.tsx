@@ -48,7 +48,7 @@ export function TransactionDetailBottomSheet({ isVisible, transaction, onClose, 
         } else {
             bottomSheetRef.current?.close();
         }
-    }, [isVisible]);
+    }, [isVisible, transaction?.id]);
 
     const handleSheetChanges = useCallback((index: number) => {
         if (index === -1) {

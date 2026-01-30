@@ -1,8 +1,10 @@
 import { View, Text, Image, Pressable, ScrollView, Linking, Platform, RefreshControl } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
     Message02Icon,
     AiMagicIcon,
@@ -13,6 +15,7 @@ import {
     Wallet03Icon,
     Alert01Icon,
     Notification01Icon,
+    Calendar01Icon,
 } from '@hugeicons/core-free-icons';
 import { getWallets, getTotalBalance } from '../../lib/wallet-service';
 import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName } from '../../lib/transaction-service';
@@ -265,254 +268,240 @@ export default function Dashboard() {
         }
     };
 
+    const handleCloseTransactionDetail = useCallback(() => {
+        setIsTransactionDetailVisible(false);
+        setSelectedTransactionForDetail(null);
+    }, []);
+
     return (
-        <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-            <ScrollView
-                className="flex-1"
-                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor={COLORS.primary}
-                        colors={[COLORS.primary]}
-                    />
-                }
+        <View className="flex-1 bg-white">
+            <StatusBar style="light" />
+            <LinearGradient
+                colors={['#0F4CFF', '#1642E5', '#0E1F5B']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ flex: 1 }}
             >
-                {/* Header */}
-                <View className="flex-row items-center mt-4 mb-8">
-                    <View className="w-12 h-12 rounded-full overflow-hidden mr-3">
-                        <Image
-                            source={require('../../assets/images/ama-avatar.png')}
-                            className="w-full h-full"
-                        />
-                    </View>
-                    <View>
-                        <Text className="text-[16px] font-manrope text-slate-500">{getGreeting()}</Text>
-                        <Text className="text-[24px] font-manrope-bold text-slate-900">Hi, Ama</Text>
-                    </View>
-                </View>
-
-                {/* Smart Detection Banner */}
-                {!isLoading && unmatchedCount > 0 && (
-                    <Pressable
-                        onPress={() => setIsLinkSheetVisible(true)}
-                        className="bg-[#F8FAFF] border-[1px] border-[#DAE2FF] rounded-[24px] p-5 mb-8 flex-row items-center gap-4"
-                    >
-                        <View className="w-12 h-12 rounded-full bg-[#1642E5]/10 items-center justify-center">
-                            <HugeiconsIcon icon={AiMagicIcon} size={24} color="#1642E5" />
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-[16px] font-manrope-bold text-slate-900">
-                                {unmatchedCount} smart detections
-                            </Text>
-                            <Text className="text-[14px] font-manrope text-slate-500">
-                                Assign them to a wallet for proper tracking
-                            </Text>
-                        </View>
-                        <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#1642E5" />
-                    </Pressable>
-                )}
-
-                {/* Balance Section or Empty State */}
-                {isLoading ? (
-                    <View className="py-20 items-center">
-                        <ActivityIndicator size="large" color={COLORS.primary} />
-                    </View>
-                ) : wallets.length === 0 ? (
-                    <View className="items-center mb-14 mt-16">
-                        <View style={{ opacity: 1 }}>
-                            <Image
-                                source={require('../../assets/images/no-wallets.png')}
-                                style={{ width: 220, height: 125, marginBottom: 24 }}
-                                resizeMode="contain"
+                <View className="flex-1" style={{ paddingTop: insets.top }}>
+                    <ScrollView
+                        className="flex-1"
+                        contentContainerStyle={{ flexGrow: 1 }}
+                        showsVerticalScrollIndicator={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                tintColor="#FFFFFF"
+                                colors={['#FFFFFF']}
                             />
-                        </View>
-                        <Text className="text-[24px] font-manrope-semibold text-[#1642E5] mt-2">
-                            No wallets yet
-                        </Text>
-                        <Text className="text-[16px] font-manrope text-[#6887F6] text-center mt-2 px-10">
-                            Track your spending instantly.{"\n"}Get started by:
-                        </Text>
-                    </View>
-                ) : (
-                    <View className="bg-[#1642E5] rounded-[32px] p-8 mb-10 overflow-hidden relative">
-                        {/* Background Circles */}
-                        <View className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10" />
-                        <View className="absolute -left-5 -bottom-5 w-24 h-24 rounded-full bg-white/5" />
-
-                        <Text className="text-white/60 text-[14px] font-manrope-bold uppercase tracking-widest mb-2">
-                            TOTAL BALANCE
-                        </Text>
-                        <View className="flex-row items-baseline">
-                            <Text className="text-white text-[16px] font-manrope-semibold mr-1">GHS</Text>
-                            <Text className="text-white text-[48px] font-manrope-bold">
-                                {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </Text>
-                        </View>
-                    </View>
-                )}
-
-                {/* Wallets Quick Access (if wallets exist) */}
-                {wallets.length > 0 && !isLoading && (
-                    <View className="mb-10">
-                        <View className="flex-row justify-between items-center mb-6">
-                            <Text className="text-[20px] font-manrope-bold text-slate-900">My Wallets</Text>
-                            <Pressable onPress={() => router.push('/wallets')}>
-                                <Text className="font-manrope-semibold" style={{ color: COLORS.primary }}>See all</Text>
-                            </Pressable>
-                        </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-6 px-6">
-                            {wallets.map((wallet) => (
+                        }
+                    >
+                        <View style={{ paddingHorizontal: 24, paddingBottom: 60 }}>
+                            {/* Header */}
+                            <View className="flex-row items-center justify-between mt-4 mb-10">
+                                <View>
+                                    <Text className="text-[24px] font-manrope-bold text-white">Hello, Ama</Text>
+                                    <Text className="text-[16px] font-manrope text-white/60">Welcome Back</Text>
+                                </View>
                                 <Pressable
-                                    key={wallet.id}
-                                    className="bg-white border-[1.5px] border-[#F1F1F1] rounded-[20px] p-5 mr-4 w-[160px]"
-                                    style={{
-                                        shadowColor: '#000',
-                                        shadowOffset: { width: 0, height: 2 },
-                                        shadowOpacity: 0.02,
-                                        shadowRadius: 10,
-                                        elevation: 1,
-                                    }}
+                                    onPress={() => router.push('/notifications')}
+                                    className="flex-row items-center bg-white/15 rounded-full p-1 pl-4 border border-white/10 shadow-sm"
                                 >
-                                    <View className="w-10 h-10 rounded-full bg-[#EFF6FF] items-center justify-center mb-4">
-                                        <HugeiconsIcon
-                                            icon={wallet.type === 'bank' ? BankIcon : wallet.type === 'momo' ? Wallet03Icon : Wallet01Icon}
-                                            size={20}
-                                            color={COLORS.primary}
+                                    <HugeiconsIcon icon={Notification01Icon} size={20} color="#FFFFFF" />
+                                    <View className="w-8 h-8 rounded-full overflow-hidden ml-3">
+                                        <Image
+                                            source={require('../../assets/images/ama-avatar.png')}
+                                            className="w-full h-full"
                                         />
                                     </View>
-                                    <Text className="text-[12px] font-manrope-medium text-[#7C7D80] mb-1 leading-tight" numberOfLines={1}>
-                                        {wallet.name}
-                                    </Text>
-                                    <Text className="text-[16px] font-manrope-bold text-[#5B5B5B]">
-                                        {Number(wallet.current_balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                    </Text>
                                 </Pressable>
-                            ))}
-                        </ScrollView>
-                    </View>
-                )}
+                            </View>
 
-                {/* Recent Transactions Section */}
-                {transactions.length > 0 && !isLoading && (
-                    <View className="mb-10">
-                        <View className="flex-row justify-between items-center mb-6">
-                            <Text className="text-[20px] font-manrope-bold text-slate-900">Recent Transactions</Text>
-                            <Pressable onPress={() => router.push('/transactions')}>
-                                <Text className="font-manrope-semibold" style={{ color: COLORS.primary }}>See all</Text>
-                            </Pressable>
+                            {/* Balance Section */}
+                            {isLoading ? (
+                                <View className="py-20 items-center">
+                                    <ActivityIndicator size="large" color="#FFFFFF" />
+                                </View>
+                            ) : wallets.length === 0 ? (
+                                <View className="items-center mb-14 mt-12">
+                                    <View style={{ opacity: 1 }}>
+                                        <Image
+                                            source={require('../../assets/images/no-wallets.png')}
+                                            style={{ width: 220, height: 125, marginBottom: 24 }}
+                                            resizeMode="contain"
+                                        />
+                                    </View>
+                                    <Text className="text-[24px] font-manrope-bold text-white mt-2">
+                                        No wallets yet
+                                    </Text>
+                                    <Text className="text-[16px] font-manrope text-white/60 text-center mt-2 px-10">
+                                        Track your spending instantly.{"\n"}Get started by:
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View className="items-center mb-4 mt-8">
+                                    <Text className="text-white/60 text-[14px] font-manrope-bold uppercase tracking-[1px] mb-1">
+                                        TOTAL BALANCE
+                                    </Text>
+                                    <Text className="text-white text-[48px] font-manrope-bold">
+                                        GHS {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                    </Text>
+                                </View>
+                            )}
                         </View>
-                        <View className="gap-4">
-                            {transactions.map((tx) => {
-                                const category = getCategoryByIdOrName(tx.category);
-                                const isIncome = tx.type === 'income' || tx.type === 'credit';
-                                const categoryColor = category?.color || '#F43F5E';
 
-                                return (
+                        {/* White Container Content */}
+                        <View className="flex-1 bg-white rounded-t-[48px] px-6 pt-2 pb-10" style={{
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: -15 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 20,
+                            elevation: 20,
+                        }}>
+                            {/* Drag Handle */}
+                            {/* <View className="w-12 h-1 bg-slate-100 rounded-full self-center mb-6" /> */}
+
+                            {/* Smart Detection Banner */}
+                            {!isLoading && unmatchedCount > 0 && (
+                                <Pressable
+                                    onPress={() => setIsLinkSheetVisible(true)}
+                                    className="bg-[#F8FAFF] border-[1px] border-[#DAE2FF] rounded-[24px] p-5 mb-8 flex-row items-center gap-4"
+                                >
+                                    <View className="w-12 h-12 rounded-full bg-[#0F4CFF]/10 items-center justify-center">
+                                        <HugeiconsIcon icon={AiMagicIcon} size={24} color="#0F4CFF" />
+                                    </View>
+                                    <View className="flex-1">
+                                        <View className="flex-row items-center gap-2">
+                                            <Text className="text-[16px] font-manrope-bold text-slate-900">
+                                                {unmatchedCount} smart detections
+                                            </Text>
+                                            <View className="bg-rose-500 w-2 h-2 rounded-full" />
+                                        </View>
+                                        <Text className="text-[14px] font-manrope text-slate-500">
+                                            Assign them for proper tracking
+                                        </Text>
+                                    </View>
+                                    <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#0F4CFF" />
+                                </Pressable>
+                            )}
+
+                            {/* Recent Transactions Section */}
+                            {transactions.length > 0 && !isLoading ? (
+                                <View className="mb-6 mt-8">
+                                    <View className="flex-row justify-between items-center mb-6">
+                                        <Text className="text-[20px] font-manrope-bold text-slate-900">Recent Transactions</Text>
+                                        <Pressable onPress={() => router.push('/transactions')}>
+                                            <Text className="text-[18px] font-manrope-semibold" style={{ color: COLORS.primary }}>See all</Text>
+                                        </Pressable>
+                                    </View>
+                                    <View className="gap-0.5">
+                                        {transactions.map((tx) => {
+                                            const category = getCategoryByIdOrName(tx.category);
+                                            const isIncome = tx.type === 'income' || tx.type === 'credit';
+                                            const categoryColor = category?.color || '#94A3B8';
+
+                                            return (
+                                                <Pressable
+                                                    key={tx.id}
+                                                    onPress={() => {
+                                                        setSelectedTransactionForDetail(tx);
+                                                        setIsTransactionDetailVisible(true);
+                                                    }}
+                                                    className="flex-row items-center justify-between p-4 bg-white rounded-[24px]"
+                                                >
+                                                    <View className="flex-row items-center gap-4 flex-1 mr-3">
+                                                        <View
+                                                            className="w-12 h-12 rounded-full items-center justify-center"
+                                                            style={{ backgroundColor: `${categoryColor}15` }}
+                                                        >
+                                                            <HugeiconsIcon
+                                                                icon={category?.icon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
+                                                                size={20}
+                                                                color={isIncome ? '#10B981' : categoryColor}
+                                                            />
+                                                        </View>
+                                                        <View className="flex-1">
+                                                            <Text className="text-[16px] font-manrope-bold text-slate-900" numberOfLines={1}>
+                                                                {tx.description}
+                                                            </Text>
+                                                            <Text className="text-[13px] font-manrope text-slate-400">
+                                                                {formatTransactionDate(tx.created_at)}
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-slate-900' : 'text-rose-500'}`}>
+                                                        {isIncome ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '₵')}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
+                                </View>
+                            ) : !isLoading && transactions.length === 0 && (
+                                <View className="items-center py-20 px-8">
+                                    <View className="w-16 h-16 bg-slate-50 rounded-full items-center justify-center mb-4">
+                                        <HugeiconsIcon icon={Wallet01Icon} size={32} color="#CBD5E1" />
+                                    </View>
+                                    <Text className="text-slate-900 font-manrope-bold text-[18px] text-center mb-2">No activity yet</Text>
+                                    <Text className="text-slate-400 font-manrope text-center">Your recent transactions will show up here.</Text>
+                                </View>
+                            )}
+
+                            {/* Actions - Only shown in empty states */}
+                            {!isLoading && transactions.length === 0 && wallets.length > 0 && (
+                                <View className="mt-4 gap-4">
+                                    {/* Recommended: SMS Tracking */}
                                     <Pressable
-                                        key={tx.id}
-                                        onPress={() => {
-                                            setSelectedTransactionForDetail(tx);
-                                            setIsTransactionDetailVisible(true);
-                                        }}
-                                        className="flex-row items-center justify-between p-4 bg-white border-[1px] border-slate-100 rounded-[20px]"
-                                        style={{
-                                            shadowColor: '#000',
-                                            shadowOffset: { width: 0, height: 1 },
-                                            shadowOpacity: 0.02,
-                                            shadowRadius: 4,
-                                            elevation: 1,
-                                        }}
+                                        onPress={handleOpenMessages}
+                                        className="bg-[#0F4CFF] rounded-[32px] p-6 relative overflow-hidden"
                                     >
-                                        <View className="flex-row items-center gap-3 flex-1 mr-3">
-                                            <View
-                                                className="w-10 h-10 rounded-full items-center justify-center"
-                                                style={{
-                                                    backgroundColor: `${categoryColor}15`
-                                                }}
-                                            >
-                                                <HugeiconsIcon
-                                                    icon={category?.icon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
-                                                    size={20}
-                                                    color={isIncome ? '#10B981' : categoryColor}
-                                                />
+                                        <View className="absolute -right-16 -top-12 opacity-[0.07]">
+                                            <HugeiconsIcon icon={Message02Icon} size={202} color="white" fill="white" />
+                                        </View>
+
+                                        <View className="flex-row justify-between items-start mb-6">
+                                            <View className="w-12 h-12 rounded-full bg-white items-center justify-center">
+                                                <HugeiconsIcon icon={Message02Icon} size={24} color="#0F4CFF" />
                                             </View>
-                                            <View className="flex-1">
-                                                <Text className="text-[14px] font-manrope-bold text-slate-900" numberOfLines={1}>
-                                                    {tx.description}
-                                                </Text>
-                                                <Text className="text-[12px] font-manrope text-slate-500">
-                                                    {formatTransactionDate(tx.created_at)} • {tx.wallet?.name || 'Manual'}{category ? ` • ${category.name}` : ''}
-                                                </Text>
+                                            <View className="bg-white/10 rounded-full px-3 py-2 flex-row items-center gap-1">
+                                                <HugeiconsIcon icon={AiMagicIcon} size={14} color="white" />
+                                                <Text className="text-white text-[12px] font-manrope-semibold">AI Detection</Text>
                                             </View>
                                         </View>
-                                        <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-emerald-500' : 'text-slate-900'}`}>
-                                            {isIncome ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '')}
+
+                                        <View className="flex-row items-end justify-between">
+                                            <View className="flex-1 mr-4">
+                                                <Text className="text-white text-[20px] font-manrope-bold mb-1">
+                                                    Share a transaction SMS
+                                                </Text>
+                                                <Text className="text-white/80 text-[16px] font-manrope">
+                                                    Log SMS for auto-tracking
+                                                </Text>
+                                            </View>
+                                            <View className="pb-1">
+                                                <HugeiconsIcon icon={ArrowRight01Icon} size={24} color="white" />
+                                            </View>
+                                        </View>
+                                    </Pressable>
+
+                                    {/* Manual Entry */}
+                                    <Pressable
+                                        onPress={() => router.push('/onboarding-link-wallet')}
+                                        className="border-2 border-dashed border-slate-100 rounded-[24px] p-6 flex-row items-center gap-4"
+                                    >
+                                        <View className="w-12 h-12 rounded-full bg-slate-50 items-center justify-center">
+                                            <HugeiconsIcon icon={AddCircleHalfDotIcon} size={24} color="#64748B" />
+                                        </View>
+                                        <Text className="text-[18px] font-manrope-semibold text-slate-500">
+                                            Add wallet manually
                                         </Text>
                                     </Pressable>
-                                );
-                            })}
+                                </View>
+                            )}
                         </View>
-                    </View>
-                )}
-
-                {/* Actions */}
-                <View className="gap-8">
-                    {transactions.length === 0 && (
-                        <>
-                            {/* Recommended: SMS Tracking - Only if no transactions yet */}
-                            <Pressable
-                                onPress={handleOpenMessages}
-                                className="bg-[#1642E5] rounded-[32px] p-6 relative overflow-hidden"
-                            >
-                                {/* Background pattern */}
-                                <View className="absolute -right-16 -top-12 opacity-[0.07]">
-                                    <HugeiconsIcon icon={Message02Icon} size={202} color="white" fill="white" />
-                                </View>
-
-                                <View className="flex-row justify-between items-start mb-6">
-                                    <View className="w-12 h-12 rounded-full bg-white items-center justify-center">
-                                        <HugeiconsIcon icon={Message02Icon} size={24} color="#1642E5" />
-                                    </View>
-                                    <View className="bg-white/10 rounded-full px-3 py-2 flex-row items-center gap-1">
-                                        <HugeiconsIcon icon={AiMagicIcon} size={14} color="white" />
-                                        <Text className="text-white text-[12px] font-manrope-semibold">Recommended</Text>
-                                    </View>
-                                </View>
-
-                                <View className="flex-row items-end justify-between">
-                                    <View className="flex-1 mr-4">
-                                        <Text className="text-white text-[20px] font-manrope-bold mb-1">
-                                            Share a transaction SMS
-                                        </Text>
-                                        <Text className="text-white/80 text-[16px] font-manrope">
-                                            Log SMS transaction to auto-create
-                                        </Text>
-                                    </View>
-                                    <View className="pb-1">
-                                        <HugeiconsIcon icon={ArrowRight01Icon} size={24} color="white" />
-                                    </View>
-                                </View>
-                            </Pressable>
-
-                            {/* Manual Entry */}
-                            <Pressable
-                                onPress={() => router.push('/onboarding-link-wallet')}
-                                className="border-2 border-dashed border-slate-200 rounded-[24px] p-6 flex-row items-center gap-4"
-                            >
-                                <View className="w-12 h-12 rounded-full bg-slate-50 items-center justify-center">
-                                    <HugeiconsIcon icon={AddCircleHalfDotIcon} size={24} color="#64748B" />
-                                </View>
-                                <Text className="text-[18px] font-manrope-semibold text-slate-500">
-                                    Add wallet manually
-                                </Text>
-                            </Pressable>
-                        </>
-                    )}
+                    </ScrollView>
                 </View>
-            </ScrollView>
+            </LinearGradient>
 
             <LinkTransactionsBottomSheet
                 isVisible={isLinkSheetVisible}
@@ -534,7 +523,6 @@ export default function Dashboard() {
                 onConfigure={handleConfigureWallet}
                 onFinish={() => {
                     setIsConfigureSheetVisible(false);
-                    // Refresh data ONLY when finished
                     fetchData();
                 }}
                 isLoading={isSavingWallet}
@@ -544,10 +532,7 @@ export default function Dashboard() {
             <TransactionDetailBottomSheet
                 isVisible={isTransactionDetailVisible}
                 transaction={selectedTransactionForDetail}
-                onClose={() => {
-                    setIsTransactionDetailVisible(false);
-                    setSelectedTransactionForDetail(null);
-                }}
+                onClose={handleCloseTransactionDetail}
                 onCategoryUpdated={fetchData}
             />
         </View>

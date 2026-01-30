@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl, Modal, Dimensions } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect, useCallback } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,6 +69,11 @@ export default function WalletDetailsPage() {
         fetchData();
     }, [fetchData]);
 
+    const handleCloseDetail = useCallback(() => {
+        setIsDetailVisible(false);
+        setSelectedTransaction(null);
+    }, []);
+
     const onRefresh = () => {
         setRefreshing(true);
         fetchData();
@@ -94,6 +100,7 @@ export default function WalletDetailsPage() {
 
     return (
         <View className="flex-1 bg-[#0F4CFF]">
+            <StatusBar style="light" />
             {/* Top section with Splash color / Gradient */}
             <LinearGradient
                 colors={['#0F4CFF', '#1642E5', '#0E1F5B']}
@@ -310,10 +317,7 @@ export default function WalletDetailsPage() {
             <TransactionDetailBottomSheet
                 isVisible={isDetailVisible}
                 transaction={selectedTransaction}
-                onClose={() => {
-                    setIsDetailVisible(false);
-                    setSelectedTransaction(null);
-                }}
+                onClose={handleCloseDetail}
                 onCategoryUpdated={fetchData}
             />
         </View>

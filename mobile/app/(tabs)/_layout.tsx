@@ -26,7 +26,7 @@ export default function TabLayout() {
                     shadowOpacity: 0.02,
                     shadowRadius: 10,
                 },
-                tabBarActiveTintColor: '#1642E5',
+                tabBarActiveTintColor: '#0F4CFF',
                 tabBarInactiveTintColor: '#ADAEAF',
                 tabBarLabelStyle: {
                     fontFamily: 'Manrope-Medium',
@@ -44,7 +44,7 @@ export default function TabLayout() {
                     tabBarLabel: ({ color, focused }) => (
                         <View className="items-center">
                             <Text style={{ color, fontFamily: focused ? 'Manrope-Bold' : 'Manrope-Medium', fontSize: 14 }}>Home</Text>
-                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#1642E5] mt-1" />}
+                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#0F4CFF] mt-1" />}
                         </View>
                     ),
                 }}
@@ -59,7 +59,7 @@ export default function TabLayout() {
                     tabBarLabel: ({ color, focused }) => (
                         <View className="items-center">
                             <Text style={{ color, fontFamily: focused ? 'Manrope-SemiBold' : 'Manrope-Medium', fontSize: 14 }}>Insights</Text>
-                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#1642E5] mt-1" />}
+                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#0F4CFF] mt-1" />}
                         </View>
                     ),
                 }}
@@ -74,7 +74,7 @@ export default function TabLayout() {
                     tabBarLabel: ({ color, focused }) => (
                         <View className="items-center">
                             <Text style={{ color, fontFamily: focused ? 'Manrope-SemiBold' : 'Manrope-Medium', fontSize: 14 }}>Wallets</Text>
-                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#1642E5] mt-1" />}
+                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#0F4CFF] mt-1" />}
                         </View>
                     ),
                 }}
@@ -89,7 +89,7 @@ export default function TabLayout() {
                     tabBarLabel: ({ color, focused }) => (
                         <View className="items-center">
                             <Text style={{ color, fontFamily: focused ? 'Manrope-SemiBold' : 'Manrope-Medium', fontSize: 14 }}>Settings</Text>
-                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#1642E5] mt-1" />}
+                            {focused && <View className="w-1.5 h-1.5 rounded-full bg-[#0F4CFF] mt-1" />}
                         </View>
                     ),
                 }}
