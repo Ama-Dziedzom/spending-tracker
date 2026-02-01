@@ -1,6 +1,19 @@
-import { supabase, Transaction, Wallet, Transfer } from './supabase';
-import { getCategoryById, suggestCategory, getCategoryByIdOrName } from './categories';
+/**
+ * Transaction Service
+ * 
+ * Handles all transaction-related operations including fetching, updating,
+ * and processing transfers. Works with Supabase RLS policies for security.
+ */
+
+import { z } from 'zod';
+import { supabase, Transaction, Wallet, Transfer, requireAuth } from './supabase';
+import { getCategoryById, suggestCategory, getCategoryByIdOrName, getDefaultCategory } from './categories';
+import { parseSmsDescription, ParsedTransactionInfo } from './parser-utils';
 import { COLORS, TRANSACTION_TYPES } from '../constants/theme';
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface TransactionWithWallet extends Transaction {
     wallet?: Wallet;
@@ -10,8 +23,199 @@ export interface TransactionWithWallet extends Transaction {
     };
 }
 
-// Re-export category utilities for convenience
-export { getCategoryById, suggestCategory, getCategoryColor, getCategoryIcon, getCategoryByIdOrName } from './categories';
+export interface WalletAnalytics {
+    totalSpent: number;
+    totalInflow: number;
+    categorySpending: { category: string; amount: number; percentage: number; color: string }[];
+}
+
+export interface GlobalAnalytics extends WalletAnalytics {
+    netCashflow: number;
+    spendingHistory: { date: string; amount: number; label: string }[];
+}
+
+export interface AIInsight {
+    id: string;
+    title: string;
+    description: string;
+    type: 'warning' | 'positive' | 'info';
+    icon: string;
+}
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const RECENT_TRANSACTIONS_LIMIT = 10;
+const ANALYTICS_COLORS = [
+    COLORS.primary,
+    COLORS.error,
+    COLORS.warning,
+    COLORS.success,
+    '#8B5CF6',
+    '#EC4899',
+    '#06B6D4',
+    '#6B7280'
+];
+
+// High spending threshold for insights (in GHS)
+const HIGH_SPENDING_THRESHOLD = 3000;
+const ANOMALY_THRESHOLD = 500;
+
+// ============================================================================
+// Re-exports
+// ============================================================================
+
+export { getCategoryById, suggestCategory, getCategoryByIdOrName } from './categories';
+export { getCategoryColor, getCategoryIcon } from './categories';
+
+// ============================================================================
+// Transaction Fetching
+// ============================================================================
+
+/**
+ * Get a single transaction by ID with wallet info
+ * RLS policies ensure user can only access their own transactions
+ */
+export async function getTransactionById(transactionId: string): Promise<TransactionWithWallet | null> {
+    try {
+        const { data, error } = await supabase
+            .from('transactions')
+            .select(`
+                *,
+                wallet:wallets(*),
+                transfer:transfers(
+                    *,
+                    from_wallet:wallets!from_wallet_id(*),
+                    to_wallet:wallets!to_wallet_id(*)
+                )
+            `)
+            .eq('id', transactionId)
+            .single();
+
+        if (error) {
+            console.error('Error fetching transaction:', error.message);
+            return null;
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Error fetching transaction:', error);
+        return null;
+    }
+}
+
+/**
+ * Fetch recent transactions for the authenticated user
+ * RLS policies handle user filtering
+ */
+export async function getRecentTransactions(limit: number = RECENT_TRANSACTIONS_LIMIT): Promise<TransactionWithWallet[]> {
+    try {
+        const { data, error } = await supabase
+            .from('transactions')
+            .select(`
+                *,
+                wallet:wallets(*),
+                transfer:transfers(
+                    *,
+                    from_wallet:wallets!from_wallet_id(*),
+                    to_wallet:wallets!to_wallet_id(*)
+                )
+            `)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            console.error('Error fetching transactions:', error.message);
+            return [];
+        }
+
+        return data || [];
+    } catch (error) {
+        console.error('Error fetching transactions:', error);
+        return [];
+    }
+}
+
+/**
+ * Get transactions for a specific wallet
+ */
+export async function getTransactionsByWallet(walletId: string, limit: number = 20): Promise<TransactionWithWallet[]> {
+    try {
+        const { data, error } = await supabase
+            .from('transactions')
+            .select(`
+                *,
+                wallet:wallets(*),
+                transfer:transfers(
+                    *,
+                    from_wallet:wallets!from_wallet_id(*),
+                    to_wallet:wallets!to_wallet_id(*)
+                )
+            `)
+            .eq('wallet_id', walletId)
+            .order('transaction_date', { ascending: false })
+            .limit(limit);
+
+        if (error) {
+            console.error('Error fetching wallet transactions:', error.message);
+            return [];
+        }
+
+        return data || [];
+    } catch (error) {
+        console.error('Error fetching wallet transactions:', error);
+        return [];
+    }
+}
+
+/**
+ * Get transactions without wallet assignment (unmatched)
+ */
+export async function getUnmatchedTransactions(): Promise<Transaction[]> {
+    try {
+        const { data, error } = await supabase
+            .from('transactions')
+            .select('*')
+            .is('wallet_id', null)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching unmatched transactions:', error.message);
+            return [];
+        }
+
+        return data || [];
+    } catch (error) {
+        console.error('Error fetching unmatched transactions:', error);
+        return [];
+    }
+}
+
+/**
+ * Get transaction count for the authenticated user
+ */
+export async function getTransactionCount(): Promise<number> {
+    try {
+        const { count, error } = await supabase
+            .from('transactions')
+            .select('*', { count: 'exact', head: true });
+
+        if (error) {
+            console.error('Error counting transactions:', error.message);
+            return 0;
+        }
+
+        return count ?? 0;
+    } catch (error) {
+        console.error('Error counting transactions:', error);
+        return 0;
+    }
+}
+
+// ============================================================================
+// Transaction Updates
+// ============================================================================
 
 /**
  * Update a transaction's category
@@ -20,185 +224,78 @@ export async function updateTransactionCategory(
     transactionId: string,
     categoryId: string
 ): Promise<boolean> {
-    const category = getCategoryById(categoryId);
-    if (!category) {
-        console.error('Invalid category ID:', categoryId);
-        return false;
-    }
+    try {
+        const category = getCategoryById(categoryId);
+        if (!category) {
+            console.error('Invalid category ID:', categoryId);
+            return false;
+        }
 
-    const { error } = await supabase
-        .from('transactions')
-        .update({
-            category: category.id,
-            updated_at: new Date().toISOString()
-        })
-        .eq('id', transactionId);
+        const { error } = await supabase
+            .from('transactions')
+            .update({
+                category: category.id,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', transactionId);
 
-    if (error) {
+        if (error) {
+            console.error('Error updating transaction category:', error.message);
+            return false;
+        }
+
+        return true;
+    } catch (error) {
         console.error('Error updating transaction category:', error);
         return false;
     }
-
-    return true;
 }
 
 /**
- * Get a single transaction by ID with wallet info
+ * Assign a transaction to a wallet using RPC (handles balance updates atomically)
+ * Note: RPC function now uses auth.uid() internally for security
  */
-export async function getTransactionById(transactionId: string): Promise<TransactionWithWallet | null> {
-    const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-            *,
-            wallet:wallets(*),
-            transfer:transfers(
-                *,
-                from_wallet:wallets!from_wallet_id(*),
-                to_wallet:wallets!to_wallet_id(*)
-            )
-        `)
-        .eq('id', transactionId)
-        .single();
-
-    if (error) {
-        console.error('Error fetching transaction:', error);
-        return null;
-    }
-
-    return data;
-}
-
-// Fetch recent transactions
-export async function getRecentTransactions(limit: number = 10): Promise<TransactionWithWallet[]> {
-    const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-            *,
-            wallet:wallets(*),
-            transfer:transfers(
-                *,
-                from_wallet:wallets!from_wallet_id(*),
-                to_wallet:wallets!to_wallet_id(*)
-            )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        console.error('Error fetching transactions:', error);
-        return [];
-    }
-
-    return data || [];
-}
-
-// Fetch all wallets
-export async function getWallets(): Promise<Wallet[]> {
-    const { data, error } = await supabase
-        .from('wallets')
-        .select('*')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching wallets:', error);
-        return [];
-    }
-
-    return data || [];
-}
-
-// Get transactions for a specific wallet
-export async function getTransactionsByWallet(walletId: string, limit: number = 20): Promise<TransactionWithWallet[]> {
-    const { data, error } = await supabase
-        .from('transactions')
-        .select(`
-            *,
-            wallet:wallets(*),
-            transfer:transfers(
-                *,
-                from_wallet:wallets!from_wallet_id(*),
-                to_wallet:wallets!to_wallet_id(*)
-            )
-        `)
-        .eq('wallet_id', walletId)
-        .order('transaction_date', { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        console.error('Error fetching wallet transactions:', error);
-        return [];
-    }
-
-    return data || [];
-}
-
-// Check if user has any wallets set up
-export async function hasWalletsConfigured(): Promise<boolean> {
-    const { count, error } = await supabase
-        .from('wallets')
-        .select('*', { count: 'exact', head: true })
-        .eq('is_active', true);
-
-    if (error) {
-        console.error('Error checking wallets:', error);
-        return false;
-    }
-
-    return (count ?? 0) > 0;
-}
-
-// Get transactions without wallet assignment (unmatched)
-export async function getUnmatchedTransactions(): Promise<Transaction[]> {
-    const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .is('wallet_id', null)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching unmatched transactions:', error);
-        return [];
-    }
-
-    return data || [];
-}
-
-// Assign a transaction to a wallet and update the wallet balance atomically via RPC
 export async function assignTransactionToWallet(transactionId: string, walletId: string): Promise<boolean> {
-    const { data: transaction, error: fetchError } = await supabase
-        .from('transactions')
-        .select('description, type')
-        .eq('id', transactionId)
-        .single();
+    try {
+        // Get transaction description to suggest category
+        const { data: transaction, error: fetchError } = await supabase
+            .from('transactions')
+            .select('description, type')
+            .eq('id', transactionId)
+            .single();
 
-    if (fetchError || !transaction) return false;
+        if (fetchError || !transaction) {
+            console.error('Error fetching transaction for assignment:', fetchError?.message);
+            return false;
+        }
 
-    const suggestedCat = suggestCategory(transaction.description, transaction.type);
+        const suggestedCat = suggestCategory(transaction.description, transaction.type);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
+        // Call RPC function - user_id is now handled internally by auth.uid()
+        const { error } = await supabase.rpc('assign_transaction_to_wallet', {
+            p_transaction_id: transactionId,
+            p_wallet_id: walletId,
+            p_category_id: suggestedCat.id,
+        });
 
-    const { error } = await supabase.rpc('assign_transaction_to_wallet', {
-        p_transaction_id: transactionId,
-        p_wallet_id: walletId,
-        p_category_id: suggestedCat.id,
-        p_user_id: user.id
-    });
+        if (error) {
+            console.error('Error in assign_transaction_to_wallet RPC:', error.message);
+            return false;
+        }
 
-    if (error) {
-        console.error('Error in assign_transaction_to_wallet RPC:', JSON.stringify(error, null, 2));
+        return true;
+    } catch (error) {
+        console.error('Error assigning transaction to wallet:', error);
         return false;
     }
-
-    return true;
 }
 
-import { parseSmsDescription, ParsedTransactionInfo } from './parser-utils';
+// ============================================================================
+// Transfers
+// ============================================================================
 
 /**
  * Detects if a transaction description indicates a transfer
- * and attempts to identify source/destination types.
  */
 export function detectTransferInfo(description: string): ParsedTransactionInfo {
     return parseSmsDescription(description);
@@ -206,6 +303,7 @@ export function detectTransferInfo(description: string): ParsedTransactionInfo {
 
 /**
  * Process a transfer between two wallets atomically via RPC
+ * Note: RPC function now uses auth.uid() internally for security
  */
 export async function processTransfer(
     transactionId: string,
@@ -215,23 +313,28 @@ export async function processTransfer(
     notes?: string
 ): Promise<boolean> {
     try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-            console.error('User must be logged in to process transfers');
+        // Validate inputs
+        if (amount <= 0) {
+            console.error('Transfer amount must be positive');
             return false;
         }
 
+        if (fromWalletId === toWalletId) {
+            console.error('Cannot transfer to the same wallet');
+            return false;
+        }
+
+        // Call RPC function - user_id is now handled internally by auth.uid()
         const { error } = await supabase.rpc('process_wallet_transfer', {
             p_transaction_id: transactionId,
             p_from_wallet_id: fromWalletId,
             p_to_wallet_id: toWalletId,
             p_amount: amount,
             p_notes: notes || '',
-            p_user_id: user.id
         });
 
         if (error) {
-            console.error('Error in process_wallet_transfer RPC:', JSON.stringify(error, null, 2));
+            console.error('Error in process_wallet_transfer RPC:', error.message);
             return false;
         }
 
@@ -242,21 +345,13 @@ export async function processTransfer(
     }
 }
 
-// Get transaction count
-export async function getTransactionCount(): Promise<number> {
-    const { count, error } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true });
+// ============================================================================
+// Formatting Utilities
+// ============================================================================
 
-    if (error) {
-        console.error('Error counting transactions:', error);
-        return 0;
-    }
-
-    return count ?? 0;
-}
-
-// Format currency
+/**
+ * Format currency for display
+ */
 export function formatCurrency(amount: number): string {
     return `GH₵ ${Math.abs(amount).toLocaleString('en-US', {
         minimumFractionDigits: 2,
@@ -264,7 +359,9 @@ export function formatCurrency(amount: number): string {
     })}`;
 }
 
-// Format date for display
+/**
+ * Format date for display
+ */
 export function formatTransactionDate(dateString: string): string {
     const date = new Date(dateString);
     const now = new Date();
@@ -288,7 +385,9 @@ export function formatTransactionDate(dateString: string): string {
     });
 }
 
-// Get time of transaction
+/**
+ * Get time of transaction
+ */
 export function formatTransactionTime(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', {
@@ -298,190 +397,171 @@ export function formatTransactionTime(dateString: string): string {
     });
 }
 
-export interface WalletAnalytics {
-    totalSpent: number;
-    totalInflow: number;
-    categorySpending: { category: string; amount: number; percentage: number; color: string }[];
-}
+// ============================================================================
+// Analytics
+// ============================================================================
 
-export interface GlobalAnalytics extends WalletAnalytics {
-    netCashflow: number;
-    spendingHistory: { date: string; amount: number; label: string }[];
-}
-
-export interface AIInsight {
-    id: string;
-    title: string;
-    description: string;
-    type: 'warning' | 'positive' | 'info';
-    icon: string;
-}
-
-// Get analytics for a specific wallet
+/**
+ * Get analytics for a specific wallet
+ */
 export async function getWalletAnalytics(walletId: string): Promise<WalletAnalytics> {
-    const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select('amount, category, type, is_transfer, transfer_side')
-        .eq('wallet_id', walletId);
+    try {
+        const { data: transactions, error } = await supabase
+            .from('transactions')
+            .select('amount, category, type, is_transfer, transfer_side')
+            .eq('wallet_id', walletId);
 
-    if (error) {
-        console.error('Error fetching analytics:', error);
+        if (error) {
+            console.error('Error fetching analytics:', error.message);
+            return { totalSpent: 0, totalInflow: 0, categorySpending: [] };
+        }
+
+        const expenses = transactions?.filter(tx =>
+            tx.type === TRANSACTION_TYPES.EXPENSE ||
+            tx.type === TRANSACTION_TYPES.DEBIT ||
+            (tx.is_transfer && tx.transfer_side === 'from')
+        ) || [];
+
+        const incomes = transactions?.filter(tx =>
+            tx.type === TRANSACTION_TYPES.INCOME ||
+            tx.type === TRANSACTION_TYPES.CREDIT ||
+            (tx.is_transfer && tx.transfer_side === 'to')
+        ) || [];
+
+        const totalSpent = expenses.reduce((sum, tx) => sum + Number(tx.amount), 0);
+        const totalInflow = incomes.reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+        const categoryMap: Record<string, number> = {};
+        expenses.forEach(tx => {
+            const effectiveCategory = (tx.is_transfer && (!tx.category || tx.category === 'transfer'))
+                ? 'transfer'
+                : (tx.category || 'other');
+            const catObj = getCategoryByIdOrName(effectiveCategory);
+            const catName = catObj?.name || effectiveCategory || 'Uncategorized';
+            categoryMap[catName] = (categoryMap[catName] || 0) + Number(tx.amount);
+        });
+
+        const categorySpending = Object.entries(categoryMap)
+            .map(([category, amount], index) => ({
+                category,
+                amount,
+                percentage: totalSpent > 0 ? (amount / totalSpent) * 100 : 0,
+                color: ANALYTICS_COLORS[index % ANALYTICS_COLORS.length]
+            }))
+            .sort((a, b) => b.amount - a.amount);
+
+        return { totalSpent, totalInflow, categorySpending };
+    } catch (error) {
+        console.error('Error fetching wallet analytics:', error);
         return { totalSpent: 0, totalInflow: 0, categorySpending: [] };
     }
-
-    const expenses = transactions?.filter(tx =>
-        tx.type === TRANSACTION_TYPES.EXPENSE ||
-        tx.type === TRANSACTION_TYPES.DEBIT ||
-        (tx.is_transfer && tx.transfer_side === 'from')
-    ) || [];
-    const incomes = transactions?.filter(tx =>
-        tx.type === TRANSACTION_TYPES.INCOME ||
-        tx.type === TRANSACTION_TYPES.CREDIT ||
-        (tx.is_transfer && tx.transfer_side === 'to')
-    ) || [];
-
-    const totalSpent = expenses.reduce((sum, tx) => sum + Number(tx.amount), 0);
-    const totalInflow = incomes.reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-    const categoryMap: Record<string, number> = {};
-    expenses.forEach(tx => {
-        // Use the transaction's category if it's not 'transfer' or null, otherwise default to 'transfer' for transfers
-        const effectiveCategory = (tx.is_transfer && (!tx.category || tx.category === 'transfer')) ? 'transfer' : (tx.category || 'other');
-        const catObj = getCategoryByIdOrName(effectiveCategory);
-        const catName = catObj?.name || effectiveCategory || 'Uncategorized';
-        categoryMap[catName] = (categoryMap[catName] || 0) + Number(tx.amount);
-    });
-
-    const categoryColors = [
-        COLORS.primary,
-        COLORS.error,
-        COLORS.warning,
-        COLORS.success,
-        '#8B5CF6',
-        '#EC4899',
-        '#06B6D4',
-        '#6B7280'
-    ];
-
-    const categorySpending = Object.entries(categoryMap).map(([category, amount], index) => ({
-        category,
-        amount,
-        percentage: totalSpent > 0 ? (amount / totalSpent) * 100 : 0,
-        color: categoryColors[index % categoryColors.length]
-    })).sort((a, b) => b.amount - a.amount);
-
-    return {
-        totalSpent,
-        totalInflow,
-        categorySpending
-    };
 }
 
-// Get global analytics for all wallets
+/**
+ * Get global analytics for all wallets
+ */
 export async function getGlobalAnalytics(period: 'week' | 'month' | 'year' = 'month'): Promise<GlobalAnalytics> {
-    const startDate = new Date();
-    if (period === 'week') startDate.setDate(startDate.getDate() - 7);
-    else if (period === 'month') startDate.setMonth(startDate.getMonth() - 1);
-    else if (period === 'year') startDate.setFullYear(startDate.getFullYear() - 1);
+    try {
+        const startDate = new Date();
+        const DAYS_IN_WEEK = 7;
 
-    const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select('amount, category, type, transaction_date, is_transfer, transfer_side')
-        .gte('transaction_date', startDate.toISOString());
+        if (period === 'week') {
+            startDate.setDate(startDate.getDate() - DAYS_IN_WEEK);
+        } else if (period === 'month') {
+            startDate.setMonth(startDate.getMonth() - 1);
+        } else {
+            startDate.setFullYear(startDate.getFullYear() - 1);
+        }
 
-    if (error) {
+        const { data: transactions, error } = await supabase
+            .from('transactions')
+            .select('amount, category, type, transaction_date, is_transfer, transfer_side')
+            .gte('transaction_date', startDate.toISOString());
+
+        if (error) {
+            console.error('Error fetching global analytics:', error.message);
+            return { totalSpent: 0, totalInflow: 0, netCashflow: 0, categorySpending: [], spendingHistory: [] };
+        }
+
+        // Include expenses and "from" transfers with spending categories
+        const expenses = transactions?.filter(tx =>
+            ((tx.type === TRANSACTION_TYPES.EXPENSE || tx.type === TRANSACTION_TYPES.DEBIT) && !tx.is_transfer) ||
+            (tx.is_transfer && tx.transfer_side === 'from' && tx.category && tx.category !== 'transfer')
+        ) || [];
+
+        // Include incomes and "to" transfers with specific categories
+        const incomes = transactions?.filter(tx =>
+            ((tx.type === TRANSACTION_TYPES.INCOME || tx.type === TRANSACTION_TYPES.CREDIT) && !tx.is_transfer) ||
+            (tx.is_transfer && tx.transfer_side === 'to' && tx.category && tx.category !== 'transfer' && tx.category !== 'income')
+        ) || [];
+
+        const totalSpent = expenses.reduce((sum, tx) => sum + Number(tx.amount), 0);
+        const totalInflow = incomes.reduce((sum, tx) => sum + Number(tx.amount), 0);
+        const netCashflow = totalInflow - totalSpent;
+
+        // Category breakdown
+        const categoryMap: Record<string, number> = {};
+        expenses.forEach(tx => {
+            const catObj = getCategoryByIdOrName(tx.category);
+            const catName = catObj?.name || tx.category || 'Uncategorized';
+            categoryMap[catName] = (categoryMap[catName] || 0) + Number(tx.amount);
+        });
+
+        const categorySpending = Object.entries(categoryMap)
+            .map(([category, amount], index) => ({
+                category,
+                amount,
+                percentage: totalSpent > 0 ? (amount / totalSpent) * 100 : 0,
+                color: ANALYTICS_COLORS[index % ANALYTICS_COLORS.length]
+            }))
+            .sort((a, b) => b.amount - a.amount);
+
+        // Spending history
+        const historyMap: Record<string, number> = {};
+        expenses.forEach(tx => {
+            const date = new Date(tx.transaction_date).toISOString().split('T')[0];
+            historyMap[date] = (historyMap[date] || 0) + Number(tx.amount);
+        });
+
+        const spendingHistory: GlobalAnalytics['spendingHistory'] = [];
+        const curr = new Date(startDate);
+        const end = new Date();
+
+        while (curr <= end) {
+            const d = curr.toISOString().split('T')[0];
+            const dateObj = new Date(curr);
+            let label = '';
+
+            if (period === 'week') {
+                label = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+            } else if (period === 'month') {
+                label = dateObj.getDate().toString();
+            } else {
+                label = dateObj.toLocaleDateString('en-US', { month: 'short' });
+            }
+
+            spendingHistory.push({
+                date: d,
+                amount: historyMap[d] || 0,
+                label
+            });
+            curr.setDate(curr.getDate() + 1);
+        }
+
+        return { totalSpent, totalInflow, netCashflow, categorySpending, spendingHistory };
+    } catch (error) {
         console.error('Error fetching global analytics:', error);
         return { totalSpent: 0, totalInflow: 0, netCashflow: 0, categorySpending: [], spendingHistory: [] };
     }
-
-    // Include expenses and "from" transfers that have a specific spending category
-    const expenses = transactions?.filter(tx =>
-        ((tx.type === TRANSACTION_TYPES.EXPENSE || tx.type === TRANSACTION_TYPES.DEBIT) && !tx.is_transfer) ||
-        (tx.is_transfer && tx.transfer_side === 'from' && tx.category && tx.category !== 'transfer')
-    ) || [];
-
-    // Include incomes and "to" transfers that have a specific income category
-    const incomes = transactions?.filter(tx =>
-        ((tx.type === TRANSACTION_TYPES.INCOME || tx.type === TRANSACTION_TYPES.CREDIT) && !tx.is_transfer) ||
-        (tx.is_transfer && tx.transfer_side === 'to' && tx.category && tx.category !== 'transfer' && tx.category !== 'income')
-    ) || [];
-
-    const totalSpent = expenses.reduce((sum, tx) => sum + Number(tx.amount), 0);
-    const totalInflow = incomes.reduce((sum, tx) => sum + Number(tx.amount), 0);
-    const netCashflow = totalInflow - totalSpent;
-
-    // Category breakdown
-    const categoryMap: Record<string, number> = {};
-    expenses.forEach(tx => {
-        const catObj = getCategoryByIdOrName(tx.category);
-        const catName = catObj?.name || tx.category || 'Uncategorized';
-        categoryMap[catName] = (categoryMap[catName] || 0) + Number(tx.amount);
-    });
-
-    const categoryColors = [
-        COLORS.primary,
-        COLORS.error,
-        COLORS.warning,
-        COLORS.success,
-        '#8B5CF6',
-        '#EC4899',
-        '#06B6D4',
-        '#6B7280'
-    ];
-
-    const categorySpending = Object.entries(categoryMap).map(([category, amount], index) => ({
-        category,
-        amount,
-        percentage: totalSpent > 0 ? (amount / totalSpent) * 100 : 0,
-        color: categoryColors[index % categoryColors.length]
-    })).sort((a, b) => b.amount - a.amount);
-
-    // Spending history
-    const historyMap: Record<string, number> = {};
-    expenses.forEach(tx => {
-        const date = new Date(tx.transaction_date).toISOString().split('T')[0];
-        historyMap[date] = (historyMap[date] || 0) + Number(tx.amount);
-    });
-
-    const spendingHistory: { date: string; amount: number; label: string }[] = [];
-    const curr = new Date(startDate);
-    const end = new Date();
-
-    while (curr <= end) {
-        const d = curr.toISOString().split('T')[0];
-        const dateObj = new Date(curr);
-        let label = '';
-
-        if (period === 'week') {
-            label = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-        } else if (period === 'month') {
-            label = dateObj.getDate().toString();
-        } else {
-            label = dateObj.toLocaleDateString('en-US', { month: 'short' });
-        }
-
-        spendingHistory.push({
-            date: d,
-            amount: historyMap[d] || 0,
-            label
-        });
-        curr.setDate(curr.getDate() + 1);
-    }
-
-    return {
-        totalSpent,
-        totalInflow,
-        netCashflow,
-        categorySpending,
-        spendingHistory
-    };
 }
 
-// Generate mock AI insights for now
+/**
+ * Generate AI insights based on analytics data
+ */
 export async function getAIInsights(analytics: GlobalAnalytics): Promise<AIInsight[]> {
     const insights: AIInsight[] = [];
 
-    if (analytics.totalSpent > 3000) {
+    if (analytics.totalSpent > HIGH_SPENDING_THRESHOLD) {
         insights.push({
             id: '1',
             title: 'High Spending Alert',

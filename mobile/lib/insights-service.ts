@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { TRANSACTION_TYPES } from '../constants/theme';
+import { TRANSACTION_TYPES, THRESHOLDS, CURRENCY } from '../constants/theme';
 import { getCategoryByIdOrName, getCategoryById } from './categories';
 import { formatCurrency } from './transaction-service';
 
@@ -95,9 +95,9 @@ export async function getInsightsData(period: 'week' | 'month' = 'month'): Promi
         .filter(([_, data]) => data.count >= 2)
         .map(([key, data]) => ({ description: key.split('-')[0], amount: data.amount, count: data.count }));
 
-    // Detect anomalies (spending > 2x average or > 500 GHS for random items)
+    // Detect anomalies (spending above threshold)
     const anomalies = current.expenses
-        .filter(tx => Number(tx.amount) > 500)
+        .filter(tx => Number(tx.amount) > THRESHOLDS.ANOMALY_AMOUNT)
         .map(tx => ({ description: tx.description, amount: Number(tx.amount), date: tx.transaction_date }));
 
     // Category changes
@@ -127,13 +127,13 @@ export function generateInsights(data: InsightsData): Insight[] {
 
     // 1. Significant changes in categories
     data.previousPeriodComparison.categoryChanges.forEach(cat => {
-        if (cat.change > 20) {
+        if (cat.change > THRESHOLDS.CATEGORY_CHANGE_ALERT) {
             insights.push({
                 type: 'attention',
                 title: `${cat.category} spending is up`,
-                description: `Your ${cat.category.toLowerCase()} costs jumped ${cat.change.toFixed(0)}% to ${formatCurrency(data.topCategories.find(c => c.category === cat.category)?.amount || 0)}. Reviewing these daily GHS payments could help.`
+                description: `Your ${cat.category.toLowerCase()} costs jumped ${cat.change.toFixed(0)}% to ${formatCurrency(data.topCategories.find(c => c.category === cat.category)?.amount || 0)}. Reviewing these daily ${CURRENCY.CODE} payments could help.`
             });
-        } else if (cat.change < -20) {
+        } else if (cat.change < -THRESHOLDS.CATEGORY_CHANGE_ALERT) {
             insights.push({
                 type: 'positive',
                 title: `Great job on ${cat.category}!`,

@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
     ArrowRight02Icon,
@@ -41,23 +41,31 @@ export function TransactionDetailBottomSheet({ isVisible, transaction, onClose, 
         }
     }, [transaction]);
 
-    // Imperative control for reliability
+    // Control visibility imperatively - use isVisible directly
     useEffect(() => {
-        if (isVisible) {
-            bottomSheetRef.current?.snapToIndex(0);
-        } else {
+        console.log('[TransactionDetail] Visibility changed:', isVisible, 'Transaction:', transaction?.id);
+
+        if (isVisible && transaction) {
+            // Small delay to ensure the sheet is mounted
+            const timer = setTimeout(() => {
+                console.log('[TransactionDetail] Opening bottom sheet');
+                bottomSheetRef.current?.snapToIndex(0);
+            }, 50);
+            return () => clearTimeout(timer);
+        } else if (!isVisible) {
             bottomSheetRef.current?.close();
         }
-    }, [isVisible, transaction?.id]);
+    }, [isVisible, transaction]);
 
     const handleSheetChanges = useCallback((index: number) => {
+        console.log('[TransactionDetail] Sheet index changed to:', index);
         if (index === -1) {
             onClose();
         }
     }, [onClose]);
 
     const renderBackdrop = useCallback(
-        (props: any) => (
+        (props: BottomSheetBackdropProps) => (
             <BottomSheetBackdrop
                 {...props}
                 appearsOnIndex={0}
@@ -107,7 +115,6 @@ export function TransactionDetailBottomSheet({ isVisible, transaction, onClose, 
     const fromWallet = transaction?.transfer?.from_wallet;
     const toWallet = transaction?.transfer?.to_wallet;
 
-    // Safely access wallet type to prevent crashes
     // Safely access wallet type to prevent crashes
     const fromWalletIcon = fromWallet?.type ? getWalletIcon(fromWallet.type) : Wallet01Icon;
     const toWalletIcon = toWallet?.type ? getWalletIcon(toWallet.type) : Wallet01Icon;

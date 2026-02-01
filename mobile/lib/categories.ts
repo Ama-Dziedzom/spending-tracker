@@ -20,12 +20,15 @@ import {
     Dumbbell01Icon,
 } from '@hugeicons/core-free-icons';
 
+// Define icon type from an actual icon
+type HugeIconType = typeof Restaurant01Icon;
+
 export interface Category {
     id: string;
     name: string;
-    icon: any;           // HugeIcons icon component
-    color: string;       // Hex color for visual distinction
-    keywords: string[];  // For auto-categorization matching
+    icon: HugeIconType;       // HugeIcons icon component
+    color: string;            // Hex color for visual distinction
+    keywords: string[];       // For auto-categorization matching
 }
 
 // Predefined categories with icons, colors, and keywords for auto-matching
@@ -134,7 +137,7 @@ export const CATEGORIES: Category[] = [
         icon: MoreHorizontalCircle01Icon,
         color: '#94A3B8',
         keywords: []
-    },  
+    },
 ];
 
 // O(1) Lookups

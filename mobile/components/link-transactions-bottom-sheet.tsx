@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
     AiMagicIcon,
@@ -136,12 +136,11 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
     }, [onClose]);
 
     const renderBackdrop = useCallback(
-        (props: any) => (
+        (props: BottomSheetBackdropProps) => (
             <BottomSheetBackdrop
                 {...props}
                 appearsOnIndex={0}
                 disappearsOnIndex={-1}
-                transparent={true}
                 opacity={0.5}
             />
         ),

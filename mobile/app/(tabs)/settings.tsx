@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
     Logout01Icon,
@@ -127,7 +128,7 @@ const SettingsToggle = ({
 export default function Settings() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
     // Settings States
@@ -180,12 +181,15 @@ export default function Settings() {
     };
 
     return (
-        <View className="flex-1 bg-slate-50">
+        <View style={{ paddingTop: insets.top }} className="flex-1 bg-slate-50">
+            {/* Header */}
+            <View className="px-6 flex-row items-center justify-center mb-2">
+                <Text className="text-slate-900 font-manrope-bold text-[24px]">Settings</Text>
+            </View>
             <StatusBar style="dark" />
             <ScrollView
                 className="flex-1"
                 contentContainerStyle={{
-                    paddingTop: insets.top + 20,
                     paddingBottom: insets.bottom + 40
                 }}
                 showsVerticalScrollIndicator={false}

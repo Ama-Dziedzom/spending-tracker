@@ -48,6 +48,7 @@ export default function Dashboard() {
     const [totalBalance, setTotalBalance] = useState(0);
     const [unmatchedCount, setUnmatchedCount] = useState(0);
     const [isLinkSheetVisible, setIsLinkSheetVisible] = useState(false);
+    const [userName, setUserName] = useState<string>('there');
 
     // Wallet Creation Flow State
     const [isSelectTypeSheetVisible, setIsSelectTypeSheetVisible] = useState(false);
@@ -63,6 +64,17 @@ export default function Dashboard() {
 
     const fetchData = async () => {
         try {
+            // Fetch user info
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user?.user_metadata?.full_name) {
+                // Get first name only
+                const firstName = user.user_metadata.full_name.split(' ')[0];
+                setUserName(firstName);
+            } else if (user?.email) {
+                // Fallback to email prefix
+                setUserName(user.email.split('@')[0]);
+            }
+
             const [walletsData, balanceData, transactionsData] = await Promise.all([
                 getWallets(),
                 getTotalBalance(),
@@ -300,7 +312,7 @@ export default function Dashboard() {
                             {/* Header */}
                             <View className="flex-row items-center justify-between mt-4 mb-10">
                                 <View>
-                                    <Text className="text-[24px] font-manrope-bold text-white">Hello, Ama</Text>
+                                    <Text className="text-[24px] font-manrope-bold text-white">Hello, {userName}</Text>
                                     <Text className="text-[16px] font-manrope text-white/60">Welcome Back</Text>
                                 </View>
                                 <Pressable
@@ -404,8 +416,10 @@ export default function Dashboard() {
                                                 <Pressable
                                                     key={tx.id}
                                                     onPress={() => {
+                                                        console.log('[Dashboard] Transaction tapped:', tx.id, tx.description);
                                                         setSelectedTransactionForDetail(tx);
                                                         setIsTransactionDetailVisible(true);
+                                                        console.log('[Dashboard] State set - isVisible should be true');
                                                     }}
                                                     className="flex-row items-center justify-between p-4 bg-white rounded-[24px]"
                                                 >
@@ -429,7 +443,7 @@ export default function Dashboard() {
                                                             </Text>
                                                         </View>
                                                     </View>
-                                                    <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-slate-900' : 'text-rose-500'}`}>
+                                                    <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-emerald-500' : 'text-slate-900'}`}>
                                                         {isIncome ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '₵')}
                                                     </Text>
                                                 </Pressable>

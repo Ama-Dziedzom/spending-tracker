@@ -11,7 +11,7 @@ import {
     CheckmarkCircle02Icon
 } from '@hugeicons/core-free-icons';
 import { Wallet } from '../lib/supabase';
-import { updateWallet, deleteWallet } from '../lib/wallet-service';
+import { updateWallet, deleteWallet, updateWalletBalance } from '../lib/wallet-service';
 
 interface Props {
     isVisible: boolean;
@@ -43,12 +43,21 @@ export function EditWalletBottomSheet({ isVisible, wallet, onClose, onSuccess }:
         if (!wallet) return;
         setIsSaving(true);
         try {
-            const success = await updateWallet(wallet.id, {
-                name,
-                current_balance: parseFloat(balance) || 0
-            });
+            // Update name if changed
+            let nameSuccess = true;
+            if (name !== wallet.name) {
+                const result = await updateWallet(wallet.id, { name });
+                nameSuccess = result !== null;
+            }
 
-            if (success) {
+            // Update balance if changed
+            const newBalance = parseFloat(balance) || 0;
+            let balanceSuccess = true;
+            if (newBalance !== Number(wallet.current_balance)) {
+                balanceSuccess = await updateWalletBalance(wallet.id, newBalance);
+            }
+
+            if (nameSuccess && balanceSuccess) {
                 onSuccess();
                 onClose();
             } else {
@@ -107,7 +116,6 @@ export function EditWalletBottomSheet({ isVisible, wallet, onClose, onSuccess }:
                 {...props}
                 appearsOnIndex={0}
                 disappearsOnIndex={-1}
-                transparent={true}
                 opacity={0.5}
             />
         ),
