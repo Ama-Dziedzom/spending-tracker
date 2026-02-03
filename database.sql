@@ -93,32 +93,47 @@ CREATE POLICY "Allow all operations on transfers" ON transfers FOR ALL USING (tr
 -- RPC Functions
 -- Drop existing functions first to avoid parameter conflicts
 DROP FUNCTION IF EXISTS process_wallet_transfer(uuid, uuid, uuid, numeric, text, uuid);
+DROP FUNCTION IF EXISTS process_wallet_transfer(uuid, uuid, uuid, numeric, text);
 DROP FUNCTION IF EXISTS assign_transaction_to_wallet(uuid, uuid, text, uuid);
 DROP FUNCTION IF EXISTS assign_transaction_to_wallet(uuid, uuid, text);
 
--- Function to assign a transaction to a wallet and update balance
+-- =============================================================================
+-- Function: assign_transaction_to_wallet
+-- Uses auth.uid() internally for security - no user_id parameter needed
+-- =============================================================================
 CREATE OR REPLACE FUNCTION assign_transaction_to_wallet(
   p_transaction_id UUID,
   p_wallet_id UUID,
-  p_category_id TEXT,
-  p_user_id UUID
+  p_category_id TEXT
 )
 RETURNS void AS $$
 DECLARE
   v_amount DECIMAL;
   v_type TEXT;
+  v_user_id UUID;
 BEGIN
+  -- Get the current authenticated user
+  v_user_id := auth.uid();
+  
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required: No authenticated user found';
+  END IF;
+
   -- Get transaction details
   SELECT amount, type INTO v_amount, v_type
   FROM transactions
   WHERE id = p_transaction_id;
 
-  -- Update transaction
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Transaction not found: %', p_transaction_id;
+  END IF;
+
+  -- Update transaction with user_id from auth.uid()
   UPDATE transactions
   SET 
     wallet_id = p_wallet_id,
     category = p_category_id,
-    user_id = p_user_id,
+    user_id = v_user_id,
     updated_at = NOW()
   WHERE id = p_transaction_id;
 
@@ -138,25 +153,39 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Function to process a transfer between two wallets
+-- =============================================================================
+-- Function: process_wallet_transfer
+-- Uses auth.uid() internally for security - no user_id parameter needed
+-- =============================================================================
 CREATE OR REPLACE FUNCTION process_wallet_transfer(
   p_transaction_id UUID,
   p_from_wallet_id UUID,
   p_to_wallet_id UUID,
   p_amount NUMERIC,
-  p_notes TEXT,
-  p_user_id UUID
+  p_notes TEXT
 )
 RETURNS void AS $$
 DECLARE
   v_transfer_id UUID;
   v_transaction_date TIMESTAMPTZ;
   v_description TEXT;
+  v_user_id UUID;
 BEGIN
+  -- Get the current authenticated user
+  v_user_id := auth.uid();
+  
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'Authentication required: No authenticated user found';
+  END IF;
+
   -- Get original transaction info
   SELECT transaction_date, description INTO v_transaction_date, v_description
   FROM transactions
   WHERE id = p_transaction_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Transaction not found: %', p_transaction_id;
+  END IF;
 
   -- 1. Create the transfer record
   INSERT INTO transfers (
@@ -168,7 +197,7 @@ BEGIN
     status,
     completed_at
   ) VALUES (
-    p_user_id,
+    v_user_id,
     p_from_wallet_id,
     p_to_wallet_id,
     p_amount,
@@ -185,7 +214,7 @@ BEGIN
     is_transfer = true,
     transfer_id = v_transfer_id,
     transfer_side = 'from',
-    user_id = p_user_id,
+    user_id = v_user_id,
     updated_at = NOW()
   WHERE id = p_transaction_id;
 
@@ -214,7 +243,7 @@ BEGIN
     'to',
     v_transaction_date,
     'transfer',
-    p_user_id,
+    v_user_id,
     NOW()
   );
 

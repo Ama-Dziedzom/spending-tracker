@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, FlatList } from 'react-native';
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetBackdropProps, BottomSheetScrollView, BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
     AiMagicIcon,
@@ -26,7 +26,7 @@ interface Props {
 export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onCreateWallet }: Props) {
     const bottomSheetRef = useRef<BottomSheet>(null);
     const router = useRouter();
-    const snapPoints = useMemo(() => ['70%', '90%'], []);
+    const snapPoints = useMemo(() => ['50%', '95%'], []);
 
     const [unmatchedTxs, setUnmatchedTxs] = useState<Transaction[]>([]);
     const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -80,13 +80,13 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
 
             if (isTransferMode) {
                 if (!targetWalletId) {
-                    console.log('Setting source wallet:', walletId);
+                    console.log('[LinkBottomSheet] Setting source wallet:', walletId);
                     setTargetWalletId(walletId);
                     setIsProcessing(false);
                     return;
                 }
 
-                console.log(`Processing transfer: TxId=${selectedTx.id}, From=${targetWalletId}, To=${walletId}`);
+                console.log(`[LinkBottomSheet] Processing transfer: TxId=${selectedTx.id}, From=${targetWalletId}, To=${walletId}, Amount=${selectedTx.amount}`);
 
                 // First selection (targetWalletId) is SOURCE
                 // Second selection (walletId) is DESTINATION
@@ -98,7 +98,7 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                     selectedTx.description
                 );
             } else {
-                console.log(`Assigning single transaction: TxId=${selectedTx.id}, Wallet=${walletId}`);
+                console.log(`[LinkBottomSheet] Assigning single transaction: TxId=${selectedTx.id}, Wallet=${walletId}`);
                 success = await assignTransactionToWallet(selectedTx.id, walletId);
             }
 
@@ -118,11 +118,11 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                     onSuccess(); // Update dashboard in background
                 }
             } else {
-                console.error(`Operation failed: ${isTransferMode ? 'Transfer' : 'Assignment'} failed for Tx ID ${selectedTx.id}`);
-                Alert.alert('Error', 'Failed to link transaction. Please check the console logs for details.');
+                console.error(`[LinkBottomSheet] ${isTransferMode ? 'Transfer' : 'Assignment'} failed for Tx ID ${selectedTx.id}`);
+                Alert.alert('Error', 'Failed to link transaction. This usually happens if you have old data without a user ID assigned. Please run the fix-transaction-user-ids.sql script in your Supabase SQL editor.');
             }
         } catch (error) {
-            console.error('Error in handleAssign:', error);
+            console.error('[LinkBottomSheet] Error in handleAssign:', error);
             Alert.alert('Error', `An unexpected error occurred: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
             setIsProcessing(false);
@@ -167,7 +167,11 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
             backgroundStyle={{ backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32 }}
             handleIndicatorStyle={{ backgroundColor: '#EDEDED', width: 60, height: 4 }}
         >
-            <BottomSheetView style={{ flex: 1, paddingHorizontal: 24, paddingBottom: 40 }}>
+            <BottomSheetScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
+                showsVerticalScrollIndicator={false}
+            >
                 <View className="mt-4 mb-8">
                     <View className="flex-row items-center gap-3 mb-2">
                         <HugeiconsIcon icon={AiMagicIcon} size={28} color="#1642E5" />
@@ -179,15 +183,15 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                 </View>
 
                 {isLoading ? (
-                    <View className="flex-1 items-center justify-center">
+                    <View className="items-center justify-center py-20">
                         <ActivityIndicator size="large" color="#1642E5" />
                     </View>
                 ) : unmatchedTxs.length === 0 ? (
-                    <View className="flex-1 items-center justify-center">
+                    <View className="items-center justify-center py-20">
                         <Text className="text-[18px] font-manrope-medium text-[#7C7D80]">All transactions are linked! 🎉</Text>
                     </View>
                 ) : selectedTx ? (
-                    <View className="flex-1">
+                    <View>
                         {/* Selected Transaction Card */}
                         <View className="bg-[#F8FAFF] border-[1.5px] border-[#DAE2FF] rounded-[24px] p-6 mb-10">
                             <Text className="text-[14px] font-manrope-bold text-[#1642E5] uppercase mb-4 tracking-widest">TRANSACTION DETAILS</Text>
@@ -224,61 +228,43 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                                 : 'SELECT WALLET'
                             }
                         </Text>
-                        <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-                            <View className="gap-4">
-                                {wallets.length > 0 ? (
-                                    wallets.map((wallet) => (
-                                        <Pressable
-                                            key={wallet.id}
-                                            onPress={() => handleAssign(wallet.id)}
-                                            disabled={isProcessing || targetWalletId === wallet.id}
-                                            className={`bg-white border-[1.5px] rounded-[20px] p-5 flex-row items-center justify-between ${targetWalletId === wallet.id ? 'border-[#1642E5] bg-[#F8FAFF]' : 'border-[#F1F1F1]'}`}
-                                        >
-                                            <View className="flex-row items-center gap-4">
-                                                <View className={`w-[44px] h-[44px] rounded-full items-center justify-center ${targetWalletId === wallet.id ? 'bg-[#1642E5]' : 'bg-[#EFF6FF]'}`}>
-                                                    <HugeiconsIcon icon={getWalletIcon(wallet.type)} size={20} color={targetWalletId === wallet.id ? 'white' : '#1642E5'} />
-                                                </View>
-                                                <View>
-                                                    <View className="flex-row items-center gap-2">
-                                                        <Text className="text-[16px] font-manrope-bold text-[#5B5B5B]">{wallet.name}</Text>
-                                                        {targetWalletId === wallet.id && (
-                                                            <View className="bg-[#1642E5] px-2 py-0.5 rounded-full">
-                                                                <Text className="text-[10px] font-manrope-bold text-white uppercase">Source</Text>
-                                                            </View>
-                                                        )}
-                                                    </View>
-                                                    <Text className="text-[14px] font-manrope text-[#7C7D80]">Balance: GHS {Number(wallet.current_balance).toFixed(2)}</Text>
-                                                </View>
+                        <View className="gap-4">
+                            {wallets.length > 0 ? (
+                                wallets.map((wallet) => (
+                                    <Pressable
+                                        key={wallet.id}
+                                        onPress={() => handleAssign(wallet.id)}
+                                        disabled={isProcessing || targetWalletId === wallet.id}
+                                        className={`bg-white border-[1.5px] rounded-[20px] p-5 flex-row items-center justify-between ${targetWalletId === wallet.id ? 'border-[#1642E5] bg-[#F8FAFF]' : 'border-[#F1F1F1]'}`}
+                                    >
+                                        <View className="flex-row items-center gap-4">
+                                            <View className={`w-[44px] h-[44px] rounded-full items-center justify-center ${targetWalletId === wallet.id ? 'bg-[#1642E5]' : 'bg-[#EFF6FF]'}`}>
+                                                <HugeiconsIcon icon={getWalletIcon(wallet.type)} size={20} color={targetWalletId === wallet.id ? 'white' : '#1642E5'} />
                                             </View>
-                                            {isProcessing ? (
-                                                <ActivityIndicator size="small" color="#1642E5" />
-                                            ) : targetWalletId === wallet.id ? (
-                                                <HugeiconsIcon icon={Tick02Icon} size={20} color="#1642E5" />
-                                            ) : (
-                                                <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#CBD5E1" />
-                                            )}
-                                        </Pressable>
-                                    ))
-                                ) : (
-                                    <View className="bg-slate-50 rounded-[20px] p-6 border-[1px] border-dashed border-slate-200 items-center">
-                                        <Text className="text-[#7C7D80] font-manrope text-center mb-4">You haven't set up any wallets yet.</Text>
-                                        <Pressable
-                                            onPress={() => {
-                                                if (onCreateWallet && selectedTx) {
-                                                    onCreateWallet(selectedTx, isTransferMode, targetWalletId);
-                                                } else {
-                                                    onClose();
-                                                    router.push('/wallets');
-                                                }
-                                            }}
-                                            className="bg-[#1642E5] px-6 py-3 rounded-full"
-                                        >
-                                            <Text className="text-white font-manrope-bold">Create a Wallet</Text>
-                                        </Pressable>
-                                    </View>
-                                )}
-
-                                {wallets.length > 0 && (
+                                            <View>
+                                                <View className="flex-row items-center gap-2">
+                                                    <Text className="text-[16px] font-manrope-bold text-[#5B5B5B]">{wallet.name}</Text>
+                                                    {targetWalletId === wallet.id && (
+                                                        <View className="bg-[#1642E5] px-2 py-0.5 rounded-full">
+                                                            <Text className="text-[10px] font-manrope-bold text-white uppercase">Source</Text>
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <Text className="text-[14px] font-manrope text-[#7C7D80]">Balance: GHS {Number(wallet.current_balance).toFixed(2)}</Text>
+                                            </View>
+                                        </View>
+                                        {isProcessing ? (
+                                            <ActivityIndicator size="small" color="#1642E5" />
+                                        ) : targetWalletId === wallet.id ? (
+                                            <HugeiconsIcon icon={Tick02Icon} size={20} color="#1642E5" />
+                                        ) : (
+                                            <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#CBD5E1" />
+                                        )}
+                                    </Pressable>
+                                ))
+                            ) : (
+                                <View className="bg-slate-50 rounded-[20px] p-6 border-[1px] border-dashed border-slate-200 items-center">
+                                    <Text className="text-[#7C7D80] font-manrope text-center mb-4">You haven't set up any wallets yet.</Text>
                                     <Pressable
                                         onPress={() => {
                                             if (onCreateWallet && selectedTx) {
@@ -288,17 +274,32 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                                                 router.push('/wallets');
                                             }
                                         }}
-                                        className="border-[1.5px] border-dashed border-slate-200 rounded-[20px] p-5 flex-row items-center gap-4 mt-2"
+                                        className="bg-[#1642E5] px-6 py-3 rounded-full"
                                     >
-                                        <View className="w-[44px] h-[44px] rounded-full bg-slate-50 items-center justify-center">
-                                            <HugeiconsIcon icon={AddCircleHalfDotIcon} size={20} color="#64748B" />
-                                        </View>
-                                        <Text className="text-[16px] font-manrope-semibold text-[#64748B]">Create new wallet</Text>
+                                        <Text className="text-white font-manrope-bold">Create a Wallet</Text>
                                     </Pressable>
-                                )}
-                            </View>
-                        </ScrollView>
+                                </View>
+                            )}
 
+                            {wallets.length > 0 && (
+                                <Pressable
+                                    onPress={() => {
+                                        if (onCreateWallet && selectedTx) {
+                                            onCreateWallet(selectedTx, isTransferMode, targetWalletId);
+                                        } else {
+                                            onClose();
+                                            router.push('/wallets');
+                                        }
+                                    }}
+                                    className="border-[1.5px] border-dashed border-slate-200 rounded-[20px] p-5 flex-row items-center gap-4 mt-2"
+                                >
+                                    <View className="w-[44px] h-[44px] rounded-full bg-slate-50 items-center justify-center">
+                                        <HugeiconsIcon icon={AddCircleHalfDotIcon} size={20} color="#64748B" />
+                                    </View>
+                                    <Text className="text-[16px] font-manrope-semibold text-[#64748B]">Create new wallet</Text>
+                                </Pressable>
+                            )}
+                        </View>
                         <Pressable
                             onPress={() => setSelectedTx(null)}
                             className="mt-8 mb-4 h-[56px] items-center justify-center"
@@ -307,32 +308,30 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                         </Pressable>
                     </View>
                 ) : (
-                    <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-                        <View className="gap-4">
-                            {unmatchedTxs.map((tx) => (
-                                <Pressable
-                                    key={tx.id}
-                                    onPress={() => setSelectedTx(tx)}
-                                    className="bg-white border-[1px] border-slate-100 rounded-[20px] p-4 flex-row items-center justify-between"
-                                >
-                                    <View className="flex-row items-center gap-3 flex-1">
-                                        <View className="w-10 h-10 rounded-full bg-[#F8FAFF] items-center justify-center">
-                                            <HugeiconsIcon icon={AiMagicIcon} size={20} color="#1642E5" />
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="text-[16px] font-manrope-bold text-slate-900" numberOfLines={1}>{tx.description}</Text>
-                                            <Text className="text-[12px] font-manrope text-slate-500">{formatTransactionDate(tx.created_at)}</Text>
-                                        </View>
+                    <View className="gap-4">
+                        {unmatchedTxs.map((tx: Transaction) => (
+                            <Pressable
+                                key={tx.id}
+                                onPress={() => setSelectedTx(tx)}
+                                className="bg-white border-[1px] border-slate-100 rounded-[20px] p-4 flex-row items-center justify-between"
+                            >
+                                <View className="flex-row items-center gap-3 flex-1">
+                                    <View className="w-10 h-10 rounded-full bg-[#F8FAFF] items-center justify-center">
+                                        <HugeiconsIcon icon={AiMagicIcon} size={20} color="#1642E5" />
                                     </View>
-                                    <Text className="text-[16px] font-manrope-bold text-slate-900 ml-4">
-                                        {(tx.type === 'income' || tx.type === 'credit') ? '+' : '-'}GHS {Number(tx.amount).toFixed(2)}
-                                    </Text>
-                                </Pressable>
-                            ))}
-                        </View>
-                    </ScrollView>
+                                    <View className="flex-1">
+                                        <Text className="text-[16px] font-manrope-bold text-slate-900" numberOfLines={1}>{tx.description}</Text>
+                                        <Text className="text-[12px] font-manrope text-slate-500">{formatTransactionDate(tx.created_at)}</Text>
+                                    </View>
+                                </View>
+                                <Text className="text-[16px] font-manrope-bold text-slate-900 ml-4">
+                                    {(tx.type === 'income' || tx.type === 'credit') ? '+' : '-'}GHS {Number(tx.amount).toFixed(2)}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </View>
                 )}
-            </BottomSheetView>
+            </BottomSheetScrollView>
         </BottomSheet>
     );
 }

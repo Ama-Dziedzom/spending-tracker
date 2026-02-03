@@ -16,7 +16,7 @@ export function CategoryPickerBottomSheet({ isVisible, currentCategoryId, onClos
     const bottomSheetRef = useRef<BottomSheet>(null);
     const [lastVisible, setLastVisible] = useState(false);
     const [selectedId, setSelectedId] = useState<string | undefined>(currentCategoryId);
-    const snapPoints = useMemo(() => ['70%'], []);
+    const snapPoints = useMemo(() => ['50%', '90%'], []);
 
     useEffect(() => {
         if (isVisible && !lastVisible) {

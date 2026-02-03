@@ -25,7 +25,7 @@ export function ConfigureWalletBottomSheet({ isVisible, selectedWallets, onClose
     const [hasStartedLinking, setHasStartedLinking] = useState(false);
     const [lastVisible, setLastVisible] = useState(false);
     const wasConfigureCalled = useRef(false);
-    const snapPoints = useMemo(() => ['70%', '98%'], []);
+    const snapPoints = useMemo(() => ['50%', '95%'], []);
 
     // State for all wallets
     const [momoProvider, setMomoProvider] = useState<string | null>(null);

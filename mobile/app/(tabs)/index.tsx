@@ -1,6 +1,6 @@
 import { View, Text, Image, Pressable, ScrollView, Linking, Platform, RefreshControl } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -27,6 +27,7 @@ import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bo
 import { TransactionDetailBottomSheet } from '../../components/transaction-detail-bottom-sheet';
 import { createWallets, CreateWalletInput } from '../../lib/wallet-service';
 import { assignTransactionToWallet } from '../../lib/transaction-service';
+import { useTabContext } from './_layout';
 
 import { COLORS } from '../../constants/theme';
 
@@ -41,6 +42,7 @@ function getGreeting(): string {
 export default function Dashboard() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const tabContext = useTabContext();
     const [refreshing, setRefreshing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -104,6 +106,13 @@ export default function Dashboard() {
     React.useEffect(() => {
         fetchData();
     }, []);
+
+    // Register fetchData with tab context so FAB can trigger refresh
+    useEffect(() => {
+        if (tabContext?.setRefreshDashboard) {
+            tabContext.setRefreshDashboard(fetchData);
+        }
+    }, [tabContext]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);

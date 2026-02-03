@@ -29,7 +29,7 @@ export function TransactionDetailBottomSheet({ isVisible, transaction, onClose, 
     const [isCategoryPickerVisible, setIsCategoryPickerVisible] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
     const [currentCategory, setCurrentCategory] = useState<Category>(getDefaultCategory());
-    const snapPoints = useMemo(() => ['70%'], []);
+    const snapPoints = useMemo(() => ['60%', '95%'], []);
 
     // Determine current category from transaction
     useEffect(() => {

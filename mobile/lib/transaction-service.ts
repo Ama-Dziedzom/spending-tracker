@@ -265,7 +265,7 @@ export async function assignTransactionToWallet(transactionId: string, walletId:
             .single();
 
         if (fetchError || !transaction) {
-            console.error('Error fetching transaction for assignment:', fetchError?.message);
+            console.error('[TransactionService] Error fetching transaction details before assignment:', fetchError?.message || 'Transaction not found');
             return false;
         }
 
@@ -279,7 +279,7 @@ export async function assignTransactionToWallet(transactionId: string, walletId:
         });
 
         if (error) {
-            console.error('Error in assign_transaction_to_wallet RPC:', error.message);
+            console.error('[TransactionService] RPC assign_transaction_to_wallet failed:', error.message, error.details, error.hint);
             return false;
         }
 
@@ -314,8 +314,8 @@ export async function processTransfer(
 ): Promise<boolean> {
     try {
         // Validate inputs
-        if (amount <= 0) {
-            console.error('Transfer amount must be positive');
+        if (Math.abs(amount) <= 0) {
+            console.error('[TransactionService] Transfer amount must be positive:', amount);
             return false;
         }
 
@@ -325,16 +325,18 @@ export async function processTransfer(
         }
 
         // Call RPC function - user_id is now handled internally by auth.uid()
+        console.log(`[TransactionService] Calling process_wallet_transfer: Tx=${transactionId}, From=${fromWalletId}, To=${toWalletId}, Amount=${amount}`);
+
         const { error } = await supabase.rpc('process_wallet_transfer', {
             p_transaction_id: transactionId,
             p_from_wallet_id: fromWalletId,
             p_to_wallet_id: toWalletId,
-            p_amount: amount,
+            p_amount: Math.abs(amount), // Ensure amount is positive for the SQL function
             p_notes: notes || '',
         });
 
         if (error) {
-            console.error('Error in process_wallet_transfer RPC:', error.message);
+            console.error('[TransactionService] RPC process_wallet_transfer failed:', error.message, error.details, error.hint);
             return false;
         }
 

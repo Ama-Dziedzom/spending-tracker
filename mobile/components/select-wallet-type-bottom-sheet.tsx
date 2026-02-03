@@ -39,7 +39,7 @@ const WALLET_TYPES = [
 
 export function SelectWalletTypeBottomSheet({ isVisible, onClose, onSelect }: Props) {
     const bottomSheetRef = useRef<BottomSheet>(null);
-    const snapPoints = useMemo(() => ['65%', '75%'], []);
+    const snapPoints = useMemo(() => ['50%', '80%'], []);
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
 
     const handleSheetChanges = useCallback((index: number) => {
