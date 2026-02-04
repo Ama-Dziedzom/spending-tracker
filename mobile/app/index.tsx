@@ -114,9 +114,9 @@ export default function OnboardingSplash() {
                 <Pressable onPress={() => router.push('/login')} className="mr-6">
                     <Text className="text-white font-heading text-[20px]">Log in</Text>
                 </Pressable>
-                {/* <Pressable onPress={handleSkip}>
+                <Pressable onPress={handleSkip}>
                     <Text className="text-white/60 font-body text-[20px]">Skip</Text>
-                </Pressable> */}
+                </Pressable>
             </View>
 
             <Pressable
