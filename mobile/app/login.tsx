@@ -165,48 +165,6 @@ export default function LoginScreen() {
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
                     >
-                        {/* Biometric Quick Login - Show if enabled */}
-                        {showBiometricButton && biometricEmail && (
-                            <View className="mb-6">
-                                <Pressable
-                                    onPress={onBiometricLogin}
-                                    disabled={loading}
-                                    className="bg-slate-50 border border-slate-200 rounded-[24px] p-5 flex-row items-center justify-between active:bg-slate-100"
-                                >
-                                    <View className="flex-row items-center gap-4">
-                                        <View className="w-12 h-12 bg-[#0F4CFF]/10 rounded-full items-center justify-center">
-                                            <HugeiconsIcon
-                                                icon={biometricType === 'face' ? FaceIdIcon : FingerPrintIcon}
-                                                size={24}
-                                                color="#0F4CFF"
-                                            />
-                                        </View>
-                                        <View>
-                                            <Text className="text-slate-900 font-heading text-[16px]">
-                                                Quick Login
-                                            </Text>
-                                            <Text className="text-slate-500 font-body text-[14px]">
-                                                {biometricEmail}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    {loading ? (
-                                        <ActivityIndicator color="#0F4CFF" />
-                                    ) : (
-                                        <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#0F4CFF" />
-                                    )}
-                                </Pressable>
-
-                                <View className="flex-row items-center my-6 gap-4">
-                                    <View className="flex-1 h-[1px] bg-slate-100" />
-                                    <Text className="text-slate-400 font-body text-[14px]">
-                                        Or use email
-                                    </Text>
-                                    <View className="flex-1 h-[1px] bg-slate-100" />
-                                </View>
-                            </View>
-                        )}
-
                         {/* Form */}
                         <View className="gap-5">
                             <View>
@@ -252,20 +210,42 @@ export default function LoginScreen() {
                                 </View>
                             </View>
 
-                            <Pressable
-                                className="bg-[#0F4CFF] h-[64px] rounded-[24px] items-center justify-center flex-row gap-2 mt-4 active:opacity-90 shadow-lg shadow-blue-200"
-                                onPress={onLogin}
-                                disabled={loading}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="white" />
-                                ) : (
-                                    <>
-                                        <Text className="text-white font-heading text-[18px]">Log In</Text>
-                                        <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="white" />
-                                    </>
+                            {/* Login Button with Biometric Option */}
+                            <View className="flex-row gap-3 mt-4">
+                                <Pressable
+                                    className="flex-1 bg-[#0F4CFF] h-[64px] rounded-[24px] items-center justify-center flex-row gap-2 active:opacity-90 shadow-lg shadow-blue-200"
+                                    onPress={onLogin}
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <ActivityIndicator color="white" />
+                                    ) : (
+                                        <>
+                                            <Text className="text-white font-heading text-[18px]">Log In</Text>
+                                            <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="white" />
+                                        </>
+                                    )}
+                                </Pressable>
+
+                                {/* Biometric Button */}
+                                {showBiometricButton && (
+                                    <Pressable
+                                        className="bg-slate-50 border border-slate-200 w-[64px] h-[64px] rounded-[24px] items-center justify-center active:bg-slate-100"
+                                        onPress={onBiometricLogin}
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <ActivityIndicator color="#0F4CFF" />
+                                        ) : (
+                                            <HugeiconsIcon
+                                                icon={biometricType === 'face' ? FaceIdIcon : FingerPrintIcon}
+                                                size={28}
+                                                color="#0F4CFF"
+                                            />
+                                        )}
+                                    </Pressable>
                                 )}
-                            </Pressable>
+                            </View>
                         </View>
 
                         {/* Divider */}
