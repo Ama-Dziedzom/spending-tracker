@@ -78,12 +78,14 @@ export default function OnboardingSplash() {
         if (currentScreen < SCREENS.length - 1) {
             setCurrentScreen(prev => prev + 1);
         } else {
-            router.push('/onboarding-choice');
+            // Go to login - existing users log in, new users can sign up
+            router.push('/login');
         }
     };
 
     const handleSkip = () => {
-        router.push('/onboarding-choice');
+        // Skip splash - go to login page
+        router.push('/login');
     };
 
     return (
@@ -112,9 +114,9 @@ export default function OnboardingSplash() {
                 <Pressable onPress={() => router.push('/login')} className="mr-6">
                     <Text className="text-white font-heading text-[20px]">Log in</Text>
                 </Pressable>
-                <Pressable onPress={handleSkip}>
+                {/* <Pressable onPress={handleSkip}>
                     <Text className="text-white/60 font-body text-[20px]">Skip</Text>
-                </Pressable>
+                </Pressable> */}
             </View>
 
             <Pressable

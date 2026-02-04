@@ -170,10 +170,20 @@ export async function getTransactionsByWallet(walletId: string, limit: number = 
 }
 
 /**
- * Get transactions without wallet assignment (unmatched)
+ * Get transactions without wallet assignment (unmatched/orphaned)
+ * Uses RPC to get transactions with NULL user_id that can be claimed by any user
  */
 export async function getUnmatchedTransactions(): Promise<Transaction[]> {
     try {
+        // First try RPC for orphaned transactions (user_id IS NULL)
+        const { data: orphanedData, error: orphanedError } = await supabase
+            .rpc('get_claimable_transactions');
+
+        if (!orphanedError && orphanedData && orphanedData.length > 0) {
+            return orphanedData as Transaction[];
+        }
+
+        // Fallback: Also get current user's unlinked transactions via RLS
         const { data, error } = await supabase
             .from('transactions')
             .select('*')
