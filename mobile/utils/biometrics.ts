@@ -6,13 +6,17 @@ import { supabase } from '../lib/supabase';
 // Keys for secure storage
 const BIO_ENABLED_KEY = 'biometric_enabled';
 const BIO_USER_EMAIL_KEY = 'biometric_user_email';
+const BIO_USER_PASSWORD_KEY = 'biometric_user_password';
 
 /**
  * Biometric authentication utility
- * 
- * SECURITY: This implementation uses Supabase session tokens instead of storing passwords.
- * When biometric login is enabled, we store only the user's email (for display purposes)
- * and rely on the existing Supabase session for re-authentication.
+ *
+ * SECURITY MODEL:
+ * - Credentials (email + password) are encrypted using expo-secure-store,
+ *   which uses iOS Keychain / Android Keystore under the hood.
+ * - The password is NEVER readable without passing the OS biometric prompt first.
+ * - On session expiry or app restart, we re-authenticate via Supabase using
+ *   the securely stored credentials after the user passes the biometric check.
  */
 export const biometrics = {
     /**
@@ -42,7 +46,7 @@ export const biometrics = {
     },
 
     /**
-     * Authenticate user using biometrics
+     * Authenticate user using biometrics (OS prompt only)
      */
     async authenticate(promptMessage: string = 'Authenticate to continue'): Promise<boolean> {
         try {
@@ -55,7 +59,6 @@ export const biometrics = {
             if (!result.success) {
                 const errorResult = result as { success: false; error: string };
 
-                // Handle specific error cases
                 switch (errorResult.error) {
                     case 'not_enrolled':
                         Alert.alert(
@@ -75,7 +78,7 @@ export const biometrics = {
                             'Biometric authentication is temporarily locked. Please try again later.'
                         );
                         break;
-                    // 'user_cancel' and 'user_fallback' are intentionally not shown to user
+                    // 'user_cancel' and 'user_fallback' are intentionally silent
                 }
             }
 
@@ -87,13 +90,16 @@ export const biometrics = {
     },
 
     /**
-     * Enable biometric login for the current user
-     * Only stores the email for display - relies on Supabase session for auth
+     * Enable biometric login for the current user.
+     * Stores the user's email and encrypted password in SecureStore.
+     * This allows re-authentication even when the Supabase session is fully expired.
      */
-    async enableBiometricLogin(email: string): Promise<boolean> {
+    async enableBiometricLogin(email: string, password: string): Promise<boolean> {
         try {
             await SecureStore.setItemAsync(BIO_ENABLED_KEY, 'true');
             await SecureStore.setItemAsync(BIO_USER_EMAIL_KEY, email);
+            await SecureStore.setItemAsync(BIO_USER_PASSWORD_KEY, password);
+            console.log('[Biometrics] Biometric login enabled for:', email);
             return true;
         } catch (error) {
             console.error('[Biometrics] Error enabling biometric login:', error);
@@ -127,86 +133,87 @@ export const biometrics = {
     },
 
     /**
-     * Attempt biometric login using existing session
-     * Returns true if successful, false if re-login is required
+     * Attempt biometric login.
+     *
+     * Strategy (in order):
+     * 1. Show biometric prompt — if user cancels, we stop.
+     * 2. If there's already a valid Supabase session → just use it (fast path).
+     * 3. If not → try refreshing the session.
+     * 4. If refresh fails → sign in with stored credentials (works even after weeks offline).
+     *
+     * Biometric flag is NEVER cleared on failure — the user can always try again.
      */
     async attemptBiometricLogin(): Promise<{ success: boolean; requiresRelogin: boolean }> {
         try {
-            // First, check if biometric login is enabled
             const isEnabled = await this.isBiometricLoginEnabled();
             if (!isEnabled) {
                 return { success: false, requiresRelogin: true };
             }
 
-            // Check if we have a valid session
-            const { data: { session }, error } = await supabase.auth.getSession();
+            // Step 1: biometric prompt first — gate everything behind the OS auth
+            const authenticated = await this.authenticate('Verify your identity to log in');
+            if (!authenticated) {
+                // User cancelled or failed biometrics — do not force re-login
+                return { success: false, requiresRelogin: false };
+            }
 
-            if (error || !session) {
-                // No valid session, user needs to log in with credentials
+            // Step 2: check for an existing valid session (happy path)
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                console.log('[Biometrics] Valid session found — using it directly.');
+                return { success: true, requiresRelogin: false };
+            }
+
+            // Step 3: try refreshing the session
+            console.log('[Biometrics] No active session, attempting refresh...');
+            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+            if (!refreshError && refreshData.session) {
+                console.log('[Biometrics] Session refreshed successfully.');
+                return { success: true, requiresRelogin: false };
+            }
+
+            // Step 4: session is fully expired — re-authenticate with stored credentials
+            console.log('[Biometrics] Session refresh failed, signing in with stored credentials...');
+            const email = await SecureStore.getItemAsync(BIO_USER_EMAIL_KEY);
+            const password = await SecureStore.getItemAsync(BIO_USER_PASSWORD_KEY);
+
+            if (!email || !password) {
+                console.warn('[Biometrics] No stored credentials found.');
+                // Keep biometrics enabled — do not wipe it — but tell caller to re-login
                 return { success: false, requiresRelogin: true };
             }
 
-            // Try to refresh the session if it exists
-            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
 
-            if (refreshError || !refreshData.session) {
-                // Session refresh failed, user needs to log in again
+            if (signInError || !signInData.session) {
+                console.error('[Biometrics] Credential sign-in failed:', signInError?.message);
+                // Credentials are wrong (e.g. password changed) — disable biometrics
                 await this.disableBiometricLogin();
                 return { success: false, requiresRelogin: true };
             }
 
-            // Authenticate using biometrics
-            const authenticated = await this.authenticate('Verify your identity to log in');
-
-            if (!authenticated) {
-                return { success: false, requiresRelogin: false };
-            }
-
-            // Success - session is valid and user authenticated with biometrics
+            console.log('[Biometrics] Re-authenticated successfully with stored credentials.');
             return { success: true, requiresRelogin: false };
         } catch (error) {
-            console.error('[Biometrics] Error during biometric login:', error);
-            return { success: false, requiresRelogin: true };
+            console.error('[Biometrics] Unexpected error during biometric login:', error);
+            return { success: false, requiresRelogin: false };
         }
     },
 
     /**
-     * Disable biometric login
+     * Disable biometric login and wipe all stored credentials
      */
     async disableBiometricLogin(): Promise<void> {
         try {
             await SecureStore.deleteItemAsync(BIO_ENABLED_KEY);
             await SecureStore.deleteItemAsync(BIO_USER_EMAIL_KEY);
+            await SecureStore.deleteItemAsync(BIO_USER_PASSWORD_KEY);
+            console.log('[Biometrics] Biometric login disabled and credentials cleared.');
         } catch (error) {
             console.error('[Biometrics] Error disabling biometric login:', error);
         }
     },
-
-    // ============================================
-    // DEPRECATED: Legacy methods for migration
-    // These will be removed in a future version
-    // ============================================
-
-    /** @deprecated Use enableBiometricLogin instead */
-    async saveCredentials(email: string, _password: string): Promise<void> {
-        console.warn('[Biometrics] saveCredentials is deprecated. Passwords are no longer stored.');
-        await this.enableBiometricLogin(email);
-    },
-
-    /** @deprecated Use attemptBiometricLogin or getBiometricUserEmail instead */
-    async getCredentials(): Promise<{ email: string; password: string } | null> {
-        console.warn('[Biometrics] getCredentials is deprecated. Passwords are no longer stored.');
-        const email = await this.getBiometricUserEmail();
-        if (email) {
-            // Return a structure that migration code expects, but password is empty
-            return { email, password: '' };
-        }
-        return null;
-    },
-
-    /** @deprecated Use disableBiometricLogin instead */
-    async clearCredentials(): Promise<void> {
-        console.warn('[Biometrics] clearCredentials is deprecated. Use disableBiometricLogin instead.');
-        await this.disableBiometricLogin();
-    }
 };

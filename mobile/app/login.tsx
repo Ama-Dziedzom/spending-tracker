@@ -87,7 +87,7 @@ export default function LoginScreen() {
                             {
                                 text: 'Yes',
                                 onPress: async () => {
-                                    await biometrics.enableBiometricLogin(email);
+                                    await biometrics.enableBiometricLogin(email, password);
                                     router.replace('/(tabs)');
                                 }
                             }
@@ -121,11 +121,11 @@ export default function LoginScreen() {
             if (result.success) {
                 router.replace('/(tabs)');
             } else if (result.requiresRelogin) {
-                // Clear the biometric state since session is invalid
+                // Credentials changed — biometrics were auto-disabled inside attemptBiometricLogin
                 setIsBiometricEnabled(false);
                 Alert.alert(
-                    'Session Expired',
-                    'Your session has expired. Please sign in with your email and password.',
+                    'Re-authentication Required',
+                    'Your password may have changed. Please sign in once with your email and password to re-enable biometrics.',
                     [{ text: 'OK' }]
                 );
             }

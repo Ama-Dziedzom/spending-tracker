@@ -2,6 +2,7 @@ import { View, Text, Pressable, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { biometrics } from '../utils/biometrics';
 import Animated, {
     FadeIn,
     FadeOut,
@@ -46,6 +47,18 @@ export default function OnboardingSplash() {
             if (session) {
                 router.replace('/(tabs)');
                 return;
+            }
+
+            // No active session — check if biometrics can restore it silently
+            const bioEnabled = await biometrics.isBiometricLoginEnabled();
+            if (bioEnabled) {
+                const result = await biometrics.attemptBiometricLogin();
+                if (result.success) {
+                    router.replace('/(tabs)');
+                    return;
+                }
+                // If user cancelled (requiresRelogin: false) fall through to splash
+                // If credentials are invalid (requiresRelogin: true) also fall through
             }
         } catch (e) {
             console.error('Auth check error', e);
