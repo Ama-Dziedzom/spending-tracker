@@ -6,6 +6,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import { Mail01Icon, GoogleIcon, AppleIcon, ArrowRight01Icon, FingerPrintIcon, FaceIdIcon } from '@hugeicons/core-free-icons';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { biometrics } from '../utils/biometrics';
 
@@ -77,6 +78,9 @@ export default function LoginScreen() {
             if (error) throw error;
 
             if (data.session) {
+                // Mark as onboarded so splash is skipped on next launch
+                await AsyncStorage.setItem('hasOnboarded', 'true');
+
                 // Check if biometric login is available but not enabled for this user
                 if (isBiometricAvailable && !isBiometricEnabled) {
                     Alert.alert(

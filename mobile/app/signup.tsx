@@ -2,6 +2,7 @@ import { View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform, Scrol
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { UserIcon, Mail01Icon, GoogleIcon, AppleIcon, ArrowRight01Icon } from '@hugeicons/core-free-icons';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -38,8 +39,10 @@ export default function SignupScreen() {
             if (error) throw error;
 
             if (data.session) {
+                await AsyncStorage.setItem('hasOnboarded', 'true');
                 router.replace('/onboarding-choice');
             } else {
+                await AsyncStorage.setItem('hasOnboarded', 'true');
                 Alert.alert('Success', 'Please check your email for confirmation');
                 router.push('/login');
             }

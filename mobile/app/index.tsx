@@ -2,6 +2,7 @@ import { View, Text, Pressable, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { biometrics } from '../utils/biometrics';
 import Animated, {
     FadeIn,
@@ -43,13 +44,14 @@ export default function OnboardingSplash() {
 
     const checkUser = async () => {
         try {
+            // 1. Check for an active Supabase session
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
                 router.replace('/(tabs)');
                 return;
             }
 
-            // No active session — check if biometrics can restore it silently
+            // 2. No active session — try biometric restore
             const bioEnabled = await biometrics.isBiometricLoginEnabled();
             if (bioEnabled) {
                 const result = await biometrics.attemptBiometricLogin();
@@ -57,9 +59,21 @@ export default function OnboardingSplash() {
                     router.replace('/(tabs)');
                     return;
                 }
-                // If user cancelled (requiresRelogin: false) fall through to splash
-                // If credentials are invalid (requiresRelogin: true) also fall through
+                // If biometrics are enabled, user has onboarded before
+                // Go straight to login instead of splash
+                router.replace('/login');
+                return;
             }
+
+            // 3. No session, no biometrics — check if user has onboarded before
+            const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
+            if (hasOnboarded === 'true') {
+                // Returning user: skip splash, go to login
+                router.replace('/login');
+                return;
+            }
+
+            // 4. Brand new user: fall through to show the splash/onboarding screen
         } catch (e) {
             console.error('Auth check error', e);
         } finally {
@@ -87,17 +101,23 @@ export default function OnboardingSplash() {
         return <View className="flex-1 bg-[#0F4CFF]" />;
     }
 
+    const markOnboarded = async () => {
+        await AsyncStorage.setItem('hasOnboarded', 'true');
+    };
+
     const handleNext = () => {
         if (currentScreen < SCREENS.length - 1) {
             setCurrentScreen(prev => prev + 1);
         } else {
             // Go to login - existing users log in, new users can sign up
+            markOnboarded();
             router.push('/login');
         }
     };
 
     const handleSkip = () => {
         // Skip splash - go to login page
+        markOnboarded();
         router.push('/login');
     };
 
@@ -124,7 +144,7 @@ export default function OnboardingSplash() {
                 className="absolute top-0 right-0 z-10 flex-row items-center"
                 style={{ paddingTop: insets.top + 24, paddingRight: 24 }}
             >
-                <Pressable onPress={() => router.push('/login')} className="mr-6">
+                <Pressable onPress={() => { markOnboarded(); router.push('/login'); }} className="mr-6">
                     <Text className="text-white font-heading text-[20px]">Log in</Text>
                 </Pressable>
                 <Pressable onPress={handleSkip}>
