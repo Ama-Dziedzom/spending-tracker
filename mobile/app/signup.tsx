@@ -107,7 +107,7 @@ export default function SignupScreen() {
                 className="flex-1 bg-white rounded-t-[50px] px-7 pt-[43px]"
             >
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     className="flex-1"
                 >
                     <ScrollView

@@ -1,3 +1,5 @@
+import 'react-native-gesture-handler';
+import { Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -39,7 +41,7 @@ export default function RootLayout() {
         <Stack screenOptions={{
           gestureEnabled: true,
           gestureDirection: 'horizontal',
-          fullScreenGestureEnabled: true
+          fullScreenGestureEnabled: Platform.OS === 'ios'
         }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />

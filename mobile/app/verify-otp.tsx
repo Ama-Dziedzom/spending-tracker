@@ -103,7 +103,7 @@ export default function VerifyOtpScreen() {
                 className="flex-1 bg-white rounded-t-[50px] px-7 pt-[43px]"
             >
                 <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     className="flex-1"
                 >
                     <ScrollView showsVerticalScrollIndicator={false}>
@@ -133,17 +133,18 @@ export default function VerifyOtpScreen() {
                                         borderColor: error ? '#E53E3E' : '#EDEDED',
                                         borderWidth: 1.5
                                     }}
-                                    className="bg-white rounded-[15px] items-center justify-center"
+                                    className="bg-white rounded-[15px] items-center justify-center overflow-hidden"
                                 >
                                     <TextInput
                                         ref={(el) => (inputRefs.current[index] = el as any)}
-                                        className="text-[32px] font-manrope-regular text-[#3E3E3E] text-center w-full"
+                                        className="text-[32px] font-manrope-regular text-[#3E3E3E] text-center w-full h-full"
                                         keyboardType="number-pad"
                                         maxLength={Platform.OS === 'android' ? 1 : 5}
                                         value={digit}
                                         onChangeText={(v) => handleOtpChange(v, index)}
                                         onKeyPress={(e) => handleKeyPress(e, index)}
                                         selectionColor="#1340DF"
+                                        cursorColor="#1340DF"
                                     />
                                 </View>
                             ))}
