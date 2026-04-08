@@ -16,6 +16,8 @@ import {
     Alert01Icon,
     Notification01Icon,
     Calendar01Icon,
+    ViewIcon,
+    ViewOffSlashIcon,
 } from '@hugeicons/core-free-icons';
 import { getWallets, getTotalBalance } from '../../lib/wallet-service';
 import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName } from '../../lib/transaction-service';
@@ -49,6 +51,7 @@ export default function Dashboard() {
     const [transactions, setTransactions] = useState<TransactionWithWallet[]>([]);
     const [totalBalance, setTotalBalance] = useState(0);
     const [unmatchedCount, setUnmatchedCount] = useState(0);
+    const [isBalanceVisible, setIsBalanceVisible] = useState(true);
     const [isLinkSheetVisible, setIsLinkSheetVisible] = useState(false);
     const [userName, setUserName] = useState<string>('there');
 
@@ -361,11 +364,27 @@ export default function Dashboard() {
                                 </View>
                             ) : (
                                 <View className="items-center mb-4 mt-8">
-                                    <Text className="text-white/60 text-[14px] font-manrope-bold uppercase tracking-[1px] mb-1">
-                                        TOTAL BALANCE
-                                    </Text>
+                                    <View className="flex-row items-center gap-2 mb-1">
+                                        <Text className="text-white/60 text-[14px] font-manrope-bold uppercase tracking-[1px]">
+                                            TOTAL BALANCE
+                                        </Text>
+                                        <Pressable 
+                                            onPress={() => setIsBalanceVisible(!isBalanceVisible)}
+                                            className="p-1"
+                                            hitSlop={8}
+                                        >
+                                            <HugeiconsIcon 
+                                                icon={isBalanceVisible ? ViewOffSlashIcon : ViewIcon} 
+                                                size={16} 
+                                                color="#FFFFFF99" 
+                                            />
+                                        </Pressable>
+                                    </View>
                                     <Text className="text-white text-[48px] font-manrope-bold">
-                                        GHS {totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                        GHS {isBalanceVisible 
+                                            ? totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                                            : '••••••'
+                                        }
                                     </Text>
                                 </View>
                             )}
