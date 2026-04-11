@@ -23,6 +23,22 @@ DROP POLICY IF EXISTS "Allow all operations on wallets" ON wallets;
 DROP POLICY IF EXISTS "Allow all operations on transactions" ON transactions;
 DROP POLICY IF EXISTS "Allow all operations on transfers" ON transfers;
 
+-- 4b. Drop existing user-specific policies (so script is safe to re-run)
+DROP POLICY IF EXISTS "Users can view their own wallets" ON wallets;
+DROP POLICY IF EXISTS "Users can insert their own wallets" ON wallets;
+DROP POLICY IF EXISTS "Users can update their own wallets" ON wallets;
+DROP POLICY IF EXISTS "Users can delete their own wallets" ON wallets;
+
+DROP POLICY IF EXISTS "Users can view their own transactions" ON transactions;
+DROP POLICY IF EXISTS "Users can insert their own transactions" ON transactions;
+DROP POLICY IF EXISTS "Users can update their own transactions" ON transactions;
+DROP POLICY IF EXISTS "Users can delete their own transactions" ON transactions;
+
+DROP POLICY IF EXISTS "Users can view their own transfers" ON transfers;
+DROP POLICY IF EXISTS "Users can insert their own transfers" ON transfers;
+DROP POLICY IF EXISTS "Users can update their own transfers" ON transfers;
+DROP POLICY IF EXISTS "Users can delete their own transfers" ON transfers;
+
 -- 5. Create proper RLS policies for WALLETS
 CREATE POLICY "Users can view their own wallets" 
 ON wallets FOR SELECT 
