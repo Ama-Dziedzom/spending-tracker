@@ -21,7 +21,7 @@ export function validateShortcutSecret(req: Request, res: Response, next: NextFu
 }
 
 // ---------------------------------------------------------------------------
-// User extraction from Authorization header
+// User extraction — supports both JWT and Shortcut (secret + env user ID)
 // ---------------------------------------------------------------------------
 
 export interface AuthenticatedRequest extends Request {
@@ -29,8 +29,14 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Resolves the user ID from the Authorization header by calling Supabase Auth.
- * Attaches `userId` to the request object.
+ * Resolves the user ID. Two modes:
+ *
+ * 1. **JWT mode** — If an `Authorization` header is present, verifies the
+ *    token via Supabase Auth and extracts the user ID.
+ *
+ * 2. **Shortcut mode** — If no Authorization header but the request already
+ *    passed `validateShortcutSecret`, uses `SHORTCUT_USER_ID` from env.
+ *    This is for iOS Shortcuts that don't have a Supabase session.
  */
 export async function extractUser(
   req: AuthenticatedRequest,
@@ -39,34 +45,46 @@ export async function extractUser(
 ): Promise<void> {
   const authHeader = req.headers.authorization ?? '';
 
-  if (!authHeader) {
-    res.status(401).json({ error: 'Unauthorized - Missing Authorization header' });
+  // ── Mode 1: JWT auth ────────────────────────────────────────────────
+  if (authHeader) {
+    try {
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY!,
+          'Authorization': authHeader,
+        },
+      });
+
+      if (!userRes.ok) {
+        res.status(401).json({ error: 'Unauthorized - Invalid or expired auth token' });
+        return;
+      }
+
+      const userData = await userRes.json() as { id?: string };
+      if (!userData?.id) {
+        res.status(401).json({ error: 'Unauthorized - Could not identify user' });
+        return;
+      }
+
+      req.userId = userData.id;
+      next();
+      return;
+    } catch (error) {
+      console.error('Auth middleware error:', error);
+      res.status(500).json({ error: 'Internal authentication error' });
+      return;
+    }
+  }
+
+  // ── Mode 2: Shortcut mode (secret already validated) ────────────────
+  const SHORTCUT_USER_ID = process.env.SHORTCUT_USER_ID;
+  if (SHORTCUT_USER_ID) {
+    req.userId = SHORTCUT_USER_ID;
+    next();
     return;
   }
 
-  try {
-    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: {
-        'apikey': SUPABASE_SERVICE_ROLE_KEY!,
-        'Authorization': authHeader,
-      },
-    });
-
-    if (!userRes.ok) {
-      res.status(401).json({ error: 'Unauthorized - Invalid or expired auth token' });
-      return;
-    }
-
-    const userData = await userRes.json() as { id?: string };
-    if (!userData?.id) {
-      res.status(401).json({ error: 'Unauthorized - Could not identify user' });
-      return;
-    }
-
-    req.userId = userData.id;
-    next();
-  } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(500).json({ error: 'Internal authentication error' });
-  }
+  res.status(401).json({
+    error: 'Unauthorized - No auth token or SHORTCUT_USER_ID configured',
+  });
 }

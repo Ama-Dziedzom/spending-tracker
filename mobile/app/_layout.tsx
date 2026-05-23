@@ -12,6 +12,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import '../global.css';
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { supabase } from '@/lib/supabase';
+import { syncSessionToAppGroup } from '@/lib/shareSync';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -30,6 +32,21 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded, error]);
+
+  // Keep the Share Extension in sync with the current session.
+  // Fires on login, token refresh, and sign-out.
+  useEffect(() => {
+    // Sync initial session immediately
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      syncSessionToAppGroup(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      syncSessionToAppGroup(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (!loaded && !error) {
     return null;

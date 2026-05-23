@@ -29,9 +29,10 @@ app.use('/api', processSmsRouter);
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-app.listen(PORT, () => {
-  console.log(`🚀 Spending Tracker API running on http://localhost:${PORT}`);
-  console.log(`   Health check: http://localhost:${PORT}/api/health`);
+const HOST = '0.0.0.0';
+app.listen(Number(PORT), HOST, () => {
+  console.log(`🚀 Spending Tracker API running on http://${HOST}:${PORT}`);
+  console.log(`   Health check: http://${HOST}:${PORT}/api/health`);
 });
 
 export default app;
