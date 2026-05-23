@@ -109,7 +109,7 @@ export default function WelcomeScreen() {
                             paddingHorizontal: 20,
                             paddingTop: 10,
                             overflow: 'hidden',
-                            opacity: 0.85,
+                            opacity: 0.5,
                         }}
                     >
                         <Text style={[styles.ct, styles.blurTextSm]}>MobileMoney</Text>
@@ -131,7 +131,7 @@ export default function WelcomeScreen() {
                             paddingHorizontal: 20,
                             paddingTop: 10,
                             overflow: 'hidden',
-                            opacity: 0.4,
+                            opacity: 0.2,
                         }}
                     >
                         <Text style={[styles.ct, styles.blurTextMd]}>MobileMoney</Text>
@@ -141,7 +141,7 @@ export default function WelcomeScreen() {
                     <View style={{ height: 12 }} />
 
                     {/* Card 4 — Heavy Blur & Mid Opacity (Visibly blends behind the headline) */}
-                    <BlurView
+                    {/* <BlurView
                         intensity={15}
                         tint="light"
                         style={{
@@ -158,12 +158,12 @@ export default function WelcomeScreen() {
                     >
                         <Text style={[styles.ct, styles.blurTextLg]}>MobileMoney</Text>
                         <Text style={[styles.cb, styles.blurTextLg]} numberOfLines={2}>{MOCK_SHORT}</Text>
-                    </BlurView>
+                    </BlurView> */}
 
                 </View>
 
                 {/* ── Headline + subtitle (overlays bottom curve of Card 4 cleanly) ──────────────────────────── */}
-                <View style={[styles.textBlock, { marginTop: -15 }]}>
+                <View style={[styles.textBlock, { marginTop: 55 }]}>
                     <Text style={styles.headline}>Spend Smart. Zero Effort.</Text>
                     <Text style={[styles.subtitle, { marginTop: 6 }]}>
                         Your MoMo and bank transactions, tracked automatically

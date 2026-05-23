@@ -339,7 +339,10 @@ export default function SignupScreen() {
                             ]}
                             onPress={() => {
                                 // Link to OTP verification screen
-                                router.push('/otp');
+                                router.push({
+                                    pathname: '/otp',
+                                    params: { email }
+                                });
                             }}
                         >
                             <Text style={styles.btnPrimaryText}>Create Account</Text>

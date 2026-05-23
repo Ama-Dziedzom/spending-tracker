@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -47,6 +47,7 @@ function ValidationCheckIcon({ isMet }: CheckIconProps) {
 export default function PasswordScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { email } = useLocalSearchParams<{ email: string }>();
 
     const [password, setPassword] = useState('');
     const [passwordFocused, setPasswordFocused] = useState(false);
@@ -232,7 +233,10 @@ export default function PasswordScreen() {
                         ]}
                         onPress={() => {
                             // Account fully registered! Navigate to success screen
-                            router.push('/success');
+                            router.push({
+                                pathname: '/success',
+                                params: { email, password }
+                            });
                         }}
                     >
                         <Text style={styles.btnPrimaryText}>Create password</Text>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Alert } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -13,6 +13,7 @@ const { width, height } = Dimensions.get('window');
 export default function OtpScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { email } = useLocalSearchParams<{ email: string }>();
 
     const [otp, setOtp] = useState(['', '', '', '', '']);
     const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -128,7 +129,7 @@ export default function OtpScreen() {
                     {/* Centered Descriptive Prompts */}
                     <View style={styles.promptContainer}>
                         <Text style={styles.promptTextNormal}>Enter the 5 digit security code we sent to</Text>
-                        <Text style={styles.promptTextBold}>ama*****@gmail.com</Text>
+                        <Text style={styles.promptTextBold}>{email || 'ama*****@gmail.com'}</Text>
                     </View>
 
                     <View style={{ height: 36 }} />
@@ -181,7 +182,10 @@ export default function OtpScreen() {
                         ]}
                         onPress={() => {
                             // Link to password creation screen
-                            router.push('/password');
+                            router.push({
+                                pathname: '/password',
+                                params: { email }
+                            });
                         }}
                     >
                         <View style={styles.btnContentRow}>

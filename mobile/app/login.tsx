@@ -1,10 +1,11 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable } from 'react-native';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, Alert } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, G } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Lock, Mail, Eye, EyeOff } from 'lucide-react-native';
+import { Lock, Mail, Eye, EyeOff, Fingerprint } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
+import { biometrics } from '../utils/biometrics';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft02Icon } from '@hugeicons/core-free-icons';
 
@@ -57,6 +58,36 @@ export default function LoginScreen() {
     
     const [emailFocused, setEmailFocused] = useState(false);
     const [passwordFocused, setPasswordFocused] = useState(false);
+    const [isBioEnabled, setIsBioEnabled] = useState(false);
+
+    const handleBiometricLogin = useCallback(async () => {
+        const result = await biometrics.attemptBiometricLogin();
+        if (result.success) {
+            router.replace('/(tabs)');
+        } else if (result.requiresRelogin) {
+            Alert.alert(
+                'Biometric Authentication Required',
+                'Your biometric key is invalid or has expired. Please log in manually with your email and password.',
+                [{ text: 'OK' }]
+            );
+        }
+    }, [router]);
+
+    useEffect(() => {
+        const checkBiometricStatus = async () => {
+            const enabled = await biometrics.isBiometricLoginEnabled();
+            setIsBioEnabled(enabled);
+            if (enabled) {
+                const bioEmail = await biometrics.getBiometricUserEmail();
+                if (bioEmail) {
+                    setEmail(bioEmail);
+                }
+                // Auto-trigger biometric prompt on mount
+                handleBiometricLogin();
+            }
+        };
+        checkBiometricStatus();
+    }, [handleBiometricLogin]);
     
     // Input element refs for keyboard navigation
     const emailInputRef = useRef<TextInput>(null);
@@ -259,20 +290,33 @@ export default function LoginScreen() {
                         <View style={{ height: 32 }} />
 
                         {/* LOG IN PRIMARY BUTTON */}
-                        <TouchableOpacity
-                            disabled={!isFormValid}
-                            activeOpacity={0.85}
-                            style={[
-                                styles.btnPrimary,
-                                !isFormValid && styles.btnPrimaryDisabled
-                            ]}
-                            onPress={() => {
-                                // Successful Login! Navigate to main tabs dashboard
-                                router.replace('/(tabs)');
-                            }}
-                        >
-                            <Text style={styles.btnPrimaryText}>Log in</Text>
-                        </TouchableOpacity>
+                        <View style={styles.actionRowContainer}>
+                            <TouchableOpacity
+                                disabled={!isFormValid}
+                                activeOpacity={0.85}
+                                style={[
+                                    styles.btnPrimary,
+                                    !isFormValid && styles.btnPrimaryDisabled,
+                                    isBioEnabled && { width: '78%' }
+                                ]}
+                                onPress={() => {
+                                    // Successful Login! Navigate to main tabs dashboard
+                                    router.replace('/(tabs)');
+                                }}
+                            >
+                                <Text style={styles.btnPrimaryText}>Log in</Text>
+                            </TouchableOpacity>
+
+                            {isBioEnabled && (
+                                <TouchableOpacity
+                                    activeOpacity={0.8}
+                                    style={styles.btnBiometricCircle}
+                                    onPress={handleBiometricLogin}
+                                >
+                                    <Fingerprint size={28} color="#FFFFFF" />
+                                </TouchableOpacity>
+                            )}
+                        </View>
 
                         {/* OR SEPARATOR */}
                         <View style={styles.separatorContainer}>
@@ -477,6 +521,25 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontFamily: 'Manrope-SemiBold',
         fontSize: 18,
+    },
+    actionRowContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+    },
+    btnBiometricCircle: {
+        backgroundColor: '#1642E5',
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#1642E5',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.16,
+        shadowRadius: 12,
+        elevation: 4,
     },
     separatorContainer: {
         flexDirection: 'row',
