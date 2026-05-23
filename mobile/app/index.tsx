@@ -1,210 +1,77 @@
-import { View, Text, Pressable, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { biometrics } from '../utils/biometrics';
-import Animated, {
-    FadeIn,
-    FadeOut,
-    SlideInRight,
-    SlideOutLeft,
-    useAnimatedStyle,
-    withSpring
-} from 'react-native-reanimated';
-import { ArrowUpRight } from 'lucide-react-native';
-import { supabase } from '../lib/supabase';
+import { useEffect } from 'react';
 
-const AnimatedText = Animated.Text as any;
-const AnimatedView = Animated.View as any;
+const { width, height } = Dimensions.get('window');
 
-const { width } = Dimensions.get('window');
-
-const SCREENS = [
-    {
-        lines: ["clear.", "personal.", "finance."],
-    },
-    {
-        lines: ["finance.", "without.", "friction."],
-    },
-    {
-        lines: ["instant.", "financial.", "clarity."],
-    }
-];
-
-export default function OnboardingSplash() {
+export default function SplashScreen() {
     const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const [currentScreen, setCurrentScreen] = useState(0);
-    const [checkingAuth, setCheckingAuth] = useState(true);
 
-    React.useEffect(() => {
-        checkUser();
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.replace('/welcome');
+        }, 2000);
+        return () => clearTimeout(timer);
     }, []);
 
-    const checkUser = async () => {
-        try {
-            // 1. Check for an active Supabase session
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                router.replace('/(tabs)');
-                return;
-            }
-
-            // 2. No active session — try biometric restore
-            const bioEnabled = await biometrics.isBiometricLoginEnabled();
-            if (bioEnabled) {
-                const result = await biometrics.attemptBiometricLogin();
-                if (result.success) {
-                    router.replace('/(tabs)');
-                    return;
-                }
-                // If biometrics are enabled, user has onboarded before
-                // Go straight to login instead of splash
-                router.replace('/login');
-                return;
-            }
-
-            // 3. No session, no biometrics — check if user has onboarded before
-            const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
-            if (hasOnboarded === 'true') {
-                // Returning user: skip splash, go to login
-                router.replace('/login');
-                return;
-            }
-
-            // 4. Brand new user: fall through to show the splash/onboarding screen
-        } catch (e) {
-            console.error('Auth check error', e);
-        } finally {
-            setCheckingAuth(false);
-        }
-    };
-
-    React.useEffect(() => {
-        if (checkingAuth) return;
-
-        const timer = setInterval(() => {
-            setCurrentScreen((prev) => {
-                if (prev < SCREENS.length - 1) {
-                    return prev + 1;
-                }
-                clearInterval(timer);
-                return prev;
-            });
-        }, 2500); // 2.5 seconds per screen
-
-        return () => clearInterval(timer);
-    }, [checkingAuth]);
-
-    if (checkingAuth) {
-        return <View className="flex-1 bg-[#0F4CFF]" />;
-    }
-
-    const markOnboarded = async () => {
-        await AsyncStorage.setItem('hasOnboarded', 'true');
-    };
-
-    const handleNext = () => {
-        if (currentScreen < SCREENS.length - 1) {
-            setCurrentScreen(prev => prev + 1);
-        } else {
-            // Go to login - existing users log in, new users can sign up
-            markOnboarded();
-            router.push('/login');
-        }
-    };
-
-    const handleSkip = () => {
-        // Skip splash - go to login page
-        markOnboarded();
-        router.push('/login');
-    };
-
     return (
-        <View className="flex-1 bg-[#0F4CFF]">
-            {/* Background Decorative Shapes - matching image panels */}
-            <View className="absolute top-0 right-0 w-full h-[75%]">
-                <View
-                    style={{ borderBottomLeftRadius: 130 }}
-                    className="absolute top-0 right-0 w-[48%] h-[65%] bg-white/10"
-                />
-                <View
-                    style={{ borderBottomLeftRadius: 140 }}
-                    className="absolute top-0 right-0 w-[45%] h-[58%] bg-white/15"
-                />
-                <View
-                    style={{ borderBottomLeftRadius: 150 }}
-                    className="absolute top-0 right-0 w-[42%] h-[52%] bg-white/20"
-                />
-            </View>
+        <View style={styles.container}>
+            <Svg style={StyleSheet.absoluteFillObject} width={width} height={height}>
+                <Defs>
+                    <RadialGradient
+                        id="upperBlue"
+                        cx={width * 0.55}
+                        cy={0}
+                        r={height * 0.65}
+                        gradientUnits="userSpaceOnUse"
+                    >
+                        <Stop offset="0%" stopColor="#1642E5" stopOpacity="1" />
+                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0" />
+                    </RadialGradient>
+                    <RadialGradient
+                        id="topLeftBlob"
+                        cx={0}
+                        cy={0}
+                        r={height * 0.45}
+                        gradientUnits="userSpaceOnUse"
+                    >
+                        <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.75" />
+                        <Stop offset="40%" stopColor="#B7C4F7" stopOpacity="0.45" />
+                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0" />
+                    </RadialGradient>
+                    <RadialGradient
+                        id="topRightBlob"
+                        cx={width * 0.8}
+                        cy={-height * 0.05}
+                        r={height * 0.55}
+                        gradientUnits="userSpaceOnUse"
+                    >
+                        <Stop offset="0%" stopColor="#3558FF" stopOpacity="0.7" />
+                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0" />
+                    </RadialGradient>
+                </Defs>
+                <Rect width={width} height={height} fill="#081750" />
+                <Rect width={width} height={height} fill="url(#upperBlue)" />
+                <Rect width={width} height={height} fill="url(#topLeftBlob)" />
+                <Rect width={width} height={height} fill="url(#topRightBlob)" />
+            </Svg>
 
-            {/* Skip Button */}
-            <View
-                className="absolute top-0 right-0 z-10 flex-row items-center"
-                style={{ paddingTop: insets.top + 24, paddingRight: 24 }}
-            >
-                <Pressable onPress={() => { markOnboarded(); router.push('/login'); }} className="mr-6">
-                    <Text className="text-white font-heading text-[20px]">Log in</Text>
-                </Pressable>
-                <Pressable onPress={handleSkip}>
-                    <Text className="text-white/60 font-body text-[20px]">Skip</Text>
-                </Pressable>
-            </View>
-
-            <Pressable
-                className="flex-1 p-8 justify-end"
-                onPress={handleNext}
-            >
-                {/* Text Content */}
-                <View className="mb-10 px-2">
-                    {SCREENS[currentScreen]?.lines?.map((line, idx) => (
-                        <AnimatedText
-                            key={`${currentScreen}-${idx}`}
-                            entering={FadeIn.duration(400).delay(idx * 100)}
-                            exiting={FadeOut.duration(200)}
-                            className="text-[64px] text-white font-heading tracking-tighter leading-[1.05]"
-                        >
-                            {line}
-                        </AnimatedText>
-                    ))}
-                </View>
-
-                {/* Footer Component */}
-                <View
-                    className="px-2"
-                    style={{ marginBottom: insets.bottom + 8 }}
-                >
-                    {/* Progress Dashes - Full width */}
-                    <View className="flex-row gap-4 items-center mb-6">
-                        {[0, 1, 2].map((i) => (
-                            <View
-                                key={i}
-                                className={`h-[2px] flex-1 rounded-full ${i === currentScreen ? 'bg-white' : 'bg-white/30'
-                                    }`}
-                            />
-                        ))}
-                    </View>
-
-                    {/* Get Started Button (Page 3 only) - Underneath lines */}
-                    <View className="h-10">
-                        {currentScreen === 2 && (
-                            <AnimatedView
-                                entering={FadeIn.duration(400)}
-                                className="flex-row justify-end"
-                            >
-                                <Pressable
-                                    className="flex-row items-center gap-2"
-                                    onPress={() => router.push('/signup')}
-                                >
-                                    <Text className="text-white font-body text-[24px]">Get started</Text>
-                                    <ArrowUpRight size={24} color="white" />
-                                </Pressable>
-                            </AnimatedView>
-                        )}
-                    </View>
-                </View>
-            </Pressable>
+            <Text style={styles.logo}>LogIt</Text>
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#081750',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    logo: {
+        color: '#FFFFFF',
+        fontSize: 48,
+        fontFamily: 'Manrope-SemiBold',
+    },
+});

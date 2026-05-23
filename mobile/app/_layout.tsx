@@ -44,12 +44,9 @@ export default function RootLayout() {
           fullScreenGestureEnabled: Platform.OS === 'ios'
         }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="signup" options={{ headerShown: false, animation: 'fade' }} />
-          <Stack.Screen name="verify-otp" options={{ headerShown: false, animation: 'slide_from_right' }} />
-          <Stack.Screen name="onboarding-choice" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding-quick-start" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding-link-wallet" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="transactions" options={{ headerShown: false }} />
           <Stack.Screen name="wallet-details" options={{ headerShown: false }} />
