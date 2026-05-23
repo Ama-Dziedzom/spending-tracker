@@ -47,6 +47,9 @@ export default function RootLayout() {
           <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="login" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="signup" options={{ headerShown: false, animation: 'fade' }} />
+          <Stack.Screen name="otp" options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="password" options={{ headerShown: false, animation: 'slide_from_right' }} />
+          <Stack.Screen name="success" options={{ headerShown: false, animation: 'fade' }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="transactions" options={{ headerShown: false }} />
           <Stack.Screen name="wallet-details" options={{ headerShown: false }} />
