@@ -1,10 +1,11 @@
-import { View, Text, Pressable, Alert, ScrollView, Switch, RefreshControl } from 'react-native';
+import { View, Text, Pressable, Alert, ScrollView, Switch, RefreshControl, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
     Logout01Icon,
@@ -137,6 +138,7 @@ export default function Settings() {
     const [timeFormat24, setTimeFormat24] = useState(true);
     const [currency, setCurrency] = useState('GHS');
     const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
+    const [smsEnabled, setSmsEnabled] = useState(false);
 
     useEffect(() => {
         const getUser = async () => {
@@ -145,6 +147,15 @@ export default function Settings() {
         };
         getUser();
     }, []);
+
+    // Refresh SMS state when settings screen is focused
+    useEffect(() => {
+        const getSmsPref = async () => {
+            const val = await AsyncStorage.getItem('sms_auto_logging_enabled');
+            setSmsEnabled(val === 'true');
+        };
+        getSmsPref();
+    }, [refreshing]);
 
     const onRefresh = React.useCallback(async () => {
         setRefreshing(true);
@@ -245,6 +256,19 @@ export default function Settings() {
                             label="24-hour Time Format"
                             value={timeFormat24}
                             onToggle={setTimeFormat24}
+                        />
+                    </SettingsSection>
+
+                    {/* SMS Integration */}
+                    <SettingsSection title="SMS Integration" delay={250}>
+                        <SettingsItem
+                            icon={Mail01Icon}
+                            label={Platform.OS === 'ios' ? "iOS Share Extension" : "SMS Auto-Logging"}
+                            value={Platform.OS === 'ios' ? "Configured & Active" : (smsEnabled ? "Enabled" : "Disabled")}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push('/sms-settings');
+                            }}
                         />
                     </SettingsSection>
 

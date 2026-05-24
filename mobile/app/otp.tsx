@@ -1,5 +1,5 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,19 +7,25 @@ import { ArrowRight } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft02Icon } from '@hugeicons/core-free-icons';
+import { useAuth } from '../lib/useAuth';
 
 const { width, height } = Dimensions.get('window');
 
 export default function OtpScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { email } = useLocalSearchParams<{ email: string }>();
+    const { email, fullName, phone } = useLocalSearchParams<{ email: string; fullName?: string; phone?: string }>();
+    const { loading, verifyOtp, resendOtp, showError } = useAuth();
 
-    const [otp, setOtp] = useState(['', '', '', '', '']);
+    const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
     const [focusedIndex, setFocusedIndex] = useState(-1);
+    const [resendCooldown, setResendCooldown] = useState(0);
 
-    // Refs for all 5 individual OTP input cells
+    // Refs for all 8 individual OTP input cells
     const inputRefs = [
+        useRef<TextInput>(null),
+        useRef<TextInput>(null),
+        useRef<TextInput>(null),
         useRef<TextInput>(null),
         useRef<TextInput>(null),
         useRef<TextInput>(null),
@@ -29,15 +35,37 @@ export default function OtpScreen() {
 
     const isComplete = useMemo(() => otp.every(digit => digit !== ''), [otp]);
 
+    // Resend cooldown timer
+    useEffect(() => {
+        if (resendCooldown <= 0) return;
+        const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+        return () => clearTimeout(timer);
+    }, [resendCooldown]);
+
     const handleOtpChange = (text: string, index: number) => {
-        // Strip out non-numeric characters just in case
+        // Strip out non-numeric characters
         const cleanedText = text.replace(/[^0-9]/g, '');
+
+        // Handle paste / iOS autofill — full code pasted into one cell
+        if (cleanedText.length > 1) {
+            const digits = cleanedText.slice(0, 8).split('');
+            const newOtp = [...otp];
+            digits.forEach((d, i) => {
+                if (i < 8) newOtp[i] = d;
+            });
+            setOtp(newOtp);
+            // Focus the last filled cell or the next empty one
+            const focusIdx = Math.min(digits.length, 7);
+            inputRefs[focusIdx].current?.focus();
+            return;
+        }
+
         const newOtp = [...otp];
         newOtp[index] = cleanedText;
         setOtp(newOtp);
 
         // Auto-focus next cell if text is typed
-        if (cleanedText && index < 4) {
+        if (cleanedText && index < 7) {
             inputRefs[index + 1].current?.focus();
         }
     };
@@ -49,9 +77,29 @@ export default function OtpScreen() {
         }
     };
 
-    const handleResend = () => {
-        Alert.alert('Code Resent', 'We have sent a new security code to your mobile number.');
-    };
+    const handleResend = useCallback(async () => {
+        if (resendCooldown > 0 || !email) return;
+        const result = await resendOtp(email);
+        if (result.success) {
+            setResendCooldown(60);
+        } else {
+            showError('Resend Failed', result.error || 'Could not resend code. Please try again.');
+        }
+    }, [email, resendCooldown, resendOtp, showError]);
+
+    const handleVerify = useCallback(async () => {
+        if (!email) return;
+        const code = otp.join('');
+        const result = await verifyOtp(email, code);
+        if (result.success) {
+            router.push({
+                pathname: '/password',
+                params: { email, fullName, phone }
+            });
+        } else {
+            showError('Verification Failed', result.error || 'Invalid code. Please try again.');
+        }
+    }, [email, fullName, phone, otp, verifyOtp, router, showError]);
 
     return (
         <KeyboardAvoidingView
@@ -128,13 +176,13 @@ export default function OtpScreen() {
                     
                     {/* Centered Descriptive Prompts */}
                     <View style={styles.promptContainer}>
-                        <Text style={styles.promptTextNormal}>Enter the 5 digit security code we sent to</Text>
-                        <Text style={styles.promptTextBold}>{email || 'ama*****@gmail.com'}</Text>
+                        <Text style={styles.promptTextNormal}>Enter the security code we sent to</Text>
+                        <Text style={styles.promptTextBold}>{email || 'your email'}</Text>
                     </View>
 
                     <View style={{ height: 36 }} />
 
-                    {/* 5 DIGIT OTP CELL INPUTS */}
+                    {/* OTP CELL INPUTS */}
                     <View style={styles.otpContainer}>
                         {otp.map((digit, index) => (
                             <TextInput
@@ -146,7 +194,7 @@ export default function OtpScreen() {
                                     digit !== '' && styles.otpCellFilled
                                 ]}
                                 keyboardType="number-pad"
-                                maxLength={1}
+                                maxLength={index === 0 ? 8 : 1}
                                 value={digit}
                                 onChangeText={(text) => handleOtpChange(text, index)}
                                 onKeyPress={(e) => handleKeyPress(e, index)}
@@ -155,18 +203,24 @@ export default function OtpScreen() {
                                 selectTextOnFocus
                                 caretHidden
                                 autoCorrect={false}
+                                textContentType={index === 0 ? 'oneTimeCode' : 'none'}
+                                autoComplete={index === 0 ? 'sms-otp' : 'off'}
                             />
                         ))}
                     </View>
 
                     <View style={{ height: 36 }} />
 
-                    {/* RESEND SMS CODE */}
+                    {/* RESEND CODE */}
                     <View style={styles.resendContainer}>
-                        <Text style={styles.resendTextNormal}>Didn’t receive the code? </Text>
-                        <TouchableOpacity onPress={handleResend} activeOpacity={0.6}>
-                            <Text style={styles.resendTextBold}>Send Again</Text>
-                        </TouchableOpacity>
+                        <Text style={styles.resendTextNormal}>Didn't receive the code? </Text>
+                        {resendCooldown > 0 ? (
+                            <Text style={styles.resendTextCooldown}>Resend in {resendCooldown}s</Text>
+                        ) : (
+                            <TouchableOpacity onPress={handleResend} activeOpacity={0.6}>
+                                <Text style={styles.resendTextBold}>Send Again</Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
 
                     {/* Pushes Verify button to spacing balance */}
@@ -174,23 +228,23 @@ export default function OtpScreen() {
 
                     {/* VERIFY ACCOUNT BUTTON */}
                     <TouchableOpacity
-                        disabled={!isComplete}
+                        disabled={!isComplete || loading}
                         activeOpacity={0.85}
                         style={[
                             styles.btnPrimary,
-                            !isComplete && styles.btnPrimaryDisabled
+                            (!isComplete || loading) && styles.btnPrimaryDisabled
                         ]}
-                        onPress={() => {
-                            // Link to password creation screen
-                            router.push({
-                                pathname: '/password',
-                                params: { email }
-                            });
-                        }}
+                        onPress={handleVerify}
                     >
                         <View style={styles.btnContentRow}>
-                            <Text style={styles.btnText}>Verify</Text>
-                            <ArrowRight size={20} color="#FFFFFF" style={styles.btnArrow} />
+                            {loading ? (
+                                <ActivityIndicator color="#FFFFFF" size="small" />
+                            ) : (
+                                <>
+                                    <Text style={styles.btnText}>Verify</Text>
+                                    <ArrowRight size={20} color="#FFFFFF" style={styles.btnArrow} />
+                                </>
+                            )}
                         </View>
                     </TouchableOpacity>
 
@@ -291,15 +345,15 @@ const styles = StyleSheet.create({
         paddingHorizontal: 4,
     },
     otpCell: {
-        width: 54,
-        height: 66,
+        width: 40,
+        height: 56,
         borderWidth: 1.5,
         borderColor: '#E8ECFC',
-        borderRadius: 18,
+        borderRadius: 14,
         backgroundColor: '#FFFFFF',
         textAlign: 'center',
         fontFamily: 'Manrope-Bold',
-        fontSize: 24,
+        fontSize: 20,
         color: '#1E293B',
         // Direct shadows for high visual pop
         shadowColor: '#1642E5',
@@ -333,6 +387,11 @@ const styles = StyleSheet.create({
         fontFamily: 'Manrope-Bold',
         fontSize: 15,
         color: '#1642E5',
+    },
+    resendTextCooldown: {
+        fontFamily: 'Manrope-Medium',
+        fontSize: 15,
+        color: '#C4C9D3',
     },
     btnPrimary: {
         backgroundColor: '#1642E5',

@@ -63,6 +63,7 @@ class ShareViewModel: ObservableObject {
     private var anonKey = ""
     private var authToken = ""
     private var accountId = ""
+    private var apiUrl = ""
 
     // Read credentials the main app saved into the shared App Group
     private func loadCredentials() {
@@ -71,6 +72,7 @@ class ShareViewModel: ObservableObject {
         anonKey     = d?.string(forKey: "supabase_anon_key") ?? ""
         authToken   = d?.string(forKey: "auth_token") ?? ""
         accountId   = d?.string(forKey: "default_account_id") ?? ""
+        apiUrl      = d?.string(forKey: "api_url") ?? "https://spending-tracker-api-production-cea1.up.railway.app"
     }
 
     func start(extensionContext: NSExtensionContext) async {
@@ -90,7 +92,7 @@ class ShareViewModel: ObservableObject {
 
         // Preview parse (no write)
         do {
-            let url = URL(string: "\(supabaseUrl)/functions/v1/parse-sms")!
+            let url = URL(string: "\(apiUrl)/parse-sms")!
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -115,7 +117,7 @@ class ShareViewModel: ObservableObject {
         state = .saving
 
         do {
-            let url = URL(string: "\(supabaseUrl)/functions/v1/process-sms")!
+            let url = URL(string: "\(apiUrl)/process-sms")!
             var req = URLRequest(url: url)
             req.httpMethod = "POST"
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, Alert } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, Alert, ActivityIndicator } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, G } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { biometrics } from '../utils/biometrics';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft02Icon } from '@hugeicons/core-free-icons';
+import { useAuth } from '../lib/useAuth';
 
 const { width, height } = Dimensions.get('window');
 
@@ -59,6 +60,7 @@ export default function LoginScreen() {
     const [emailFocused, setEmailFocused] = useState(false);
     const [passwordFocused, setPasswordFocused] = useState(false);
     const [isBioEnabled, setIsBioEnabled] = useState(false);
+    const { loading, signIn, showError } = useAuth();
 
     const handleBiometricLogin = useCallback(async () => {
         const result = await biometrics.attemptBiometricLogin();
@@ -292,19 +294,27 @@ export default function LoginScreen() {
                         {/* LOG IN PRIMARY BUTTON */}
                         <View style={styles.actionRowContainer}>
                             <TouchableOpacity
-                                disabled={!isFormValid}
+                                disabled={!isFormValid || loading}
                                 activeOpacity={0.85}
                                 style={[
                                     styles.btnPrimary,
-                                    !isFormValid && styles.btnPrimaryDisabled,
+                                    (!isFormValid || loading) && styles.btnPrimaryDisabled,
                                     isBioEnabled && { width: '78%' }
                                 ]}
-                                onPress={() => {
-                                    // Successful Login! Navigate to main tabs dashboard
-                                    router.replace('/(tabs)');
+                                onPress={async () => {
+                                    const result = await signIn(email, password);
+                                    if (result.success) {
+                                        router.replace('/(tabs)');
+                                    } else {
+                                        showError('Login Failed', result.error || 'Invalid email or password.');
+                                    }
                                 }}
                             >
-                                <Text style={styles.btnPrimaryText}>Log in</Text>
+                                {loading ? (
+                                    <ActivityIndicator color="#FFFFFF" size="small" />
+                                ) : (
+                                    <Text style={styles.btnPrimaryText}>Log in</Text>
+                                )}
                             </TouchableOpacity>
 
                             {isBioEnabled && (

@@ -25,6 +25,8 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api', parseSmsRouter);
 app.use('/api', processSmsRouter);
+app.use('/', parseSmsRouter);
+app.use('/', processSmsRouter);
 
 // ---------------------------------------------------------------------------
 // Start

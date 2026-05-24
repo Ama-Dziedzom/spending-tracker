@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, ActivityIndicator } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { Eye, EyeOff } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft02Icon } from '@hugeicons/core-free-icons';
+import { useAuth } from '../lib/useAuth';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,7 +48,8 @@ function ValidationCheckIcon({ isMet }: CheckIconProps) {
 export default function PasswordScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { email } = useLocalSearchParams<{ email: string }>();
+    const { email, fullName, phone } = useLocalSearchParams<{ email: string; fullName?: string; phone?: string }>();
+    const { loading, setPasswordAndProfile, showError } = useAuth();
 
     const [password, setPassword] = useState('');
     const [passwordFocused, setPasswordFocused] = useState(false);
@@ -225,21 +227,26 @@ export default function PasswordScreen() {
 
                     {/* CREATE PASSWORD PRIMARY BUTTON */}
                     <TouchableOpacity
-                        disabled={!isAllCriteriaMet}
+                        disabled={!isAllCriteriaMet || loading}
                         activeOpacity={0.85}
                         style={[
                             styles.btnPrimary,
-                            !isAllCriteriaMet && styles.btnPrimaryDisabled
+                            (!isAllCriteriaMet || loading) && styles.btnPrimaryDisabled
                         ]}
-                        onPress={() => {
-                            // Account fully registered! Navigate to success screen
-                            router.push({
-                                pathname: '/success',
-                                params: { email, password }
-                            });
+                        onPress={async () => {
+                            const result = await setPasswordAndProfile(password, fullName, phone);
+                            if (result.success) {
+                                router.push('/success');
+                            } else {
+                                showError('Password Setup Failed', result.error || 'Could not set password. Please try again.');
+                            }
                         }}
                     >
-                        <Text style={styles.btnPrimaryText}>Create password</Text>
+                        {loading ? (
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                        ) : (
+                            <Text style={styles.btnPrimaryText}>Create password</Text>
+                        )}
                     </TouchableOpacity>
 
                     {/* A white view extending far below the card to cover any keyboard/scrolling gaps */}

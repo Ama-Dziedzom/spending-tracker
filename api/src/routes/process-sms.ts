@@ -26,7 +26,6 @@ export const processSmsRouter = Router();
 
 processSmsRouter.post(
   '/process-sms',
-  validateShortcutSecret,
   extractUser,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -43,6 +42,15 @@ processSmsRouter.post(
           raw_sms: rawSms,
           reason: parseResult.reason ?? 'no_pattern_matched',
         });
+
+        const wantsJson = req.query.format === 'json';
+        const isShortcut = !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
+        const returnText = !wantsJson && isShortcut;
+
+        if (returnText) {
+          res.type('text/plain').status(400).send(`⚠️ Could not parse SMS\nNo matching pattern was found for this message.`);
+          return;
+        }
 
         res.status(400).json({ error: 'Could not parse SMS', rawSms });
         return;
@@ -128,6 +136,34 @@ processSmsRouter.post(
       }
 
       // ── Response ────────────────────────────────────────────────────────
+      const wantsJson = req.query.format === 'json';
+      const isShortcut = !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
+      const returnText = !wantsJson && isShortcut;
+
+      if (returnText) {
+        const typeEmoji = transaction.type === 'debit' ? '💸' : '💰';
+        const typeStr = transaction.type === 'debit' ? 'Debit' : 'Credit';
+        const formattedAmount = `GHS ${transaction.amount.toFixed(2)}`;
+        const formattedBalance = transaction.balance !== null && transaction.balance !== undefined
+          ? `GHS ${transaction.balance.toFixed(2)}`
+          : null;
+
+        let textResponse = `✅ Transaction Logged!\n`;
+        textResponse += `💵 Amount: ${formattedAmount} (${typeStr})\n`;
+        textResponse += `📱 Source: ${transaction.source}\n`;
+        textResponse += `🏷️ Category: ${transaction.category}\n`;
+        textResponse += `💬 Desc: ${transaction.description}`;
+        if (formattedBalance) {
+          textResponse += `\n💰 Balance: ${formattedBalance}`;
+        }
+        if (transaction.is_transfer && transaction.transfer_type) {
+          textResponse += `\n🔄 Transfer: ${transaction.transfer_type}`;
+        }
+
+        res.type('text/plain').send(textResponse);
+        return;
+      }
+
       res.json({
         success: true,
         data,
@@ -140,6 +176,16 @@ processSmsRouter.post(
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error('process-sms error:', message);
+
+      const wantsJson = req.query.format === 'json';
+      const isShortcut = !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
+      const returnText = !wantsJson && isShortcut;
+
+      if (returnText) {
+        res.type('text/plain').status(500).send(`⛔ Error Processing SMS\n${message}`);
+        return;
+      }
+
       res.status(500).json({ error: message });
     }
   },

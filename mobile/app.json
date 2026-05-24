@@ -22,8 +22,11 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
-      ]
+      ],
+      "package": "com.ama.spendingtracker"
     },
     "web": {
       "output": "single",
@@ -31,6 +34,7 @@
     },
     "plugins": [
       "./plugins/withShareExtension",
+      "./plugins/withAndroidSmsReceiver",
       "expo-router",
       [
         "expo-splash-screen",

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, ActivityIndicator } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, G } from 'react-native-svg';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../lib/useAuth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { User, ChevronDown, Mail } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -59,6 +60,7 @@ function AppleIcon() {
 export default function SignupScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { loading, signUpWithEmail, showError } = useAuth();
     
     // Sign up field states
     const [fullName, setFullName] = useState('');
@@ -331,21 +333,29 @@ export default function SignupScreen() {
 
                         {/* CREATE ACCOUNT PRIMARY BUTTON */}
                         <TouchableOpacity
-                            disabled={!isFormValid}
+                            disabled={!isFormValid || loading}
                             activeOpacity={0.85}
                             style={[
                                 styles.btnPrimary,
-                                !isFormValid && styles.btnPrimaryDisabled
+                                (!isFormValid || loading) && styles.btnPrimaryDisabled
                             ]}
-                            onPress={() => {
-                                // Link to OTP verification screen
-                                router.push({
-                                    pathname: '/otp',
-                                    params: { email }
-                                });
+                            onPress={async () => {
+                                const result = await signUpWithEmail(email);
+                                if (result.success) {
+                                    router.push({
+                                        pathname: '/otp',
+                                        params: { email, fullName, phone: `${selectedCountry.code}${phone}` }
+                                    });
+                                } else {
+                                    showError('Sign Up Failed', result.error || 'Could not create account. Please try again.');
+                                }
                             }}
                         >
-                            <Text style={styles.btnPrimaryText}>Create Account</Text>
+                            {loading ? (
+                                <ActivityIndicator color="#FFFFFF" size="small" />
+                            ) : (
+                                <Text style={styles.btnPrimaryText}>Create Account</Text>
+                            )}
                         </TouchableOpacity>
 
                         {/* OR SEPARATOR */}
