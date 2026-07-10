@@ -157,6 +157,17 @@ function addShareExtensionTarget(proj, mainBundleId) {
   );
   if (exists) return;
 
+  // The `xcode` package's addTarget() → addTargetDependency() only wires up
+  // the app_extension → main-target dependency edge if PBXTargetDependency /
+  // PBXContainerItemProxy sections already exist in the pbxproj. A fresh
+  // single-target Expo project has neither, so it silently no-ops (no error)
+  // and Xcode never builds the extension target, leaving ShareExtension.appex
+  // with no executable at install time. Pre-create the sections so the edge
+  // actually gets written.
+  const objects = proj.hash.project.objects;
+  if (!objects['PBXTargetDependency']) objects['PBXTargetDependency'] = {};
+  if (!objects['PBXContainerItemProxy']) objects['PBXContainerItemProxy'] = {};
+
   // Create a PBX group for the extension files
   const extGroup = proj.addPbxGroup([], EXT_NAME, EXT_NAME);
   const mainGroupUuid = proj.getFirstProject().firstProject.mainGroup;
@@ -170,18 +181,27 @@ function addShareExtensionTarget(proj, mainBundleId) {
     extBundleId,
   );
 
+  // addTarget() does not create a Sources build phase for the new target.
+  // Without this, addSourceFile()'s target-phase lookup fails to find a
+  // "Sources" phase on extTarget and silently falls back to matching *any*
+  // target's "Sources" phase in the project — landing the file in the main
+  // app target instead of the extension.
+  proj.addBuildPhase([], 'PBXSourcesBuildPhase', 'Sources', extTarget.uuid);
+
   // Add source file (automatically added to the target's Sources build phase)
+  // Paths here are relative to extGroup's own path (EXT_NAME), which Xcode
+  // already prepends — passing "${EXT_NAME}/..." would double it up.
   proj.addSourceFile(
-    `${EXT_NAME}/ShareViewController.swift`,
+    'ShareViewController.swift',
     { target: extTarget.uuid },
     extGroup.uuid,
   );
 
   // Add Info.plist and entitlements to the group (not build phases — referenced via settings)
-  proj.addFile(`${EXT_NAME}/Info.plist`, extGroup.uuid, {
+  proj.addFile('Info.plist', extGroup.uuid, {
     defaultEncoding: 4,
   });
-  proj.addFile(`${EXT_NAME}/${EXT_NAME}.entitlements`, extGroup.uuid, {
+  proj.addFile(`${EXT_NAME}.entitlements`, extGroup.uuid, {
     defaultEncoding: 4,
   });
 
