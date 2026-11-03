@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { NativeModules, Platform } from 'react-native';
 
 // Validate environment variables at startup
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -20,9 +21,67 @@ if (!supabaseAnonKey) {
     );
 }
 
+// ----------------------------------------------------------------------------
+// Session hand-off from the iOS Share Extension / Android SMS receiver
+// ----------------------------------------------------------------------------
+// Both can refresh the session in the background. Supabase rotates refresh
+// tokens, so if the app later reused its own (older) refresh token the whole
+// session could be revoked and the user logged out. Before supabase-js reads
+// the saved session, adopt the newer tokens from shared storage when the
+// extension/receiver has flagged them via `tokens_updated_by`.
+const sharedReader: { getItem?: (key: string) => Promise<string | null> } | undefined =
+    Platform.OS === 'ios' ? NativeModules.AppGroupReader : NativeModules.AppGroupBridge;
+const sharedWriter: { removeItem?: (key: string) => void } | undefined = NativeModules.AppGroupBridge;
+
+async function adoptSharedTokens(key: string, stored: string | null): Promise<string | null> {
+    if (!stored || !sharedReader?.getItem) return stored;
+    const updatedBy = await sharedReader.getItem('tokens_updated_by');
+    if (!updatedBy) return stored;
+
+    const [access, refresh] = await Promise.all([
+        sharedReader.getItem('auth_token'),
+        sharedReader.getItem('refresh_token'),
+    ]);
+    let session: Record<string, unknown>;
+    try {
+        session = JSON.parse(stored);
+    } catch {
+        return stored;
+    }
+    if (!access || !refresh || typeof session.refresh_token !== 'string') return stored;
+
+    sharedWriter?.removeItem?.('tokens_updated_by');
+    if (session.refresh_token === refresh) return stored;
+
+    // Use the newer tokens; mark as expired so supabase-js refreshes with the
+    // new refresh token straight away (and never touches the old one).
+    const merged = JSON.stringify({
+        ...session,
+        access_token: access,
+        refresh_token: refresh,
+        expires_in: 0,
+        expires_at: Math.floor(Date.now() / 1000) - 1,
+    });
+    await AsyncStorage.setItem(key, merged);
+    return merged;
+}
+
+const authStorage = {
+    async getItem(key: string): Promise<string | null> {
+        const stored = await AsyncStorage.getItem(key);
+        try {
+            return await adoptSharedTokens(key, stored);
+        } catch {
+            return stored;
+        }
+    },
+    setItem: (key: string, value: string) => AsyncStorage.setItem(key, value),
+    removeItem: (key: string) => AsyncStorage.removeItem(key),
+};
+
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
-        storage: AsyncStorage,
+        storage: authStorage,
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,

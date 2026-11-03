@@ -2,6 +2,7 @@ package com.ama.spendingtracker
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
@@ -26,5 +27,11 @@ class AppGroupBridge(reactContext: ReactApplicationContext) : ReactContextBaseJa
     @ReactMethod
     fun removeItem(key: String) {
         sharedPref.edit().remove(key).apply()
+    }
+
+    /** Lets the app pick up a session the background SMS receiver refreshed. */
+    @ReactMethod
+    fun getItem(key: String, promise: Promise) {
+        promise.resolve(sharedPref.getString(key, null))
     }
 }

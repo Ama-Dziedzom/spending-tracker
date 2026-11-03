@@ -2,35 +2,156 @@
  * POST /api/process-sms
  *
  * Full SMS processing pipeline:
- *   1. Validate shortcut secret
- *   2. Extract user from auth token
- *   3. Parse SMS via parseSms() (direct call, no HTTP)
- *   4. Insert transaction into DB
- *   5. Update account balance (snapshot or math sync)
- *   6. Match pending transfers
- *   7. Record failed parses
- *
- * Ported from: supabase/functions/process-sms/index.ts
+ *   1. Authenticate (JWT, or shortcut secret)
+ *   2. Parse SMS via parseSms() (direct call, no HTTP)
+ *   3. Skip exact duplicates (same SMS already logged by this user)
+ *   4. Route to the user's wallet for that provider (create it if missing)
+ *   5. Insert transaction (wallet_id, balance_snapshot, transaction_date from the SMS)
+ *   6. Update the wallet balance — only if this SMS is not older than the
+ *      latest balance we already have for that wallet
+ *   7. Match pending transfers (this user's only)
+ *   8. Record failed parses
  */
 
 import { Router, type Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { parseSms } from './parse-sms.js';
-import {
-  validateShortcutSecret,
-  extractUser,
-  type AuthenticatedRequest,
-} from '../middleware/auth.js';
+import { PROVIDERS, extractSmsDate } from '../lib/sms-helpers.js';
+import { extractUser, type AuthenticatedRequest } from '../middleware/auth.js';
 
 export const processSmsRouter = Router();
+
+interface ParsedTx {
+  amount: number;
+  type: 'debit' | 'credit';
+  source: string;
+  description: string;
+  balance: number | null;
+  category: string;
+  is_transfer: boolean;
+  transfer_type: string | null;
+}
+
+interface WalletRef {
+  id: string;
+  name: string;
+  created: boolean;
+}
+
+function isShortcutRequest(req: AuthenticatedRequest): boolean {
+  return !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
+}
+
+function wantsPlainText(req: AuthenticatedRequest): boolean {
+  return req.query.format !== 'json' && isShortcutRequest(req);
+}
+
+/**
+ * Find the wallet this SMS belongs to.
+ * 1. An explicit accountId (wallet id) owned by the user, if one was sent.
+ * 2. A wallet whose source_identifier matches the provider (mtn / telecel / at / stanchart …).
+ * 3. A wallet of the same type whose name looks like the provider (tags it for next time).
+ * 4. Otherwise create the wallet, seeded from the balance in the SMS.
+ */
+async function resolveWallet(userId: string, accountId: string | undefined, tx: ParsedTx): Promise<WalletRef | null> {
+  if (accountId) {
+    const { data } = await supabaseAdmin
+      .from('wallets')
+      .select('id, name')
+      .eq('id', accountId)
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (data) return { id: data.id, name: data.name, created: false };
+  }
+
+  const provider = PROVIDERS[tx.source];
+  if (!provider) return null;
+
+  const { data: wallets, error } = await supabaseAdmin
+    .from('wallets')
+    .select('id, name, type, source_identifier')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .eq('type', provider.type);
+  if (error) {
+    console.error('Wallet lookup failed:', error.message);
+    return null;
+  }
+
+  const list = wallets ?? [];
+  const byIdentifier = list.find((w) => (w.source_identifier ?? '').toLowerCase() === provider.identifier);
+  if (byIdentifier) return { id: byIdentifier.id, name: byIdentifier.name, created: false };
+
+  const byName = list.find(
+    (w) => !w.source_identifier && provider.nameHints.some((h) => (w.name ?? '').toLowerCase().includes(h)),
+  );
+  if (byName) {
+    await supabaseAdmin.from('wallets').update({ source_identifier: provider.identifier }).eq('id', byName.id);
+    return { id: byName.id, name: byName.name, created: false };
+  }
+
+  // Create it. Seed the opening balance so that "opening ± this transaction = balance in SMS".
+  const opening =
+    tx.balance !== null && tx.balance !== undefined
+      ? tx.type === 'debit'
+        ? tx.balance + tx.amount
+        : tx.balance - tx.amount
+      : 0;
+
+  const { data: created, error: createError } = await supabaseAdmin
+    .from('wallets')
+    .insert({
+      user_id: userId,
+      name: provider.name,
+      type: provider.type,
+      icon: '💰',
+      color: provider.color,
+      initial_balance: opening,
+      current_balance: opening,
+      source_identifier: provider.identifier,
+      is_active: true,
+    })
+    .select('id, name')
+    .single();
+
+  if (createError || !created) {
+    console.error('Wallet auto-create failed:', createError?.message);
+    return null;
+  }
+  console.log(`🆕 Created wallet "${created.name}" for user ${userId}`);
+  return { id: created.id, name: created.name, created: true };
+}
+
+/**
+ * True when the wallet already has a balance from a message newer than this one,
+ * meaning this (older, late-shared) SMS is already reflected in the balance.
+ */
+async function hasNewerSnapshot(walletId: string, smsDate: Date, excludeTxId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('transactions')
+    .select('transaction_date')
+    .eq('wallet_id', walletId)
+    .not('balance_snapshot', 'is', null)
+    .neq('id', excludeTxId)
+    .order('transaction_date', { ascending: false })
+    .limit(1);
+  const latest = data?.[0]?.transaction_date;
+  return !!latest && new Date(latest).getTime() > smsDate.getTime();
+}
 
 processSmsRouter.post(
   '/process-sms',
   extractUser,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { rawSms, accountId } = req.body;
+      const { rawSms, accountId } = req.body as { rawSms?: unknown; accountId?: string };
       const userId = req.userId!;
+
+      if (typeof rawSms !== 'string' || rawSms.trim().length === 0) {
+        res.status(400).json({ error: 'rawSms is required' });
+        return;
+      }
 
       // ── Step 1: Parse SMS ───────────────────────────────────────────────
       const parseResult = await parseSms(rawSms);
@@ -43,29 +164,47 @@ processSmsRouter.post(
           reason: parseResult.reason ?? 'no_pattern_matched',
         });
 
-        const wantsJson = req.query.format === 'json';
-        const isShortcut = !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
-        const returnText = !wantsJson && isShortcut;
-
-        if (returnText) {
+        if (wantsPlainText(req)) {
           res.type('text/plain').status(400).send(`⚠️ Could not parse SMS\nNo matching pattern was found for this message.`);
           return;
         }
-
         res.status(400).json({ error: 'Could not parse SMS', rawSms });
         return;
       }
 
-      const transaction = parseResult.transaction;
+      const transaction = parseResult.transaction as ParsedTx;
 
-      // ── Step 2: Insert transaction ──────────────────────────────────────
+      // ── Step 2: Skip duplicates ─────────────────────────────────────────
+      const { data: existing } = await supabaseAdmin
+        .from('transactions')
+        .select('id, wallet_id')
+        .eq('user_id', userId)
+        .eq('raw_sms', rawSms)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        if (wantsPlainText(req)) {
+          res.type('text/plain').send(`ℹ️ Already logged\nThis message is already in LogIt.`);
+          return;
+        }
+        res.json({ success: true, duplicate: true, data: existing[0] });
+        return;
+      }
+
+      // ── Step 3: Route to wallet ─────────────────────────────────────────
+      const wallet = await resolveWallet(userId, accountId, transaction);
+      const smsDate = extractSmsDate(rawSms);
+
+      // ── Step 4: Insert transaction ──────────────────────────────────────
       const { data, error: insertError } = await supabaseAdmin
         .from('transactions')
         .insert({
           ...transaction,
           raw_sms: rawSms,
           user_id: userId,
-          account_id: accountId,
+          wallet_id: wallet?.id ?? null,
+          balance_snapshot: transaction.balance ?? null,
+          transaction_date: (smsDate ?? new Date()).toISOString(),
         })
         .select()
         .single();
@@ -74,55 +213,47 @@ processSmsRouter.post(
         throw new Error(`Database error: ${insertError.message}`);
       }
 
-      // ── Step 3: Update account balance ──────────────────────────────────
-      if (accountId && transaction.balance !== null && transaction.balance !== undefined) {
-        // Snapshot sync — use the balance from the SMS
-        console.log(`✅ Snapshot sync: Account ${accountId} → GHS ${transaction.balance}`);
+      // ── Step 5: Update wallet balance ───────────────────────────────────
+      let balanceApplied = false;
+      if (wallet) {
+        const isOlder = smsDate ? await hasNewerSnapshot(wallet.id, smsDate, data.id) : false;
 
-        const { error: updateError } = await supabaseAdmin
-          .from('accounts')
-          .update({
-            current_balance: transaction.balance,
-            last_snapshot_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', accountId);
-
-        if (updateError) {
-          console.error('Error updating account with snapshot:', updateError.message);
-        }
-      } else if (accountId) {
-        // Math sync — no snapshot available, compute from current balance
-        console.log(`⚠️ Math sync: Account ${accountId} (no snapshot available)`);
-
-        const { data: accounts, error: fetchError } = await supabaseAdmin
-          .from('accounts')
-          .select('current_balance')
-          .eq('id', accountId);
-
-        if (!fetchError && accounts && accounts.length > 0) {
-          const currentBalance = accounts[0].current_balance || 0;
-          const isDebit = transaction.type === 'debit';
-          const newBalance = isDebit
-            ? currentBalance - transaction.amount
-            : currentBalance + transaction.amount;
-
-          await supabaseAdmin
-            .from('accounts')
-            .update({
-              current_balance: newBalance,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', accountId);
+        if (isOlder) {
+          console.log(`⏪ Older SMS for wallet ${wallet.id}: balance already reflects it, not changed`);
+        } else if (transaction.balance !== null && transaction.balance !== undefined) {
+          // Snapshot sync — use the balance from the SMS
+          const { error: updateError } = await supabaseAdmin
+            .from('wallets')
+            .update({ current_balance: transaction.balance, updated_at: new Date().toISOString() })
+            .eq('id', wallet.id);
+          if (updateError) console.error('Wallet snapshot update failed:', updateError.message);
+          else balanceApplied = true;
+        } else {
+          // Math sync — no balance in the SMS, adjust by the amount
+          const { data: w } = await supabaseAdmin
+            .from('wallets')
+            .select('current_balance')
+            .eq('id', wallet.id)
+            .single();
+          if (w) {
+            const current = Number(w.current_balance) || 0;
+            const next = transaction.type === 'debit' ? current - transaction.amount : current + transaction.amount;
+            const { error: mathError } = await supabaseAdmin
+              .from('wallets')
+              .update({ current_balance: next, updated_at: new Date().toISOString() })
+              .eq('id', wallet.id);
+            if (!mathError) balanceApplied = true;
+          }
         }
       }
 
-      // ── Step 4: Transfer matching ───────────────────────────────────────
+      // ── Step 6: Transfer matching (this user's pending transfers only) ──
       let transferSuggestions: unknown[] = [];
       if (transaction.is_transfer) {
         const { data: pendingTransfers, error: transferError } = await supabaseAdmin
           .from('transfers')
           .select('*')
+          .eq('user_id', userId)
           .eq('status', 'pending');
 
         if (!transferError && pendingTransfers) {
@@ -136,37 +267,32 @@ processSmsRouter.post(
       }
 
       // ── Response ────────────────────────────────────────────────────────
-      const wantsJson = req.query.format === 'json';
-      const isShortcut = !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
-      const returnText = !wantsJson && isShortcut;
-
-      if (returnText) {
+      if (wantsPlainText(req)) {
         const typeEmoji = transaction.type === 'debit' ? '💸' : '💰';
         const typeStr = transaction.type === 'debit' ? 'Debit' : 'Credit';
-        const formattedAmount = `GHS ${transaction.amount.toFixed(2)}`;
-        const formattedBalance = transaction.balance !== null && transaction.balance !== undefined
-          ? `GHS ${transaction.balance.toFixed(2)}`
-          : null;
-
         let textResponse = `✅ Transaction Logged!\n`;
-        textResponse += `💵 Amount: ${formattedAmount} (${typeStr})\n`;
-        textResponse += `📱 Source: ${transaction.source}\n`;
+        textResponse += `${typeEmoji} Amount: GHS ${transaction.amount.toFixed(2)} (${typeStr})\n`;
+        textResponse += `👛 Wallet: ${wallet ? wallet.name + (wallet.created ? ' (new)' : '') : 'Not linked'}\n`;
         textResponse += `🏷️ Category: ${transaction.category}\n`;
         textResponse += `💬 Desc: ${transaction.description}`;
-        if (formattedBalance) {
-          textResponse += `\n💰 Balance: ${formattedBalance}`;
+        if (transaction.balance !== null && transaction.balance !== undefined) {
+          textResponse += `\n💰 Balance: GHS ${transaction.balance.toFixed(2)}`;
         }
         if (transaction.is_transfer && transaction.transfer_type) {
           textResponse += `\n🔄 Transfer: ${transaction.transfer_type}`;
         }
-
         res.type('text/plain').send(textResponse);
         return;
       }
 
       res.json({
         success: true,
+        duplicate: false,
         data,
+        walletId: wallet?.id ?? null,
+        walletName: wallet?.name ?? null,
+        walletCreated: wallet?.created ?? false,
+        balanceApplied,
         isTransfer: transaction.is_transfer,
         transferType: transaction.transfer_type,
         transferSuggestions: transferSuggestions.length > 0 ? transferSuggestions : null,
@@ -177,15 +303,10 @@ processSmsRouter.post(
       const message = error instanceof Error ? error.message : String(error);
       console.error('process-sms error:', message);
 
-      const wantsJson = req.query.format === 'json';
-      const isShortcut = !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
-      const returnText = !wantsJson && isShortcut;
-
-      if (returnText) {
+      if (wantsPlainText(req)) {
         res.type('text/plain').status(500).send(`⛔ Error Processing SMS\n${message}`);
         return;
       }
-
       res.status(500).json({ error: message });
     }
   },

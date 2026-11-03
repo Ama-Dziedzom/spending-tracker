@@ -510,7 +510,7 @@ export default function Dashboard() {
 
                                     {/* Manual Entry */}
                                     <Pressable
-                                        onPress={() => router.push('/onboarding-link-wallet')}
+                                        onPress={() => router.push('/(tabs)/wallets')}
                                         className="border-2 border-dashed border-slate-100 rounded-[24px] p-6 flex-row items-center gap-4"
                                     >
                                         <View className="w-12 h-12 rounded-full bg-slate-50 items-center justify-center">

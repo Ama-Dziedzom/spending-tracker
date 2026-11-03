@@ -149,6 +149,9 @@ class SmsReceiver : BroadcastReceiver() {
                 sharedPref.edit().apply {
                     putString("auth_token", newAccessToken)
                     putString("refresh_token", newRefreshToken)
+                    // Supabase rotates refresh tokens: flag it so the app adopts
+                    // this session instead of reusing its old (now revoked) token.
+                    putString("tokens_updated_by", "receiver")
                     apply()
                 }
                 true

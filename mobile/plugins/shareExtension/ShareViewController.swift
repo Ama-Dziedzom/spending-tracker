@@ -62,6 +62,7 @@ class ShareViewModel: ObservableObject {
     private var supabaseUrl = ""
     private var anonKey = ""
     private var authToken = ""
+    private var refreshToken = ""
     private var accountId = ""
     private var apiUrl = ""
 
@@ -71,6 +72,7 @@ class ShareViewModel: ObservableObject {
         supabaseUrl = d?.string(forKey: "supabase_url") ?? ""
         anonKey     = d?.string(forKey: "supabase_anon_key") ?? ""
         authToken   = d?.string(forKey: "auth_token") ?? ""
+        refreshToken = d?.string(forKey: "refresh_token") ?? ""
         accountId   = d?.string(forKey: "default_account_id") ?? ""
         apiUrl      = d?.string(forKey: "api_url") ?? "https://spending-tracker-api-production-cea1.up.railway.app"
     }
@@ -92,14 +94,11 @@ class ShareViewModel: ObservableObject {
 
         // Preview parse (no write)
         do {
-            let url = URL(string: "\(apiUrl)/parse-sms")!
-            var req = URLRequest(url: url)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
-            req.httpBody = try JSONSerialization.data(withJSONObject: ["rawSms": text])
-
-            let (data, _) = try await URLSession.shared.data(for: req)
+            let (data, status) = try await send(path: "parse-sms", body: ["rawSms": text])
+            if status == 401 {
+                state = .noAuth
+                return
+            }
             let result = try JSONDecoder().decode(ParseResult.self, from: data)
 
             if result.parsed, let tx = result.transaction {
@@ -117,17 +116,14 @@ class ShareViewModel: ObservableObject {
         state = .saving
 
         do {
-            let url = URL(string: "\(apiUrl)/process-sms")!
-            var req = URLRequest(url: url)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
             var body: [String: Any] = ["rawSms": rawSms]
             if !accountId.isEmpty { body["accountId"] = accountId }
-            req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-            let (data, response) = try await URLSession.shared.data(for: req)
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            let (data, statusCode) = try await send(path: "process-sms", body: body)
+            if statusCode == 401 {
+                state = .noAuth
+                return
+            }
 
             if (200..<300).contains(statusCode) {
                 state = .saved
@@ -141,6 +137,56 @@ class ShareViewModel: ObservableObject {
         } catch {
             state = .error(error.localizedDescription)
         }
+    }
+
+    // MARK: Networking with automatic session refresh
+
+    /// POSTs to the LogIt API. If the access token has expired (401), refreshes
+    /// the Supabase session once using the refresh token and retries.
+    private func send(path: String, body: [String: Any]) async throws -> (Data, Int) {
+        var (data, status) = try await perform(path: path, body: body)
+        if status == 401, await refreshSession() {
+            (data, status) = try await perform(path: path, body: body)
+        }
+        return (data, status)
+    }
+
+    private func perform(path: String, body: [String: Any]) async throws -> (Data, Int) {
+        var req = URLRequest(url: URL(string: "\(apiUrl)/\(path)")!)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+    }
+
+    /// Exchanges the stored refresh token for a new session and saves it back to
+    /// the App Group. `tokens_updated_by` tells the main app to adopt these tokens
+    /// on its next launch (Supabase rotates refresh tokens, so the app must not
+    /// keep using its old one).
+    private func refreshSession() async -> Bool {
+        guard !refreshToken.isEmpty, !anonKey.isEmpty,
+              let url = URL(string: "\(supabaseUrl)/auth/v1/token?grant_type=refresh_token") else { return false }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["refresh_token": refreshToken])
+
+        guard let result = try? await URLSession.shared.data(for: req),
+              (result.1 as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: result.0) as? [String: Any],
+              let newAccess = json["access_token"] as? String,
+              let newRefresh = json["refresh_token"] as? String else { return false }
+
+        authToken = newAccess
+        refreshToken = newRefresh
+        let d = UserDefaults(suiteName: appGroupId)
+        d?.set(newAccess, forKey: "auth_token")
+        d?.set(newRefresh, forKey: "refresh_token")
+        d?.set("extension", forKey: "tokens_updated_by")
+        return true
     }
 
     private func extractText(from ctx: NSExtensionContext) async -> String? {
