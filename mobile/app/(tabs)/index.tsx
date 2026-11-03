@@ -18,6 +18,7 @@ import {
     Calendar01Icon,
     ViewIcon,
     ViewOffSlashIcon,
+    InboxIcon,
 } from '@hugeicons/core-free-icons';
 import { getWallets } from '../../lib/wallet-service';
 import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName, getGlobalAnalytics } from '../../lib/transaction-service';
@@ -29,6 +30,7 @@ import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bo
 import { TransactionDetailBottomSheet } from '../../components/transaction-detail-bottom-sheet';
 import { createWallets, CreateWalletInput } from '../../lib/wallet-service';
 import { assignTransactionToWallet } from '../../lib/transaction-service';
+import { getPendingReviewCount } from '../../lib/review-service';
 import { useTabContext } from './_layout';
 
 import { COLORS } from '../../constants/theme';
@@ -52,6 +54,7 @@ export default function Dashboard() {
     const [transactions, setTransactions] = useState<TransactionWithWallet[]>([]);
     const [spentThisMonth, setSpentThisMonth] = useState(0);
     const [unmatchedCount, setUnmatchedCount] = useState(0);
+    const [reviewCount, setReviewCount] = useState(0);
     const [isBalanceVisible, setIsBalanceVisible] = useState(true);
     const [isLinkSheetVisible, setIsLinkSheetVisible] = useState(false);
     const [userName, setUserName] = useState<string>('there');
@@ -81,11 +84,13 @@ export default function Dashboard() {
                 setUserName(user.email.split('@')[0]);
             }
 
-            const [walletsData, monthAnalytics, transactionsData] = await Promise.all([
+            const [walletsData, monthAnalytics, transactionsData, pendingReviews] = await Promise.all([
                 getWallets(),
                 getGlobalAnalytics('month'),
-                getRecentTransactions(5)
+                getRecentTransactions(5),
+                getPendingReviewCount(),
             ]);
+            setReviewCount(pendingReviews);
 
             // Get count of unmatched transactions
             const { count, error: unmatchedError } = await supabase
@@ -404,6 +409,28 @@ export default function Dashboard() {
                                         </Text>
                                     </View>
                                     <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#0F4CFF" />
+                                </Pressable>
+                            )}
+
+                            {/* Needs Review Banner — SMS LogIt couldn't read */}
+                            {!isLoading && reviewCount > 0 && (
+                                <Pressable
+                                    onPress={() => router.push('/review')}
+                                    className="bg-[#FFFBEB] border-[1px] border-[#FDE68A] rounded-[24px] p-5 mb-8 flex-row items-center gap-4"
+                                    accessibilityRole="button"
+                                >
+                                    <View className="w-12 h-12 rounded-full bg-[#F59E0B]/15 items-center justify-center">
+                                        <HugeiconsIcon icon={InboxIcon} size={24} color="#B45309" />
+                                    </View>
+                                    <View className="flex-1">
+                                        <Text className="text-[16px] font-manrope-bold text-slate-900">
+                                            {reviewCount} {reviewCount === 1 ? 'message needs' : 'messages need'} a look
+                                        </Text>
+                                        <Text className="text-[14px] font-manrope text-slate-500">
+                                            LogIt couldn’t read {reviewCount === 1 ? 'it' : 'them'} on its own
+                                        </Text>
+                                    </View>
+                                    <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#B45309" />
                                 </Pressable>
                             )}
 

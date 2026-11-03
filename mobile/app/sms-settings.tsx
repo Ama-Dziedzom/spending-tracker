@@ -19,16 +19,41 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase, getSession } from '../lib/supabase';
 import { syncSessionToAppGroup } from '../lib/shareSync';
 
+function formatAgo(iso: string): string {
+    const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs} hr${hrs === 1 ? '' : 's'} ago`;
+    const days = Math.round(hrs / 24);
+    return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
 export default function SmsSettings() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [smsEnabled, setSmsEnabled] = useState(false);
     const [hasPermission, setHasPermission] = useState(false);
+    const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null);
+    const [lastSmsAt, setLastSmsAt] = useState<string | null>(null);
 
     useEffect(() => {
         const loadSettings = async () => {
             const val = await AsyncStorage.getItem('sms_auto_logging_enabled');
             setSmsEnabled(val === 'true');
+
+            // Real status: signed in (the share sheet needs this) + last SMS logged
+            const session = await getSession();
+            setIsSignedIn(!!session);
+            if (session) {
+                const { data } = await supabase
+                    .from('transactions')
+                    .select('created_at')
+                    .not('raw_sms', 'is', null)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                setLastSmsAt(data?.[0]?.created_at ?? null);
+            }
 
             if (Platform.OS === 'android') {
                 const checkPerm = await PermissionsAndroid.check(
@@ -155,13 +180,20 @@ export default function SmsSettings() {
                                 </View>
                                 <View className="ml-4 flex-1">
                                     <Text className="text-slate-900 font-manrope-bold text-[18px]">iOS Share Extension</Text>
-                                    <Text className="text-emerald-500 font-manrope-semibold text-[12px] mt-0.5">✅ Active & Fully Configured</Text>
+                                    <Text className={`${isSignedIn === false ? 'text-rose-500' : 'text-emerald-600'} font-manrope-semibold text-[12px] mt-0.5`}>
+                                        {isSignedIn === null
+                                            ? 'Checking…'
+                                            : !isSignedIn
+                                                ? 'Sign in to share messages'
+                                                : lastSmsAt
+                                                    ? `Ready · last SMS logged ${formatAgo(lastSmsAt)}`
+                                                    : 'Ready · no messages shared yet'}
+                                    </Text>
                                 </View>
                             </View>
                             
                             <Text className="text-slate-500 font-manrope text-[14px] leading-6 border-t border-slate-50 pt-4">
-                                On iOS, background SMS reading is restricted by Apple for privacy. 
-                                Instead, LogIt includes a beautiful native **Share Extension** that lets you log SMS texts with a single tap from any app!
+                                Apple doesn’t let apps read your messages, so on iPhone you share them with LogIt instead. It takes a couple of taps, and LogIt does the rest.
                             </Text>
                         </View>
                     </Animated.View>
@@ -181,7 +213,7 @@ export default function SmsSettings() {
                                         <Text className="text-slate-600 font-manrope-bold text-[14px]">1</Text>
                                     </View>
                                     <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        Select and **Copy** any bank or Mobile Money (MTN MoMo, Telecel Cash) transaction message received on your phone.
+                                        In Messages, press and hold a Mobile Money or bank SMS (MTN MoMo, Telecel Cash, AT Money, your bank).
                                     </Text>
                                 </View>
                                 
@@ -190,7 +222,7 @@ export default function SmsSettings() {
                                         <Text className="text-slate-600 font-manrope-bold text-[14px]">2</Text>
                                     </View>
                                     <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        Tap the **Share** button (in Messages or any text view) or copy the text and tap the LogIt widget in the share sheet.
+                                        Tap <Text className="font-manrope-bold text-slate-900">Share</Text> and choose <Text className="font-manrope-bold text-slate-900">LogIt</Text>.
                                     </Text>
                                 </View>
 
@@ -199,7 +231,7 @@ export default function SmsSettings() {
                                         <Text className="text-slate-600 font-manrope-bold text-[14px]">3</Text>
                                     </View>
                                     <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        The LogIt preview panel will instantly pop up, parse your MoMo transaction amount/merchant, and let you tap **Save**!
+                                        Check the preview and tap <Text className="font-manrope-bold text-slate-900">Save</Text>. LogIt puts it in the right wallet and updates your balance.
                                     </Text>
                                 </View>
                             </View>
@@ -228,7 +260,7 @@ export default function SmsSettings() {
                                         <Text className="text-slate-600 font-manrope-bold text-[14px]">3</Text>
                                     </View>
                                     <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        The SMS is parsed securely on our servers under your account and logged instantly. You get a push notification: *✅ Transaction Logged!*
+                                        It’s logged to the right wallet straight away, with a short note like “Spent GHS 10.00 on MTN Airtime · MTN MoMo”. Anything LogIt can’t read waits for you in Needs review.
                                     </Text>
                                 </View>
                             </View>

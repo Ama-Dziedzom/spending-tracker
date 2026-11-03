@@ -33,12 +33,8 @@ class SmsReceiver : BroadcastReceiver() {
         val rawSms = msgs.map { it.messageBody }.joinToString("")
         val sender = msgs.firstOrNull()?.originatingAddress ?: ""
 
-        // Lightweight check: only parse potential transaction messages
-        val lowerSms = rawSms.lowercase()
-        val keywords = listOf("received", "sent", "debited", "credited", "payment", "momo", "ghs", "transferred", "withdrew", "balance")
-        val isTransaction = keywords.any { lowerSms.contains(it) }
-
-        if (!isTransaction) return
+        // Only look at messages that are very likely money movements
+        if (!isLikelyTransaction(sender, rawSms)) return
 
         // Keep the BroadcastReceiver alive during background execution
         val pendingResult = goAsync()
@@ -75,10 +71,9 @@ class SmsReceiver : BroadcastReceiver() {
 
                 // ── Step 3: Handle Final Result ──────────────────────────────
                 if (logResult.statusCode in 200..299) {
-                    showNotification(context, "Logged Successfully", logResult.responseBody)
+                    describeLogged(logResult.responseBody)?.let { showNotification(context, it.first, it.second) }
                 } else if (logResult.statusCode == 400) {
-                    // Failed parse (e.g. valid format but not matches templates) - log silently or ignore
-                    showNotification(context, "⚠️ Transaction Not Logged", "SMS received but no registered pattern matched.")
+                    // Couldn't read it: the API saved it to "Needs review" in the app. Stay quiet.
                 } else {
                     showNotification(context, "❌ Logging Failed", "Server returned status ${logResult.statusCode}")
                 }
@@ -91,6 +86,63 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     private data class RequestResult(val statusCode: Int, val responseBody: String)
+
+    // Sender IDs used by Ghanaian MoMo providers and banks (lower-case, partial match).
+    private val knownSenders = listOf(
+        "mobilemoney", "momo", "mtn", "t-cash", "tcash", "telecel", "vodafone",
+        "airteltigo", "atmoney", "at money", "stanchart", "standard", "scb", "gcb", "uba",
+        "absa", "ecobank", "fidelity", "calbank", "cbg", "zenith", "access", "stanbic",
+        "republic", "prudential", "gtbank", "fbn", "societe", "adb", "nib", "omnibsic",
+        "consolidated", "first atlantic", "bank"
+    )
+
+    private val otpRegex = Regex("\\b(otp|one[- ]time|verification code|your code is|pin is)\\b")
+    private val amountRegex = Regex("(ghs|gh₵|ghc)\\s?[\\d,]+")
+    private val movementRegex = Regex("\\b(debited|credited|received|sent|paid|payment|cash out|withdraw|transfer)")
+    private val balanceRegex = Regex("\\b(balance|bal|avail)")
+
+    /**
+     * True when the SMS is very likely a money movement:
+     * - from a known MoMo/bank sender and mentions an amount, or
+     * - from any sender but reads strongly like a transaction alert
+     *   (amount + movement word + balance), so unfamiliar banks still work.
+     * One-time codes are ignored.
+     */
+    private fun isLikelyTransaction(sender: String, body: String): Boolean {
+        val s = sender.lowercase()
+        val b = body.lowercase()
+        if (otpRegex.containsMatchIn(b)) return false
+
+        val hasAmount = amountRegex.containsMatchIn(b) || b.contains("ghana cedis")
+        if (!hasAmount) return false
+
+        if (knownSenders.any { s.contains(it) }) return true
+        return movementRegex.containsMatchIn(b) && balanceRegex.containsMatchIn(b)
+    }
+
+    /**
+     * Turns the API's JSON reply into a short, human notification.
+     * Returns null when nothing needs saying (e.g. a duplicate).
+     */
+    private fun describeLogged(body: String): Pair<String, String>? {
+        return try {
+            val json = JSONObject(body)
+            if (json.optBoolean("duplicate", false) && !json.optBoolean("linkedNow", false)) return null
+            val data = json.optJSONObject("data") ?: return Pair("Logged", "Your transaction was saved in LogIt.")
+            val amount = data.optDouble("amount", Double.NaN)
+            val type = data.optString("type", "")
+            val desc = data.optString("description", "").trim()
+            val wallet = json.optString("walletName", "").takeIf { it.isNotBlank() && it != "null" }
+            val amountText = if (amount.isNaN()) "" else String.format(java.util.Locale.US, "GHS %,.2f", amount)
+            val title = (if (type == "credit") "Received $amountText" else "Spent $amountText").trim()
+            val who = if (desc.isNotEmpty() && desc != "null") (if (type == "credit") "from $desc" else "on $desc") else ""
+            val where = wallet?.let { "· $it" } ?: ""
+            val text = listOf(who, where).filter { it.isNotEmpty() }.joinToString(" ")
+            Pair(title, if (text.isEmpty()) "Logged in LogIt" else text)
+        } catch (e: Exception) {
+            Pair("Logged", "Your transaction was saved in LogIt.")
+        }
+    }
 
     private fun postTransaction(apiUrl: String, token: String, rawSms: String, accountId: String): RequestResult {
         val targetUrl = URL("$apiUrl/process-sms")

@@ -20,7 +20,16 @@ import { COLORS } from '../constants/theme';
 interface Props {
     isVisible: boolean;
     onClose: () => void;
-    onSuccess: () => void;
+    /** Called after saving, with the new transaction's id. */
+    onSuccess: (transactionId?: string) => void;
+    /** Optional starting values, e.g. when adding an SMS from "Needs review". */
+    prefill?: {
+        amount?: string;
+        type?: 'expense' | 'income';
+        description?: string;
+        date?: string; // ISO; defaults to now
+        rawSms?: string;
+    };
 }
 
 type TransactionType = 'expense' | 'income';
@@ -34,7 +43,7 @@ const getWalletIcon = (type: string) => {
     }
 };
 
-export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Props) {
+export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess, prefill }: Props) {
     const bottomSheetRef = useRef<BottomSheet>(null);
     const [lastVisible, setLastVisible] = useState(false);
     const snapPoints = useMemo(() => ['85%'], []);
@@ -56,6 +65,11 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Pro
     useEffect(() => {
         if (isVisible && !lastVisible) {
             bottomSheetRef.current?.snapToIndex(0);
+            if (prefill) {
+                if (prefill.amount) setAmount(prefill.amount);
+                if (prefill.type) setTransactionType(prefill.type);
+                if (prefill.description) setDescription(prefill.description);
+            }
             loadWallets();
             // Auto-focus amount after a short delay
             setTimeout(() => {
@@ -150,7 +164,7 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Pro
 
             const parsedAmount = parseFloat(amount);
             const dbType = transactionType === 'expense' ? 'debit' : 'credit';
-            const now = new Date().toISOString();
+            const now = prefill?.date ?? new Date().toISOString();
 
             // Create the transaction
             const { data: txData, error: txError } = await supabase
@@ -164,6 +178,7 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Pro
                     wallet_id: selectedWallet.id,
                     transaction_date: now,
                     source: 'manual',
+                    ...(prefill?.rawSms ? { raw_sms: prefill.rawSms } : {}),
                 })
                 .select()
                 .single();
@@ -177,7 +192,7 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Pro
             // Success
             resetForm();
             onClose();
-            onSuccess();
+            onSuccess(txData?.id);
 
             // Delayed success message
             setTimeout(() => {

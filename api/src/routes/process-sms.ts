@@ -188,15 +188,24 @@ processSmsRouter.post(
       const parseResult = await parseSms(rawSms);
 
       if (!parseResult.parsed) {
-        // Record the failure so the team can improve patterns
-        await supabaseAdmin.from('failed_parses').insert({
-          user_id: userId,
-          raw_sms: rawSms,
-          reason: parseResult.reason ?? 'no_pattern_matched',
-        });
+        // Record the failure (once per message) so it shows in the user's
+        // "Needs review" list and the team can improve patterns.
+        const { data: alreadyFailed } = await supabaseAdmin
+          .from('failed_parses')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('raw_sms', rawSms)
+          .limit(1);
+        if (!alreadyFailed || alreadyFailed.length === 0) {
+          await supabaseAdmin.from('failed_parses').insert({
+            user_id: userId,
+            raw_sms: rawSms,
+            reason: parseResult.reason ?? 'no_pattern_matched',
+          });
+        }
 
         if (wantsPlainText(req)) {
-          res.type('text/plain').status(400).send(`⚠️ Could not parse SMS\nNo matching pattern was found for this message.`);
+          res.type('text/plain').status(400).send(`⚠️ Couldn't read this one\nIt's in Needs review in LogIt, where you can add it in a few taps.`);
           return;
         }
         res.status(400).json({ error: 'Could not parse SMS', rawSms });
