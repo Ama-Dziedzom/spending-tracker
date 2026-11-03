@@ -33,6 +33,7 @@ interface ParsedTx {
   transfer_type: string | null;
   fee: number;
   provider_txn_id: string | null;
+  affects_balance: boolean;
 }
 
 /** An undated message is treated as late when its estimated time is this far before now. */
@@ -392,7 +393,7 @@ processSmsRouter.post(
                 ...(smsDate ? { transaction_date: smsDate.toISOString() } : {}),
               })
               .eq('id', prev.id);
-            await applyBalance(linkedWallet.id, transaction, smsDate, prev.id);
+            if (transaction.affects_balance) await applyBalance(linkedWallet.id, transaction, smsDate, prev.id);
           }
         } else {
           const { data: w } = await supabaseAdmin.from('wallets').select('name').eq('id', prev.wallet_id).maybeSingle();
@@ -450,7 +451,7 @@ processSmsRouter.post(
       const knownDate = dateSource === 'received' ? null : txDate;
 
       // ── Step 4: Insert transaction (+ a separate row for any fee) ───────
-      const { fee, provider_txn_id: providerTxnId, ...txFields } = transaction;
+      const { fee, provider_txn_id: providerTxnId, affects_balance: affectsBalance, ...txFields } = transaction;
       const { data, error: insertError } = await supabaseAdmin
         .from('transactions')
         .insert({
@@ -500,7 +501,7 @@ processSmsRouter.post(
         .eq('status', 'pending');
 
       // ── Step 5: Update wallet balance ───────────────────────────────────
-      const balanceApplied = wallet ? await applyBalance(wallet.id, transaction, knownDate, data.id) : false;
+      const balanceApplied = wallet && affectsBalance ? await applyBalance(wallet.id, transaction, knownDate, data.id) : false;
 
       // ── Step 6: Transfer matching (this user's pending transfers only) ──
       let transferSuggestions: unknown[] = [];

@@ -218,7 +218,8 @@ struct LogItClient {
         let feeText = fee > 0 ? String(format: " (+ GHS %.2f fee)", fee) : ""
         let estimated = (json["dateSource"] as? String) == "estimated" ? " · date estimated" : ""
 
-        let verb = isCredit ? "Received" : "Spent"
+        let isLoan = (tx["category"] as? String) == "loans"
+        let verb = isLoan ? (isCredit ? "Borrowed" : "Repaid") : (isCredit ? "Received" : "Spent")
         let what = String(format: "%@ GHS %.2f%@", verb, amount, feeText)
         let line = "\(what) · \(category)\n\(desc)\(wallet)\(estimated)"
         return .logged(line)

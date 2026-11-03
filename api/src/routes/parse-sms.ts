@@ -23,6 +23,11 @@ interface FieldMap {
   source: string;
   flags?: string;
   default_description?: string;
+  /** Overrides for messages the generic rules can't read correctly */
+  type?: 'debit' | 'credit';
+  category?: string;
+  /** false when the message doesn't change the wallet balance (e.g. overdraft drawn straight into a payment) */
+  affects_balance?: boolean;
   transfer_metadata?: {
     reference?: number | null;
     phone?: number | null;
@@ -51,6 +56,8 @@ export interface ParsedTransaction {
   fee: number;
   /** Provider's transaction number, used to date undated messages */
   provider_txn_id: string | null;
+  /** false: log it, but leave the wallet balance alone */
+  affects_balance: boolean;
 }
 
 export interface ParseSuccess {
@@ -144,10 +151,20 @@ export async function parseSms(rawSms: string): Promise<ParseResult> {
       isDebit = true;
     }
 
+    if (fm.type) isDebit = fm.type === 'debit';
+
     // Category IDs must match the app's (mobile/lib/categories.ts)
-    const category = pattern.transfer_type
-      ? 'transfer'
-      : categorizeTransaction(description, fm.source, cleanSms, isDebit ? 'debit' : 'credit');
+    const category =
+      fm.category ??
+      (pattern.transfer_type
+        ? 'transfer'
+        : categorizeTransaction(description, fm.source, cleanSms, isDebit ? 'debit' : 'credit'));
+
+    // Borrowing and repaying a loan/overdraft is neither income nor spending;
+    // only its fees and interest are a cost (saved as separate Fees rows).
+    const isLoanMove = category === 'loans';
+    const isTransfer = !!pattern.transfer_type || isLoanMove;
+    const transferType = pattern.transfer_type ?? (isLoanMove ? (isDebit ? 'transfer_out' : 'transfer_in') : null);
 
     return {
       parsed: true,
@@ -159,11 +176,12 @@ export async function parseSms(rawSms: string): Promise<ParseResult> {
         description,
         balance,
         category,
-        is_transfer: !!pattern.transfer_type,
-        transfer_type: pattern.transfer_type,
+        is_transfer: isTransfer,
+        transfer_type: transferType,
         transfer_metadata: transferMetadata,
-        fee: isDebit ? extractFee(cleanSms) : 0,
+        fee: extractFee(cleanSms),
         provider_txn_id: extractProviderTxnId(cleanSms),
+        affects_balance: fm.affects_balance !== false,
       },
     };
   }
