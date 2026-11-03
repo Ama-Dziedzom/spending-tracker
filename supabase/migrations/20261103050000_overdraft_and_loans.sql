@@ -1,6 +1,7 @@
 -- =============================================================================
 -- Overdraft (MoMoBoost) and loans (3 Nov 2026)
---  1. Pattern: "GHS13.43 has been used on FRI:…/MM with access fee GHS 0.68 …
+--  1. Pattern: "You have used 13.43 GHS on FRI:…/MM with access fee 0.68 …"
+--     (also "GHS13.43 has been used on …")
 --     from MoMoBoost." The overdraft paid part of a payment that is already
 --     logged (the payment SMS carries the real balance), so it is logged as
 --     borrowing (Loans, not income) without touching the wallet balance.
@@ -14,7 +15,7 @@ INSERT INTO patterns (institution_name, institution_code, regex_pattern, field_m
 SELECT
   'MTN Mobile Money',
   'mtn_momo',
-  'GHS\s?([\d,]+\.?\d*)\s+has been used\b.*?\baccess fee',
+  '(?:You have used\s+|GHS\s?)([\d,]+\.?\d*)\s*(?:GHS\s+on|has been used)\b.*?\baccess fee',
   '{"amount":1,"description":null,"balance":null,"source":"MTN_MoMo","flags":"i","default_description":"MoMoBoost overdraft","type":"credit","category":"loans","affects_balance":false}',
   NULL,
   44
@@ -24,7 +25,7 @@ WHERE NOT EXISTS (
 
 -- Looser match (the first version needed "used on X with access fee" exactly)
 UPDATE patterns
-SET regex_pattern = 'GHS\s?([\d,]+\.?\d*)\s+has been used\b.*?\baccess fee'
+SET regex_pattern = '(?:You have used\s+|GHS\s?)([\d,]+\.?\d*)\s*(?:GHS\s+on|has been used)\b.*?\baccess fee'
 WHERE field_map->>'default_description' = 'MoMoBoost overdraft';
 
 UPDATE transactions
