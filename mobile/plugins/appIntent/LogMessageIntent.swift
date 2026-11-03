@@ -30,7 +30,8 @@ struct LogMessageIntent: AppIntent {
 
     @Parameter(
         title: "Messages",
-        description: "The SMS text. In a Message automation or a Share Sheet shortcut, use Shortcut Input."
+        description: "The SMS text. In a Message automation or a Share Sheet shortcut, use Shortcut Input.",
+        requestValueDialog: "Paste the MoMo or bank message to log."
     )
     var messages: [String]
 
@@ -64,6 +65,27 @@ enum LogItIntentError: Error, CustomLocalizedStringResourceConvertible {
         switch self {
         case .notSignedIn: return "Open LogIt and sign in, then try again."
         }
+    }
+}
+
+// MARK: - App Shortcuts
+//
+// Registers "Log Message" with the system, so it sits at the top of LogIt's
+// section in the Shortcuts action list, shows up in Spotlight, and works with
+// Siri ("Log a message in LogIt") with no setup. Automations still have to be
+// created by the user; Apple doesn't let apps create them.
+
+@available(iOS 16.0, *)
+struct LogItAppShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: LogMessageIntent(),
+            phrases: [
+                "Log a message in \(.applicationName)",
+                "Log a transaction in \(.applicationName)",
+                "Add an SMS to \(.applicationName)",
+            ]
+        )
     }
 }
 
