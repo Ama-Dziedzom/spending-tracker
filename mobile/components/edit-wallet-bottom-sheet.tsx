@@ -11,7 +11,7 @@ import {
     CheckmarkCircle02Icon
 } from '@hugeicons/core-free-icons';
 import { Wallet } from '../lib/supabase';
-import { updateWallet, deleteWallet, updateWalletBalance } from '../lib/wallet-service';
+import { updateWallet, deleteWallet } from '../lib/wallet-service';
 
 interface Props {
     isVisible: boolean;
@@ -25,14 +25,12 @@ export function EditWalletBottomSheet({ isVisible, wallet, onClose, onSuccess }:
     const snapPoints = useMemo(() => ['50%', '70%'], []);
 
     const [name, setName] = useState('');
-    const [balance, setBalance] = useState('0.00');
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         if (isVisible && wallet) {
             setName(wallet.name);
-            setBalance(Number(wallet.current_balance).toFixed(2));
             bottomSheetRef.current?.snapToIndex(0);
         } else {
             bottomSheetRef.current?.close();
@@ -50,14 +48,7 @@ export function EditWalletBottomSheet({ isVisible, wallet, onClose, onSuccess }:
                 nameSuccess = result !== null;
             }
 
-            // Update balance if changed
-            const newBalance = parseFloat(balance) || 0;
-            let balanceSuccess = true;
-            if (newBalance !== Number(wallet.current_balance)) {
-                balanceSuccess = await updateWalletBalance(wallet.id, newBalance);
-            }
-
-            if (nameSuccess && balanceSuccess) {
+            if (nameSuccess) {
                 onSuccess();
                 onClose();
             } else {
@@ -164,20 +155,6 @@ export function EditWalletBottomSheet({ isVisible, wallet, onClose, onSuccess }:
                                 onChangeText={setName}
                                 className="text-[18px] font-manrope-semibold text-slate-900"
                                 placeholder="Wallet Name"
-                            />
-                        </View>
-                    </View>
-
-                    <View>
-                        <Text className="text-[14px] font-manrope-bold text-[#ADAEAF] uppercase mb-2 ml-1">CURRENT BALANCE</Text>
-                        <View className="bg-[#F8FAFF] border-[1.5px] border-[#DAE2FF] rounded-[16px] p-4 flex-row items-center">
-                            <Text className="text-[18px] font-manrope-semibold text-[#1642E5] mr-2">GHS</Text>
-                            <BottomSheetTextInput
-                                value={balance}
-                                onChangeText={setBalance}
-                                keyboardType="decimal-pad"
-                                className="text-[24px] font-manrope-bold text-[#1642E5] flex-1"
-                                placeholder="0.00"
                             />
                         </View>
                     </View>

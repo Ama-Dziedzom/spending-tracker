@@ -57,7 +57,7 @@ export function useAuth() {
             const { error } = await supabase.auth.verifyOtp({
                 email,
                 token,
-                type: 'signup',
+                type: 'email',
             });
 
             if (error) {

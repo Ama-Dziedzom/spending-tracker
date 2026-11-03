@@ -189,6 +189,7 @@ export default function SignupScreen() {
                 style={{ flex: 1 }}
             >
                 <ScrollView
+                    style={styles.scroll}
                     contentContainerStyle={styles.scrollContainer}
                     bounces={false}
                     showsVerticalScrollIndicator={false}
@@ -464,6 +465,9 @@ const styles = StyleSheet.create({
     root: {
         flex: 1,
         backgroundColor: '#081750'
+    },
+    scroll: {
+        flex: 1,
     },
     scrollContainer: {
         flexGrow: 1,

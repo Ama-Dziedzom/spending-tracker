@@ -174,23 +174,6 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Pro
                 return;
             }
 
-            // Update wallet balance
-            const balanceChange = transactionType === 'expense' ? -parsedAmount : parsedAmount;
-            const newBalance = Number(selectedWallet.current_balance) + balanceChange;
-
-            const { error: walletError } = await supabase
-                .from('wallets')
-                .update({
-                    current_balance: newBalance,
-                    updated_at: now,
-                })
-                .eq('id', selectedWallet.id);
-
-            if (walletError) {
-                console.error('Error updating wallet balance:', walletError);
-                // Transaction was created, so we still show success but warn about balance
-            }
-
             // Success
             resetForm();
             onClose();
@@ -356,9 +339,6 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Pro
                                 <Text className="text-[16px] font-manrope-semibold text-slate-900">
                                     {selectedWallet.name}
                                 </Text>
-                                <Text className="text-[13px] font-manrope text-slate-400">
-                                    Balance: GHS {Number(selectedWallet.current_balance).toFixed(2)}
-                                </Text>
                             </View>
                         </View>
                     ) : (
@@ -514,9 +494,6 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess }: Pro
                                     <View>
                                         <Text className="text-[16px] font-manrope-bold text-[#5B5B5B]">
                                             {wallet.name}
-                                        </Text>
-                                        <Text className="text-[14px] font-manrope text-[#7C7D80]">
-                                            Balance: GHS {Number(wallet.current_balance).toFixed(2)}
                                         </Text>
                                     </View>
                                 </View>

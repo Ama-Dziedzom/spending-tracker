@@ -183,36 +183,6 @@ export async function getWalletById(id: string): Promise<Wallet | null> {
 }
 
 /**
- * Update wallet balance
- */
-export async function updateWalletBalance(id: string, newBalance: number): Promise<boolean> {
-    try {
-        if (newBalance < 0) {
-            console.error('Balance cannot be negative');
-            return false;
-        }
-
-        const { error } = await supabase
-            .from('wallets')
-            .update({
-                current_balance: newBalance,
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', id);
-
-        if (error) {
-            console.error('Error updating wallet balance:', error.message);
-            return false;
-        }
-
-        return true;
-    } catch (error) {
-        console.error('Error updating wallet balance:', error);
-        return false;
-    }
-}
-
-/**
  * Update wallet details
  */
 export async function updateWallet(id: string, updates: UpdateWalletInput): Promise<Wallet | null> {
@@ -290,27 +260,5 @@ export async function hasWalletsConfigured(): Promise<boolean> {
     } catch (error) {
         console.error('Error checking wallets:', error);
         return false;
-    }
-}
-
-/**
- * Get total balance across all wallets for the authenticated user
- */
-export async function getTotalBalance(): Promise<number> {
-    try {
-        const { data, error } = await supabase
-            .from('wallets')
-            .select('current_balance')
-            .eq('is_active', true);
-
-        if (error) {
-            console.error('Error fetching total balance:', error.message);
-            return 0;
-        }
-
-        return data?.reduce((sum, wallet) => sum + (Number(wallet.current_balance) || 0), 0) || 0;
-    } catch (error) {
-        console.error('Error fetching total balance:', error);
-        return 0;
     }
 }

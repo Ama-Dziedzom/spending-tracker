@@ -13,8 +13,8 @@ import {
     Wallet03Icon,
     ArrowUpRight03Icon,
 } from '@hugeicons/core-free-icons';
-import { getWallets, createWallets, CreateWalletInput, getTotalBalance } from '../../lib/wallet-service';
-import { assignTransactionToWallet } from '../../lib/transaction-service';
+import { getWallets, createWallets, CreateWalletInput } from '../../lib/wallet-service';
+import { assignTransactionToWallet, getWalletAnalytics } from '../../lib/transaction-service';
 import { Wallet } from '../../lib/supabase';
 import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bottom-sheet';
 import { SelectWalletTypeBottomSheet } from '../../components/select-wallet-type-bottom-sheet';
@@ -43,7 +43,7 @@ export default function Wallets() {
     }>();
 
     const [wallets, setWallets] = React.useState<Wallet[]>([]);
-    const [totalBalance, setTotalBalance] = React.useState(0);
+    const [spentThisMonthByWallet, setSpentThisMonthByWallet] = React.useState<Record<string, number>>({});
     const [isLoading, setIsLoading] = React.useState(true);
     const [refreshing, setRefreshing] = React.useState(false);
     const [isSelectTypeSheetVisible, setIsSelectTypeSheetVisible] = React.useState(false);
@@ -55,12 +55,13 @@ export default function Wallets() {
 
     const fetchWallets = React.useCallback(async () => {
         try {
-            const [walletsData, balanceData] = await Promise.all([
-                getWallets(),
-                getTotalBalance()
-            ]);
+            const walletsData = await getWallets();
             setWallets(walletsData);
-            setTotalBalance(balanceData);
+
+            const analyticsEntries = await Promise.all(
+                walletsData.map(async (w) => [w.id, (await getWalletAnalytics(w.id, 'month')).totalSpent] as const)
+            );
+            setSpentThisMonthByWallet(Object.fromEntries(analyticsEntries));
         } catch (error) {
             console.error('Error fetching wallets:', error);
         } finally {
@@ -116,7 +117,7 @@ export default function Wallets() {
                     type: 'momo',
                     icon: 'wallet-03',
                     color: '#1642E5',
-                    initial_balance: parseFloat(data.momo.balance.toString().replace(/[^0-9.]/g, '')) || 0,
+                    initial_balance: 0,
                     source_identifier: data.momo.provider,
                 });
             }
@@ -127,7 +128,7 @@ export default function Wallets() {
                     type: 'bank',
                     icon: 'bank',
                     color: '#1642E5',
-                    initial_balance: parseFloat(data.bank.balance.toString().replace(/[^0-9.]/g, '')) || 0,
+                    initial_balance: 0,
                 });
             }
 
@@ -137,7 +138,7 @@ export default function Wallets() {
                     type: 'cash',
                     icon: 'money-01',
                     color: '#1642E5',
-                    initial_balance: parseFloat(data.cash.balance.toString().replace(/[^0-9.]/g, '')) || 0,
+                    initial_balance: 0,
                 });
             }
 
@@ -228,7 +229,10 @@ export default function Wallets() {
                                                         {wallet.name}
                                                     </Text>
                                                     <Text className="text-white font-manrope-bold text-[32px]">
-                                                        GHS {formatMoney(wallet.current_balance)}
+                                                        GHS {formatMoney(spentThisMonthByWallet[wallet.id])}
+                                                    </Text>
+                                                    <Text className="text-white/60 font-manrope-medium text-[12px] uppercase tracking-wider">
+                                                        Spent this month
                                                     </Text>
                                                 </View>
 
@@ -284,7 +288,6 @@ export default function Wallets() {
                     fetchWallets();
                 }}
                 isLoading={isSaving}
-                initialBalanceFromTransaction={params.initialAmount}
             />
 
             <EditWalletBottomSheet

@@ -34,7 +34,7 @@ class SmsReceiver : BroadcastReceiver() {
         val sender = msgs.firstOrNull()?.originatingAddress ?: ""
 
         // Lightweight check: only parse potential transaction messages
-        val lowerSms = rawSms.toLowerCase()
+        val lowerSms = rawSms.lowercase()
         val keywords = listOf("received", "sent", "debited", "credited", "payment", "momo", "ghs", "transferred", "withdrew", "balance")
         val isTransaction = keywords.any { lowerSms.contains(it) }
 

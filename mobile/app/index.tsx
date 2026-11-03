@@ -2,17 +2,41 @@ import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { biometrics } from '../utils/biometrics';
 
 const { width, height } = Dimensions.get('window');
+const MIN_SPLASH_MS = 2000;
 
 export default function SplashScreen() {
     const router = useRouter();
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            router.replace('/welcome');
-        }, 2000);
-        return () => clearTimeout(timer);
+        let cancelled = false;
+
+        const resolveDestination = async (): Promise<'/(tabs)' | '/login' | '/welcome'> => {
+            // Biometric users get routed through /login, which auto-triggers the
+            // Face ID/fingerprint prompt on mount and can restore a session even
+            // after the Supabase token has fully expired (see utils/biometrics.ts).
+            if (await biometrics.isBiometricLoginEnabled()) {
+                return '/login';
+            }
+
+            // No biometrics configured — fall back to checking the persisted
+            // Supabase session directly so we don't force a manual re-login
+            // just because the app reloaded.
+            const { data: { session } } = await supabase.auth.getSession();
+            return session ? '/(tabs)' : '/welcome';
+        };
+
+        Promise.all([
+            resolveDestination(),
+            new Promise((resolve) => setTimeout(resolve, MIN_SPLASH_MS)),
+        ]).then(([destination]) => {
+            if (!cancelled) router.replace(destination);
+        });
+
+        return () => { cancelled = true; };
     }, []);
 
     return (

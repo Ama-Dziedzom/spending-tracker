@@ -51,7 +51,7 @@ export default function WalletDetailsPage() {
             setWallet(walletData);
 
             const [analytics, transactions] = await Promise.all([
-                getWalletAnalytics(walletId),
+                getWalletAnalytics(walletId, 'month'),
                 getTransactionsByWallet(walletId)
             ]);
 
@@ -121,10 +121,13 @@ export default function WalletDetailsPage() {
 
                 <View className="items-center px-8">
                     <Text className="text-white/80 text-[16px] font-manrope-bold mb-0.5 uppercase tracking-widest text-center">
-                        {wallet.name} Balance
+                        {wallet.name}
                     </Text>
-                    <Text className="text-white text-[60px] font-manrope-bold mb-6 tracking-tight text-center">
-                        GHS {formatMoney(wallet.current_balance)}
+                    <Text className="text-white text-[60px] font-manrope-bold mb-1 tracking-tight text-center">
+                        GHS {formatMoney(walletAnalytics?.totalSpent)}
+                    </Text>
+                    <Text className="text-white/60 text-[13px] font-manrope-semibold uppercase tracking-wider mb-6 text-center">
+                        Spent this month
                     </Text>
 
                     <View className="flex-row items-center justify-center gap-8 w-full">
@@ -135,7 +138,7 @@ export default function WalletDetailsPage() {
                                     GHS {formatMoney(walletAnalytics?.totalInflow)}
                                 </Text>
                             </View>
-                            <Text className="text-white/60 text-[12px] font-manrope-semibold uppercase tracking-wider">Total Inflow</Text>
+                            <Text className="text-white/60 text-[12px] font-manrope-semibold uppercase tracking-wider">Inflow This Month</Text>
                         </View>
 
                         <View className="w-[1px] h-6 bg-white/10" />
@@ -147,7 +150,7 @@ export default function WalletDetailsPage() {
                                     GHS {formatMoney(walletAnalytics?.totalSpent)}
                                 </Text>
                             </View>
-                            <Text className="text-white/60 text-[12px] font-manrope-semibold uppercase tracking-wider">Total Outflow</Text>
+                            <Text className="text-white/60 text-[12px] font-manrope-semibold uppercase tracking-wider">Outflow This Month</Text>
                         </View>
                     </View>
                 </View>

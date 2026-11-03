@@ -81,7 +81,7 @@ function withXcodeChanges(config) {
     const projectName = mod.modRequest.projectName;
 
     addBridgeFilesToMainTarget(proj, projectName);
-    addShareExtensionTarget(proj, bundleId);
+    addShareExtensionTarget(proj, bundleId, mod.ios?.appleTeamId);
 
     return mod;
   });
@@ -147,7 +147,7 @@ function addBridgeFilesToMainTarget(proj, projectName) {
 }
 
 // Add the ShareExtension app_extension target (idempotent)
-function addShareExtensionTarget(proj, mainBundleId) {
+function addShareExtensionTarget(proj, mainBundleId, appleTeamId) {
   const extBundleId = `${mainBundleId}${EXT_BUNDLE_SUFFIX}`;
 
   // Idempotency: names may or may not be quoted in the stored pbxproj
@@ -230,6 +230,7 @@ function addShareExtensionTarget(proj, mainBundleId) {
         SKIP_INSTALL: '"YES"',
         SWIFT_VERSION: '"5.0"',
         TARGETED_DEVICE_FAMILY: '"1,2"',
+        ...(appleTeamId && { DEVELOPMENT_TEAM: appleTeamId }),
       });
     }
   }

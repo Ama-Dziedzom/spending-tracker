@@ -1,4 +1,4 @@
-import { View, Text, Image, Pressable, ScrollView, Linking, Platform, RefreshControl } from 'react-native';
+import { View, Text, Image, Pressable, ScrollView, Linking, Platform, RefreshControl, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'expo-router';
@@ -19,8 +19,8 @@ import {
     ViewIcon,
     ViewOffSlashIcon,
 } from '@hugeicons/core-free-icons';
-import { getWallets, getTotalBalance } from '../../lib/wallet-service';
-import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName } from '../../lib/transaction-service';
+import { getWallets } from '../../lib/wallet-service';
+import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName, getGlobalAnalytics } from '../../lib/transaction-service';
 import { Wallet, supabase, Transaction } from '../../lib/supabase';
 import { ActivityIndicator, Alert } from 'react-native';
 import { LinkTransactionsBottomSheet } from '../../components/link-transactions-bottom-sheet';
@@ -44,12 +44,13 @@ function getGreeting(): string {
 export default function Dashboard() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
+    const { height: windowHeight } = useWindowDimensions();
     const tabContext = useTabContext();
     const [refreshing, setRefreshing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [transactions, setTransactions] = useState<TransactionWithWallet[]>([]);
-    const [totalBalance, setTotalBalance] = useState(0);
+    const [spentThisMonth, setSpentThisMonth] = useState(0);
     const [unmatchedCount, setUnmatchedCount] = useState(0);
     const [isBalanceVisible, setIsBalanceVisible] = useState(true);
     const [isLinkSheetVisible, setIsLinkSheetVisible] = useState(false);
@@ -80,9 +81,9 @@ export default function Dashboard() {
                 setUserName(user.email.split('@')[0]);
             }
 
-            const [walletsData, balanceData, transactionsData] = await Promise.all([
+            const [walletsData, monthAnalytics, transactionsData] = await Promise.all([
                 getWallets(),
-                getTotalBalance(),
+                getGlobalAnalytics('month'),
                 getRecentTransactions(5)
             ]);
 
@@ -95,7 +96,7 @@ export default function Dashboard() {
             if (unmatchedError) console.error('Error counting unmatched transactions:', unmatchedError);
 
             setWallets(walletsData);
-            setTotalBalance(balanceData);
+            setSpentThisMonth(monthAnalytics.totalSpent);
             setTransactions(transactionsData);
             setUnmatchedCount(count || 0);
         } catch (error) {
@@ -162,69 +163,38 @@ export default function Dashboard() {
     const handleConfigureWallet = async (data: any) => {
         setIsSavingWallet(true);
         try {
-            const amount = activeTransaction ? Number(activeTransaction.amount) : 0;
-            const isIncome = activeTransaction ? (activeTransaction.type === 'income' || activeTransaction.type === 'credit') : false;
             const desc = activeTransaction?.description?.toLowerCase() || '';
-
-            // Determine target wallet type for adjustment to avoid double counting
-            let targetTypeForAdjustment: string | null = null;
-            if (activeTransaction) {
-                if (selectedWalletTypes.length === 1) {
-                    targetTypeForAdjustment = selectedWalletTypes[0];
-                } else {
-                    const isMomo = desc.includes('mtn') || desc.includes('momo') || desc.includes('telecel') || desc.includes('vodafone');
-                    if (isMomo && selectedWalletTypes.includes('momo')) targetTypeForAdjustment = 'momo';
-                    else if (!isMomo && selectedWalletTypes.includes('bank')) targetTypeForAdjustment = 'bank';
-                    else targetTypeForAdjustment = selectedWalletTypes[0];
-                }
-            }
 
             const walletsToCreate: CreateWalletInput[] = [];
 
             if (data.momo) {
-                let balance = parseFloat(data.momo.balance.toString().replace(/[^0-9.]/g, '')) || 0;
-                // If this is the target wallet, adjust initial balance because assignTransactionToWallet will also apply it
-                if (targetTypeForAdjustment === 'momo') {
-                    balance = isIncome ? balance - amount : balance + amount;
-                }
-
                 walletsToCreate.push({
                     name: 'Mobile Money',
                     type: 'momo',
                     icon: 'wallet-03',
                     color: '#1642E5',
-                    initial_balance: balance,
+                    initial_balance: 0,
                     source_identifier: data.momo.provider,
                 });
             }
 
             if (data.bank) {
-                let balance = parseFloat(data.bank.balance.toString().replace(/[^0-9.]/g, '')) || 0;
-                if (targetTypeForAdjustment === 'bank') {
-                    balance = isIncome ? balance - amount : balance + amount;
-                }
-
                 walletsToCreate.push({
                     name: data.bank.name || 'Bank Wallet',
                     type: 'bank',
                     icon: 'bank',
                     color: '#1642E5',
-                    initial_balance: balance,
+                    initial_balance: 0,
                 });
             }
 
             if (data.cash) {
-                let balance = parseFloat(data.cash.balance.toString().replace(/[^0-9.]/g, '')) || 0;
-                if (targetTypeForAdjustment === 'cash') {
-                    balance = isIncome ? balance - amount : balance + amount;
-                }
-
                 walletsToCreate.push({
                     name: data.cash.name || 'Cash Wallet',
                     type: 'cash',
                     icon: 'money-01',
                     color: '#1642E5',
-                    initial_balance: balance,
+                    initial_balance: 0,
                 });
             }
 
@@ -320,7 +290,11 @@ export default function Dashboard() {
                             />
                         }
                     >
-                        <View style={{ paddingHorizontal: 24, paddingBottom: 60 }}>
+                        <View style={{
+                            paddingHorizontal: 24,
+                            paddingBottom: 60,
+                            minHeight: !isLoading && wallets.length === 0 ? windowHeight * 0.82 : undefined,
+                        }}>
                             {/* Header */}
                             <View className="flex-row items-center justify-between mt-4 mb-10">
                                 <View>
@@ -350,39 +324,47 @@ export default function Dashboard() {
                                 <View className="items-center mb-14 mt-12">
                                     <View style={{ opacity: 1 }}>
                                         <Image
-                                            source={require('../../assets/images/no-wallets.png')}
-                                            style={{ width: 220, height: 125, marginBottom: 24 }}
+                                            source={require('../../assets/images/empty state ill.png')}
+                                            style={{ width: 240, height: 136, marginBottom: 24 }}
                                             resizeMode="contain"
                                         />
                                     </View>
                                     <Text className="text-[24px] font-manrope-bold text-white mt-2">
-                                        No wallets yet
+                                        Nothing to track yet
                                     </Text>
                                     <Text className="text-[16px] font-manrope text-white/60 text-center mt-2 px-10">
-                                        Track your spending instantly.{"\n"}Get started by:
+                                        Forward a mobile money message and watch your first wallet appear
                                     </Text>
+                                    <Pressable
+                                        onPress={handleOpenMessages}
+                                        className="bg-white rounded-full px-10 py-4 mt-8"
+                                    >
+                                        <Text className="text-[16px] font-manrope-bold" style={{ color: COLORS.primary }}>
+                                            Share an SMS
+                                        </Text>
+                                    </Pressable>
                                 </View>
                             ) : (
                                 <View className="items-center mb-4 mt-8">
                                     <View className="flex-row items-center gap-2 mb-1">
                                         <Text className="text-white/60 text-[14px] font-manrope-bold uppercase tracking-[1px]">
-                                            TOTAL BALANCE
+                                            SPENT THIS MONTH
                                         </Text>
-                                        <Pressable 
+                                        <Pressable
                                             onPress={() => setIsBalanceVisible(!isBalanceVisible)}
                                             className="p-1"
                                             hitSlop={8}
                                         >
-                                            <HugeiconsIcon 
-                                                icon={isBalanceVisible ? ViewOffSlashIcon : ViewIcon} 
-                                                size={16} 
-                                                color="#FFFFFF99" 
+                                            <HugeiconsIcon
+                                                icon={isBalanceVisible ? ViewOffSlashIcon : ViewIcon}
+                                                size={16}
+                                                color="#FFFFFF99"
                                             />
                                         </Pressable>
                                     </View>
                                     <Text className="text-white text-[48px] font-manrope-bold">
-                                        GHS {isBalanceVisible 
-                                            ? totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })
+                                        GHS {isBalanceVisible
+                                            ? spentThisMonth.toLocaleString('en-US', { minimumFractionDigits: 2 })
                                             : '••••••'
                                         }
                                     </Text>
@@ -479,7 +461,7 @@ export default function Dashboard() {
                                         })}
                                     </View>
                                 </View>
-                            ) : !isLoading && transactions.length === 0 && (
+                            ) : !isLoading && transactions.length === 0 && wallets.length > 0 && (
                                 <View className="items-center py-20 px-8">
                                     <View className="w-16 h-16 bg-slate-50 rounded-full items-center justify-center mb-4">
                                         <HugeiconsIcon icon={Wallet01Icon} size={32} color="#CBD5E1" />
@@ -568,7 +550,6 @@ export default function Dashboard() {
                     fetchData();
                 }}
                 isLoading={isSavingWallet}
-                initialBalanceFromTransaction={activeTransaction?.amount?.toString()}
             />
 
             <TransactionDetailBottomSheet

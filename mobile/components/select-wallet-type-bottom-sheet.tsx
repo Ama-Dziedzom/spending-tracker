@@ -7,7 +7,6 @@ import {
     Wallet01Icon,
     Wallet03Icon,
     Tick02Icon,
-    ArrowRight02Icon,
 } from '@hugeicons/core-free-icons';
 
 interface Props {
@@ -157,7 +156,6 @@ export function SelectWalletTypeBottomSheet({ isVisible, onClose, onSelect }: Pr
                         <Text className="text-white text-[20px] font-manrope-semibold">
                             Continue
                         </Text>
-                        <HugeiconsIcon icon={ArrowRight02Icon} size={20} color="white" />
                     </Pressable>
                 </View>
             </BottomSheetView>

@@ -250,7 +250,6 @@ export function LinkTransactionsBottomSheet({ isVisible, onClose, onSuccess, onC
                                                         </View>
                                                     )}
                                                 </View>
-                                                <Text className="text-[14px] font-manrope text-[#7C7D80]">Balance: GHS {Number(wallet.current_balance).toFixed(2)}</Text>
                                             </View>
                                         </View>
                                         {isProcessing ? (

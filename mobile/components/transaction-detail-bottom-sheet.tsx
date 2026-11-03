@@ -3,7 +3,6 @@ import { View, Text, Pressable, ActivityIndicator, Alert } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView, BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-    ArrowRight02Icon,
     BankIcon,
     Wallet01Icon,
     Wallet03Icon,
@@ -280,10 +279,7 @@ export function TransactionDetailBottomSheet({ isVisible, transaction, onClose, 
                                             {currentCategory.name || 'Uncategorized'}
                                         </Text>
                                     </View>
-                                    <View className="flex-row items-center gap-1">
-                                        <Text className="text-[14px] font-manrope-medium text-[#1642E5]">Change</Text>
-                                        <HugeiconsIcon icon={ArrowRight02Icon} size={18} color="#1642E5" />
-                                    </View>
+                                    <Text className="text-[14px] font-manrope-medium text-[#1642E5]">Change</Text>
                                 </Pressable>
                             </View>
                         </View>

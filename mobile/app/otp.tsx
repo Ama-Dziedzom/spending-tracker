@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, Sc
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowRight } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft02Icon } from '@hugeicons/core-free-icons';
@@ -17,14 +16,13 @@ export default function OtpScreen() {
     const { email, fullName, phone } = useLocalSearchParams<{ email: string; fullName?: string; phone?: string }>();
     const { loading, verifyOtp, resendOtp, showError } = useAuth();
 
-    const [otp, setOtp] = useState(['', '', '', '', '', '', '', '']);
+    const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [focusedIndex, setFocusedIndex] = useState(-1);
     const [resendCooldown, setResendCooldown] = useState(0);
+    const [error, setError] = useState<string | null>(null);
 
-    // Refs for all 8 individual OTP input cells
+    // Refs for all 6 individual OTP input cells
     const inputRefs = [
-        useRef<TextInput>(null),
-        useRef<TextInput>(null),
         useRef<TextInput>(null),
         useRef<TextInput>(null),
         useRef<TextInput>(null),
@@ -46,16 +44,18 @@ export default function OtpScreen() {
         // Strip out non-numeric characters
         const cleanedText = text.replace(/[^0-9]/g, '');
 
+        if (error) setError(null);
+
         // Handle paste / iOS autofill — full code pasted into one cell
         if (cleanedText.length > 1) {
-            const digits = cleanedText.slice(0, 8).split('');
+            const digits = cleanedText.slice(0, 6).split('');
             const newOtp = [...otp];
             digits.forEach((d, i) => {
-                if (i < 8) newOtp[i] = d;
+                if (i < 6) newOtp[i] = d;
             });
             setOtp(newOtp);
             // Focus the last filled cell or the next empty one
-            const focusIdx = Math.min(digits.length, 7);
+            const focusIdx = Math.min(digits.length, 5);
             inputRefs[focusIdx].current?.focus();
             return;
         }
@@ -65,7 +65,7 @@ export default function OtpScreen() {
         setOtp(newOtp);
 
         // Auto-focus next cell if text is typed
-        if (cleanedText && index < 7) {
+        if (cleanedText && index < 5) {
             inputRefs[index + 1].current?.focus();
         }
     };
@@ -79,9 +79,12 @@ export default function OtpScreen() {
 
     const handleResend = useCallback(async () => {
         if (resendCooldown > 0 || !email) return;
+        setError(null);
         const result = await resendOtp(email);
         if (result.success) {
+            setOtp(['', '', '', '', '', '']);
             setResendCooldown(60);
+            inputRefs[0].current?.focus();
         } else {
             showError('Resend Failed', result.error || 'Could not resend code. Please try again.');
         }
@@ -92,14 +95,15 @@ export default function OtpScreen() {
         const code = otp.join('');
         const result = await verifyOtp(email, code);
         if (result.success) {
+            setError(null);
             router.push({
                 pathname: '/password',
                 params: { email, fullName, phone }
             });
         } else {
-            showError('Verification Failed', result.error || 'Invalid code. Please try again.');
+            setError(result.error || 'Incorrect code. Please try again.');
         }
-    }, [email, fullName, phone, otp, verifyOtp, router, showError]);
+    }, [email, fullName, phone, otp, verifyOtp, router]);
 
     return (
         <KeyboardAvoidingView
@@ -149,6 +153,7 @@ export default function OtpScreen() {
             </View>
 
             <ScrollView
+                style={styles.scroll}
                 contentContainerStyle={styles.scrollContainer}
                 bounces={false}
                 showsVerticalScrollIndicator={false}
@@ -191,10 +196,11 @@ export default function OtpScreen() {
                                 style={[
                                     styles.otpCell,
                                     focusedIndex === index && styles.otpCellFocused,
-                                    digit !== '' && styles.otpCellFilled
+                                    digit !== '' && styles.otpCellFilled,
+                                    error && styles.otpCellError,
                                 ]}
                                 keyboardType="number-pad"
-                                maxLength={index === 0 ? 8 : 1}
+                                maxLength={index === 0 ? 6 : 1}
                                 value={digit}
                                 onChangeText={(text) => handleOtpChange(text, index)}
                                 onKeyPress={(e) => handleKeyPress(e, index)}
@@ -204,12 +210,17 @@ export default function OtpScreen() {
                                 caretHidden
                                 autoCorrect={false}
                                 textContentType={index === 0 ? 'oneTimeCode' : 'none'}
-                                autoComplete={index === 0 ? 'sms-otp' : 'off'}
+                                autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                                importantForAutofill={index === 0 ? 'yes' : 'no'}
                             />
                         ))}
                     </View>
 
-                    <View style={{ height: 36 }} />
+                    {error ? (
+                        <Text style={styles.errorText}>{error}</Text>
+                    ) : (
+                        <View style={{ height: 36 }} />
+                    )}
 
                     {/* RESEND CODE */}
                     <View style={styles.resendContainer}>
@@ -240,10 +251,7 @@ export default function OtpScreen() {
                             {loading ? (
                                 <ActivityIndicator color="#FFFFFF" size="small" />
                             ) : (
-                                <>
-                                    <Text style={styles.btnText}>Verify</Text>
-                                    <ArrowRight size={20} color="#FFFFFF" style={styles.btnArrow} />
-                                </>
+                                <Text style={styles.btnText}>Verify</Text>
                             )}
                         </View>
                     </TouchableOpacity>
@@ -267,6 +275,9 @@ const styles = StyleSheet.create({
     root: {
         flex: 1,
         backgroundColor: '#081750'
+    },
+    scroll: {
+        flex: 1,
     },
     scrollContainer: {
         flexGrow: 1,
@@ -372,6 +383,17 @@ const styles = StyleSheet.create({
         backgroundColor: '#F8FAFF',
         borderColor: '#DAE2FF',
     },
+    otpCellError: {
+        borderColor: '#DC2626',
+    },
+    errorText: {
+        fontFamily: 'Manrope-SemiBold',
+        fontSize: 15,
+        color: '#DC2626',
+        textAlign: 'center',
+        marginTop: 20,
+        marginBottom: 16,
+    },
     resendContainer: {
         flexDirection: 'row',
         justifyContent: 'center',
@@ -421,8 +443,5 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontFamily: 'Manrope-SemiBold',
         fontSize: 18,
-    },
-    btnArrow: {
-        marginLeft: 8,
     },
 });

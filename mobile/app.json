@@ -10,7 +10,8 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ama.spendingtracker"
+      "bundleIdentifier": "com.ama.spendingtracker",
+      "appleTeamId": "9UJVR384QQ"
     },
     "android": {
       "adaptiveIcon": {
@@ -35,6 +36,7 @@
     "plugins": [
       "./plugins/withShareExtension",
       "./plugins/withAndroidSmsReceiver",
+      "./plugins/withXcode27Fixes",
       "expo-router",
       [
         "expo-splash-screen",

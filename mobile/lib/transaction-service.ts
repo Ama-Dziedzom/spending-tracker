@@ -416,12 +416,32 @@ export function formatTransactionTime(dateString: string): string {
 /**
  * Get analytics for a specific wallet
  */
-export async function getWalletAnalytics(walletId: string): Promise<WalletAnalytics> {
+export async function getWalletAnalytics(
+    walletId: string,
+    period: 'week' | 'month' | 'year' | 'all' = 'all'
+): Promise<WalletAnalytics> {
     try {
-        const { data: transactions, error } = await supabase
+        let query = supabase
             .from('transactions')
             .select('amount, category, type, is_transfer, transfer_side')
             .eq('wallet_id', walletId);
+
+        if (period !== 'all') {
+            const startDate = new Date();
+            const DAYS_IN_WEEK = 7;
+
+            if (period === 'week') {
+                startDate.setDate(startDate.getDate() - DAYS_IN_WEEK);
+            } else if (period === 'month') {
+                startDate.setMonth(startDate.getMonth() - 1);
+            } else {
+                startDate.setFullYear(startDate.getFullYear() - 1);
+            }
+
+            query = query.gte('transaction_date', startDate.toISOString());
+        }
+
+        const { data: transactions, error } = await query;
 
         if (error) {
             console.error('Error fetching analytics:', error.message);
