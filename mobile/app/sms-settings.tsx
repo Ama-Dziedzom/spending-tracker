@@ -1,4 +1,4 @@
-import { View, Text, Pressable, ScrollView, Switch, Alert, Platform, PermissionsAndroid } from 'react-native';
+import { View, Text, Pressable, ScrollView, Switch, Alert, Platform, PermissionsAndroid, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
@@ -28,6 +28,15 @@ function formatAgo(iso: string): string {
     const days = Math.round(hrs / 24);
     return `${days} day${days === 1 ? '' : 's'} ago`;
 }
+
+// Bold parts sit at odd indexes
+const IOS_AUTOPILOT_STEPS: string[][] = [
+    ['Open ', 'Shortcuts', ', go to ', 'Automation', ' and tap ', '+', '.'],
+    ['Choose ', 'Message', '. Under Message Contains, type ', 'GHS', '. Leave Sender empty.'],
+    ['Choose ', 'Run Immediately', ' if you see it, then tap ', 'Next', '.'],
+    ['Add the action ', 'Log Message', ' from LogIt. Set Messages to ', 'Shortcut Input', '.'],
+    ['Tap ', 'Done', '. From now on, MoMo and bank alerts log themselves as they arrive.', ''],
+];
 
 export default function SmsSettings() {
     const router = useRouter();
@@ -179,7 +188,7 @@ export default function SmsSettings() {
                                     <HugeiconsIcon icon={Mail01Icon} size={24} color={COLORS.primary} />
                                 </View>
                                 <View className="ml-4 flex-1">
-                                    <Text className="text-slate-900 font-manrope-bold text-[18px]">iOS Share Extension</Text>
+                                    <Text className="text-slate-900 font-manrope-bold text-[18px]">iPhone autopilot</Text>
                                     <Text className={`${isSignedIn === false ? 'text-rose-500' : 'text-emerald-600'} font-manrope-semibold text-[12px] mt-0.5`}>
                                         {isSignedIn === null
                                             ? 'Checking…'
@@ -193,7 +202,7 @@ export default function SmsSettings() {
                             </View>
                             
                             <Text className="text-slate-500 font-manrope text-[14px] leading-6 border-t border-slate-50 pt-4">
-                                Apple doesn’t let apps read your messages, so on iPhone you share them with LogIt instead. It takes a couple of taps, and LogIt does the rest.
+                                Apple doesn’t let apps read your messages. Instead, a Shortcuts automation hands each MoMo or bank alert to LogIt the moment it arrives. Set it up once below.
                             </Text>
                         </View>
                     </Animated.View>
@@ -202,38 +211,38 @@ export default function SmsSettings() {
                 {/* Instructions Section */}
                 <Animated.View {...{ entering: FadeInDown.delay(100).duration(600) } as any} className="mb-6">
                     <Text className="text-slate-400 font-manrope-bold text-[12px] uppercase tracking-[2px] ml-4 mb-3">
-                        {Platform.OS === 'ios' ? 'How to log via iOS Share Sheet' : 'How it works on Android'}
+                        {Platform.OS === 'ios' ? 'Turn on autopilot · once, about a minute' : 'How it works on Android'}
                     </Text>
                     
                     <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm shadow-slate-200/50">
                         {Platform.OS === 'ios' ? (
-                            <View className="space-y-6">
-                                <View className="flex-row items-start">
-                                    <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
-                                        <Text className="text-slate-600 font-manrope-bold text-[14px]">1</Text>
+                            <View>
+                                {IOS_AUTOPILOT_STEPS.map((step, i) => (
+                                    <View key={i} className={`flex-row items-start ${i > 0 ? 'mt-4' : ''}`}>
+                                        <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
+                                            <Text className="text-slate-600 font-manrope-bold text-[14px]">{i + 1}</Text>
+                                        </View>
+                                        <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
+                                            {step.map((part, j) =>
+                                                j % 2 === 1
+                                                    ? <Text key={j} className="font-manrope-bold text-slate-900">{part}</Text>
+                                                    : part
+                                            )}
+                                        </Text>
                                     </View>
-                                    <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        In Messages, press and hold a Mobile Money or bank SMS (MTN MoMo, Telecel Cash, AT Money, your bank).
-                                    </Text>
-                                </View>
-                                
-                                <View className="flex-row items-start mt-4">
-                                    <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
-                                        <Text className="text-slate-600 font-manrope-bold text-[14px]">2</Text>
-                                    </View>
-                                    <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        Tap <Text className="font-manrope-bold text-slate-900">Share</Text> and choose <Text className="font-manrope-bold text-slate-900">LogIt</Text>.
-                                    </Text>
-                                </View>
+                                ))}
 
-                                <View className="flex-row items-start mt-4">
-                                    <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
-                                        <Text className="text-slate-600 font-manrope-bold text-[14px]">3</Text>
-                                    </View>
-                                    <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        Check the preview and tap <Text className="font-manrope-bold text-slate-900">Save</Text>. LogIt puts it in the right wallet and updates your balance.
-                                    </Text>
-                                </View>
+                                <Pressable
+                                    onPress={() => Linking.openURL('shortcuts://').catch(() => {})}
+                                    className="mt-6 h-12 rounded-2xl items-center justify-center"
+                                    style={({ pressed }) => ({ backgroundColor: COLORS.primary, opacity: pressed ? 0.85 : 1 })}
+                                >
+                                    <Text className="text-white font-manrope-bold text-[15px]">Open Shortcuts</Text>
+                                </Pressable>
+
+                                <Text className="text-slate-400 font-manrope text-[13px] leading-5 mt-5 border-t border-slate-50 pt-4">
+                                    Missed a few? In Messages, press and hold one, tap More, select the others, then Share › LogIt.
+                                </Text>
                             </View>
                         ) : (
                             <View className="space-y-6">

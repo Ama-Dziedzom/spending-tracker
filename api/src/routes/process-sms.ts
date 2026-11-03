@@ -160,18 +160,26 @@ function wantsPlainText(req: AuthenticatedRequest): boolean {
  * 4. Otherwise create the wallet, seeded from the balance in the SMS.
  */
 async function resolveWallet(userId: string, accountId: string | undefined, tx: ParsedTx): Promise<WalletRef | null> {
+  const provider = PROVIDERS[tx.source];
+
+  // An explicit wallet (the Share Extension's default) only wins when it can
+  // belong to the sender: a Standard Chartered alert must not land in MoMo.
   if (accountId) {
     const { data } = await supabaseAdmin
       .from('wallets')
-      .select('id, name')
+      .select('id, name, type, source_identifier')
       .eq('id', accountId)
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle();
-    if (data) return { id: data.id, name: data.name, created: false };
+    const fits =
+      !!data &&
+      (!provider ||
+        (data.type === provider.type &&
+          (!data.source_identifier || data.source_identifier.toLowerCase() === provider.identifier)));
+    if (data && fits) return { id: data.id, name: data.name, created: false };
   }
 
-  const provider = PROVIDERS[tx.source];
   if (!provider) return null;
 
   const { data: wallets, error } = await supabaseAdmin

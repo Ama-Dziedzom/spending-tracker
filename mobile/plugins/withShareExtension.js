@@ -21,6 +21,15 @@ const APP_GROUP_ID = 'group.com.ama.spendingtracker';
 
 const SHARE_EXT_SOURCES = path.join(__dirname, 'shareExtension');
 const BRIDGE_SOURCES = path.join(__dirname, 'appGroupBridge');
+const INTENT_SOURCES = path.join(__dirname, 'appIntent');
+
+// Files compiled into the main app target: [source folder, file name]
+const MAIN_TARGET_FILES = [
+  [BRIDGE_SOURCES, 'AppGroupBridge.swift'],
+  [BRIDGE_SOURCES, 'AppGroupBridge.m'],
+  // "Log Message" action for the Shortcuts app (App Intent, iOS 16+)
+  [INTENT_SOURCES, 'LogMessageIntent.swift'],
+];
 
 // ─── Step 1: copy files into ios/ during prebuild ─────────────────────────────
 
@@ -46,8 +55,8 @@ function withCopyFiles(config) {
       // ios/<ProjectName>/ — bridge files
       const appDir = path.join(iosRoot, projectName);
       if (!fs.existsSync(appDir)) fs.mkdirSync(appDir, { recursive: true });
-      for (const file of ['AppGroupBridge.swift', 'AppGroupBridge.m']) {
-        const src = path.join(BRIDGE_SOURCES, file);
+      for (const [dir, file] of MAIN_TARGET_FILES) {
+        const src = path.join(dir, file);
         if (fs.existsSync(src)) fs.copyFileSync(src, path.join(appDir, file));
       }
 
@@ -93,16 +102,16 @@ function unquote(s) {
   return String(s || '').replace(/^"(.*)"$/, '$1');
 }
 
-// Add AppGroupBridge.swift + .m to the main app target (idempotent)
+// Add the MAIN_TARGET_FILES to the main app target (idempotent per file)
 function addBridgeFilesToMainTarget(proj, projectName) {
-  // Idempotency: skip if the file reference already exists
   const fileRefs = proj.hash.project.objects['PBXFileReference'] || {};
-  const alreadyAdded = Object.values(fileRefs).some((f) => {
-    if (typeof f !== 'object') return false;
-    const base = unquote(f.path).split('/').pop();
-    return base === 'AppGroupBridge.swift';
-  });
-  if (alreadyAdded) return;
+  const present = new Set(
+    Object.values(fileRefs)
+      .filter((f) => typeof f === 'object')
+      .map((f) => unquote(f.path).split('/').pop()),
+  );
+  const missing = MAIN_TARGET_FILES.map(([, file]) => file).filter((file) => !present.has(file));
+  if (missing.length === 0) return;
 
   // Find the main app target (product type = application)
   const nativeTargets = proj.hash.project.objects['PBXNativeTarget'] || {};
@@ -134,16 +143,9 @@ function addBridgeFilesToMainTarget(proj, projectName) {
     mainGroupUuid = proj.getFirstProject().firstProject.mainGroup;
   }
 
-  proj.addSourceFile(
-    `${projectName}/AppGroupBridge.swift`,
-    { target: mainTargetUuid },
-    mainGroupUuid,
-  );
-  proj.addSourceFile(
-    `${projectName}/AppGroupBridge.m`,
-    { target: mainTargetUuid },
-    mainGroupUuid,
-  );
+  for (const file of missing) {
+    proj.addSourceFile(`${projectName}/${file}`, { target: mainTargetUuid }, mainGroupUuid);
+  }
 }
 
 // Add the ShareExtension app_extension target (idempotent)
