@@ -136,6 +136,8 @@ export interface Transaction {
     updated_at?: string;
     is_transfer?: boolean;
     source?: TransactionSource;
+    /** sms = read from the message, estimated = worked out by LogIt, received = when LogIt got it */
+    date_source?: 'sms' | 'estimated' | 'received' | 'manual' | null;
 }
 
 /**

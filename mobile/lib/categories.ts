@@ -18,6 +18,9 @@ import {
     Airplane01Icon,
     GiftIcon,
     Dumbbell01Icon,
+    Cash01Icon,
+    BankIcon,
+    PercentIcon,
 } from '@hugeicons/core-free-icons';
 
 // Define icon type from an actual icon
@@ -132,6 +135,27 @@ export const CATEGORIES: Category[] = [
         keywords: ['subscription', 'renew', 'recurring', 'payment', 'bill', 'utility', 'prepaid', 'postpaid', 'airtime', 'bundle']
     },
     {
+        id: 'cash',
+        name: 'Cash',
+        icon: Cash01Icon,
+        color: '#65A30D',
+        keywords: ['cash out', 'cash-out', 'withdrawal', 'atm']
+    },
+    {
+        id: 'loans',
+        name: 'Loans',
+        icon: BankIcon,
+        color: '#EA580C',
+        keywords: ['loan', 'repaid', 'repayment', 'xtracash', 'qwikloan', 'fido']
+    },
+    {
+        id: 'fees',
+        name: 'Fees & Charges',
+        icon: PercentIcon,
+        color: '#DC2626',
+        keywords: ['fee', 'charge', 'e-levy', 'levy', 'tax']
+    },
+    {
         id: 'other',
         name: 'Other',
         icon: MoreHorizontalCircle01Icon,
@@ -175,8 +199,7 @@ const LEGACY_CATEGORY_NAMES: Record<string, string> = {
     'health': 'healthcare',
     'church & charity': 'gifts',
     'transfers': 'transfer',
-    'cash withdrawal': 'other',
-    'fees & charges': 'other',
+    'cash withdrawal': 'cash',
 };
 
 export function getCategoryByIdOrName(idOrName?: string): Category | undefined {

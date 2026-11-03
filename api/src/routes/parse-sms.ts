@@ -10,6 +10,7 @@
 import { Router, type Request, type Response } from 'express';
 import { supabaseAnon } from '../lib/supabase.js';
 import { categorizeTransaction } from '../lib/categorize.js';
+import { extractFee, extractProviderTxnId } from '../lib/sms-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +47,10 @@ export interface ParsedTransaction {
   is_transfer: boolean;
   transfer_type: string | null;
   transfer_metadata: Record<string, string | null> | null;
+  /** Provider charges on top of the amount (fee + tax/E-levy); 0 when none */
+  fee: number;
+  /** Provider's transaction number, used to date undated messages */
+  provider_txn_id: string | null;
 }
 
 export interface ParseSuccess {
@@ -63,6 +68,14 @@ export type ParseResult = ParseSuccess | ParseFailure;
 // ---------------------------------------------------------------------------
 // Core parsing logic (exported for direct use by process-sms)
 // ---------------------------------------------------------------------------
+
+/** Trim status text a pattern can drag into the payee, e.g. "MTN AIRTIME has been completed at …". */
+function cleanDescription(text: string): string {
+  return text
+    .replace(/\s+(has been|was|is)\s+(completed|successful|processed|received)\b.*$/i, '')
+    .replace(/\s+(at|on)\s+\d{4}-\d{2}-\d{2}.*$/i, '')
+    .trim();
+}
 
 export async function parseSms(rawSms: string): Promise<ParseResult> {
   // Load active patterns ordered by priority
@@ -91,7 +104,7 @@ export async function parseSms(rawSms: string): Promise<ParseResult> {
 
     const description =
       fm.description && match[fm.description]
-        ? match[fm.description].trim()
+        ? cleanDescription(match[fm.description])
         : (fm.default_description ?? 'Transaction');
 
     const balance =
@@ -124,7 +137,7 @@ export async function parseSms(rawSms: string): Promise<ParseResult> {
     ) {
       isDebit = false;
     } else if (
-      /\bsent\b|^payment made|^payment of|^payment for|^your payment|^Cash Out|paid to|withdrawal|transaction was made/i.test(
+      /\bsent\b|^payment made|^payment of|^payment for|^your payment|^Cash Out|paid to|withdrawal|transaction was made|\brepaid\b|\brepayment\b/i.test(
         cleanSms,
       )
     ) {
@@ -149,6 +162,8 @@ export async function parseSms(rawSms: string): Promise<ParseResult> {
         is_transfer: !!pattern.transfer_type,
         transfer_type: pattern.transfer_type,
         transfer_metadata: transferMetadata,
+        fee: isDebit ? extractFee(cleanSms) : 0,
+        provider_txn_id: extractProviderTxnId(cleanSms),
       },
     };
   }

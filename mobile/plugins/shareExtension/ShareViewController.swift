@@ -211,7 +211,8 @@ private let categoryNames: [String: String] = [
     "bills": "Bills & Utilities", "entertainment": "Entertainment", "healthcare": "Healthcare",
     "education": "Education", "housing": "Housing", "travel": "Travel", "fitness": "Fitness",
     "gifts": "Gifts & Donations", "transfer": "Transfer", "income": "Income",
-    "subscription": "Subscription", "other": "Other",
+    "subscription": "Subscription", "cash": "Cash", "loans": "Loans",
+    "fees": "Fees & Charges", "other": "Other",
 ]
 
 func categoryName(_ id: String) -> String {

@@ -122,7 +122,7 @@ export async function getRecentTransactions(limit: number = RECENT_TRANSACTIONS_
                     to_wallet:wallets!to_wallet_id(*)
                 )
             `)
-            .order('created_at', { ascending: false })
+            .order('transaction_date', { ascending: false })
             .limit(limit);
 
         if (error) {

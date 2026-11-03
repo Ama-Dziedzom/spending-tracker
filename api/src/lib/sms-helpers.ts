@@ -48,6 +48,12 @@ export function extractSmsDate(sms: string, now: Date = new Date()): Date | null
     d = new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3], +iso[4], +iso[5], iso[6] ? +iso[6] : 0));
   }
 
+  // 2026-08-27 with no time (card alerts): midday, so the day is right in any view
+  if (!d) {
+    const isoDay = sms.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+    if (isoDay) d = new Date(Date.UTC(+isoDay[1], +isoDay[2] - 1, +isoDay[3], 12, 0));
+  }
+
   // 05-APR-26 / 05 Apr 2026 [at 17:29]  (bank style)
   if (!d) {
     const mon = sms.match(/\b(\d{1,2})[-\s/]([A-Za-z]{3})[A-Za-z]*[-\s/,]+(\d{2,4})(?:[^\d]{1,5}(\d{1,2}):(\d{2}))?/);
@@ -71,4 +77,23 @@ export function extractSmsDate(sms: string, now: Date = new Date()): Date | null
   if (d.getTime() > now.getTime() + oneDay) return null;
   if (d.getTime() < now.getTime() - 400 * oneDay) return null;
   return d;
+}
+
+/**
+ * Charges the provider took on top of the amount: "Fee charged: GHS3.00",
+ * "Fee was GHS 0.50", "TRANSACTION FEE: 1.00", plus "Tax was GHS 0.15" / E-levy.
+ * Returns the total, or 0 when there is none.
+ */
+export function extractFee(sms: string): number {
+  const num = (s: string | undefined) => (s ? parseFloat(s.replace(/,/g, '')) || 0 : 0);
+  const fee = sms.match(/\b(?:fee charged|fee was|transaction fee|cash-?out fee(?: of| is)?)\s*:?\s*(?:GHS|GH₵|GHC)?\s?([\d,]+(?:\.\d+)?)/i);
+  const tax = sms.match(/\b(?:tax(?: was| charged)?|e-?levy(?: charged)?)\s*:?\s*(?:GHS|GH₵|GHC)\s?([\d,]+(?:\.\d+)?)/i);
+  const total = num(fee?.[1]) + num(tax?.[1]);
+  return Math.round(total * 100) / 100;
+}
+
+/** The provider's own transaction number, e.g. "Financial Transaction Id: 92977942993". */
+export function extractProviderTxnId(sms: string): string | null {
+  const m = sms.match(/\b(?:financial\s+)?trans(?:action)?\.?\s*id\s*:?\s*(\d{8,15})\b/i);
+  return m ? m[1] : null;
 }

@@ -227,16 +227,21 @@ export function TransactionDetailBottomSheet({ isVisible, transaction, onClose, 
                                     <View className="flex-row items-center gap-2">
                                         <HugeiconsIcon icon={Calendar03Icon} size={16} color="#64748B" />
                                         <Text className="text-[15px] font-manrope-medium text-slate-700">
-                                            {formatTransactionDate(transaction.transaction_date || transaction.created_at)}
+                                            {transaction.date_source === 'estimated' ? '≈ ' : ''}{formatTransactionDate(transaction.transaction_date || transaction.created_at)}
                                         </Text>
                                     </View>
+                                    {transaction.date_source === 'estimated' && (
+                                        <Text className="text-[12px] font-manrope-medium text-slate-400 mt-1">
+                                            Estimated · the message had no date
+                                        </Text>
+                                    )}
                                 </View>
                                 <View className="flex-1">
                                     <Text className="text-[12px] font-manrope-medium text-slate-400 uppercase mb-1">Time</Text>
                                     <View className="flex-row items-center gap-2">
                                         <HugeiconsIcon icon={Clock01Icon} size={16} color="#64748B" />
                                         <Text className="text-[15px] font-manrope-medium text-slate-700">
-                                            {formatTransactionTime(transaction.transaction_date || transaction.created_at)}
+                                            {transaction.date_source === 'estimated' ? '≈ ' : ''}{formatTransactionTime(transaction.transaction_date || transaction.created_at)}
                                         </Text>
                                     </View>
                                 </View>

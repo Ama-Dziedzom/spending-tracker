@@ -476,7 +476,7 @@ export default function Dashboard() {
                                                                 {tx.description}
                                                             </Text>
                                                             <Text className="text-[13px] font-manrope text-slate-400">
-                                                                {formatTransactionDate(tx.created_at)}
+                                                                {tx.date_source === 'estimated' ? '≈ ' : ''}{formatTransactionDate(tx.transaction_date || tx.created_at)}
                                                             </Text>
                                                         </View>
                                                     </View>

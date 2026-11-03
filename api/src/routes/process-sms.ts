@@ -17,6 +17,7 @@ import { Router, type Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { parseSms } from './parse-sms.js';
 import { PROVIDERS, extractSmsDate } from '../lib/sms-helpers.js';
+import { recordAnchor, estimateDateFromId } from '../lib/date-estimate.js';
 import { extractUser, type AuthenticatedRequest } from '../middleware/auth.js';
 
 export const processSmsRouter = Router();
@@ -30,6 +31,34 @@ interface ParsedTx {
   category: string;
   is_transfer: boolean;
   transfer_type: string | null;
+  fee: number;
+  provider_txn_id: string | null;
+}
+
+/** An undated message is treated as late when its estimated time is this far before now. */
+const LATE_SHARE_MS = 2 * 60 * 60 * 1000;
+
+async function userFullName(userId: string): Promise<string | null> {
+  try {
+    const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const name = data.user?.user_metadata?.full_name;
+    return typeof name === 'string' && name.trim() ? name.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the counterparty is the user themself (moving money between their
+ * own accounts), e.g. "Payment received … from Ama Dziedzom Barnor". Needs at
+ * least two parts of their name in the payee/payer text.
+ */
+export function isOwnName(description: string, fullName: string | null): boolean {
+  if (!fullName) return false;
+  const parts = fullName.toLowerCase().split(/\s+/).filter((p) => p.length >= 3);
+  if (parts.length < 2) return false;
+  const words = new Set(description.toLowerCase().split(/[^a-z']+/).filter(Boolean));
+  return parts.filter((p) => words.has(p)).length >= 2;
 }
 
 interface WalletRef {
@@ -240,7 +269,7 @@ async function applyBalance(walletId: string, tx: ParsedTx, smsDate: Date | null
   const { data: w } = await supabaseAdmin.from('wallets').select('current_balance').eq('id', walletId).single();
   if (!w) return false;
   const current = Number(w.current_balance) || 0;
-  const next = tx.type === 'debit' ? current - tx.amount : current + tx.amount;
+  const next = tx.type === 'debit' ? current - tx.amount - (tx.fee || 0) : current + tx.amount;
   const { error } = await supabaseAdmin
     .from('wallets')
     .update({ current_balance: next, updated_at: new Date().toISOString() })
@@ -383,20 +412,46 @@ processSmsRouter.post(
         return;
       }
 
-      // ── Step 3: Route to wallet ─────────────────────────────────────────
-      const wallet = await resolveWallet(userId, accountId, transaction);
-      const smsDate = extractSmsDate(rawSms);
+      // ── Step 3: Own accounts, wallet and date ───────────────────────────
+      // Money moved between the user's own accounts is a transfer, not income
+      // or spending.
+      if (!transaction.is_transfer && isOwnName(transaction.description, await userFullName(userId))) {
+        transaction.is_transfer = true;
+        transaction.transfer_type = transaction.type === 'credit' ? 'transfer_in' : 'transfer_out';
+        transaction.category = 'transfer';
+      }
 
-      // ── Step 4: Insert transaction ──────────────────────────────────────
+      const wallet = await resolveWallet(userId, accountId, transaction);
+
+      // When it happened: the date in the SMS, else an estimate from the
+      // provider's transaction ID (only used when the message is clearly
+      // being logged late), else now.
+      const now = new Date();
+      const smsDate = extractSmsDate(rawSms, now);
+      let txDate: Date = smsDate ?? now;
+      let dateSource: 'sms' | 'estimated' | 'received' = smsDate ? 'sms' : 'received';
+      if (smsDate) {
+        await recordAnchor(transaction.source, transaction.provider_txn_id, smsDate);
+      } else {
+        const estimate = await estimateDateFromId(transaction.source, transaction.provider_txn_id, now);
+        if (estimate && now.getTime() - estimate.getTime() > LATE_SHARE_MS) {
+          txDate = estimate;
+          dateSource = 'estimated';
+        }
+      }
+      const knownDate = dateSource === 'received' ? null : txDate;
+
+      // ── Step 4: Insert transaction (+ a separate row for any fee) ───────
+      const { fee, provider_txn_id: providerTxnId, ...txFields } = transaction;
       const { data, error: insertError } = await supabaseAdmin
         .from('transactions')
         .insert({
-          ...transaction,
+          ...txFields,
           raw_sms: rawSms,
           user_id: userId,
           wallet_id: wallet?.id ?? null,
           balance_snapshot: transaction.balance ?? null,
-          transaction_date: (smsDate ?? new Date()).toISOString(),
+          transaction_date: txDate.toISOString(),
         })
         .select()
         .single();
@@ -405,8 +460,39 @@ processSmsRouter.post(
         throw new Error(`Database error: ${insertError.message}`);
       }
 
+      // Columns added by the capture migration; written separately so the API
+      // keeps working if the migration hasn't run yet.
+      const { error: extraError } = await supabaseAdmin
+        .from('transactions')
+        .update({ date_source: dateSource, provider_txn_id: providerTxnId })
+        .eq('id', data.id);
+      if (extraError) console.error('date_source/provider_txn_id not saved (run the capture migration):', extraError.message);
+
+      if (fee > 0) {
+        const { error: feeError } = await supabaseAdmin.from('transactions').insert({
+          user_id: userId,
+          wallet_id: wallet?.id ?? null,
+          amount: fee,
+          type: 'debit',
+          category: 'fees',
+          description: `Fee · ${transaction.description}`.trim(),
+          source: transaction.source,
+          is_transfer: false,
+          transaction_date: txDate.toISOString(),
+        });
+        if (feeError) console.error('Fee row insert failed:', feeError.message);
+      }
+
+      // This message may have been waiting in "Needs review"
+      await supabaseAdmin
+        .from('failed_parses')
+        .update({ status: 'resolved', resolved_transaction_id: data.id, resolved_at: now.toISOString() })
+        .eq('user_id', userId)
+        .eq('raw_sms', rawSms)
+        .eq('status', 'pending');
+
       // ── Step 5: Update wallet balance ───────────────────────────────────
-      const balanceApplied = wallet ? await applyBalance(wallet.id, transaction, smsDate, data.id) : false;
+      const balanceApplied = wallet ? await applyBalance(wallet.id, transaction, knownDate, data.id) : false;
 
       // ── Step 6: Transfer matching (this user's pending transfers only) ──
       let transferSuggestions: unknown[] = [];
@@ -436,6 +522,10 @@ processSmsRouter.post(
         textResponse += `👛 Wallet: ${wallet ? wallet.name + (wallet.created ? ' (new)' : '') : 'Not linked'}\n`;
         textResponse += `🏷️ Category: ${transaction.category}\n`;
         textResponse += `💬 Desc: ${transaction.description}`;
+        if (transaction.fee > 0) textResponse += `\n🧾 Fee: GHS ${transaction.fee.toFixed(2)}`;
+        if (dateSource === 'estimated') {
+          textResponse += `\n🕒 Date: about ${txDate.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} (estimated)`;
+        }
         if (transaction.balance !== null && transaction.balance !== undefined) {
           textResponse += `\n💰 Balance: GHS ${transaction.balance.toFixed(2)}`;
         }
@@ -459,6 +549,9 @@ processSmsRouter.post(
         transferSuggestions: transferSuggestions.length > 0 ? transferSuggestions : null,
         snapshotUsed: transaction.balance !== null,
         balanceAfter: transaction.balance,
+        fee: transaction.fee,
+        transactionDate: txDate.toISOString(),
+        dateSource,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

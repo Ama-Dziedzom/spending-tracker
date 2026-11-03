@@ -3,17 +3,17 @@
  *
  * Returns the app's category IDs (mobile/lib/categories.ts): food, transport,
  * shopping, bills, entertainment, healthcare, education, housing, travel,
- * fitness, gifts, transfer, income, subscription, other.
+ * fitness, gifts, transfer, income, subscription, cash, loans, fees, other.
  * Keep the two lists in sync — the app shows anything it doesn't recognise as "Other".
  */
 
 type CategoryId =
   | 'food' | 'transport' | 'shopping' | 'bills' | 'entertainment' | 'healthcare'
   | 'education' | 'housing' | 'travel' | 'fitness' | 'gifts' | 'transfer'
-  | 'income' | 'subscription' | 'other';
+  | 'income' | 'subscription' | 'cash' | 'loans' | 'fees' | 'other';
 
 /** Keywords per category, including common Ghanaian merchants and billers. */
-const KEYWORDS: Record<Exclude<CategoryId, 'transfer' | 'income' | 'other'>, string[]> = {
+const KEYWORDS: Partial<Record<Exclude<CategoryId, 'transfer' | 'income' | 'other'>, string[]>> = {
   bills: [
     'airtime', 'bundle', 'data', 'ecg', 'electricity', 'prepaid', 'postpaid', 'power',
     'gwcl', 'ghana water', 'water', 'internet', 'broadband', 'fibre', 'vodafone broadband',
@@ -41,7 +41,7 @@ const KEYWORDS: Record<Exclude<CategoryId, 'transfer' | 'income' | 'other'>, str
   travel: ['flight', 'airline', 'airport', 'hotel', 'airbnb', 'booking', 'africa world', 'passion air', 'travel', 'visa'],
   fitness: ['gym', 'fitness', 'workout', 'sport'],
   gifts: ['church', 'offering', 'tithe', 'donation', 'charity', 'chapel', 'mosque', 'ministry', 'ministries', 'baptist', 'methodist', 'presby', 'calvary', 'pentecost', 'icgc', 'temple', 'assemblies', 'lighthouse', 'christ', 'gift'],
-  subscription: ['subscription', 'renewal', 'recurring', 'membership', 'apple.com', 'google', 'icloud', 'youtube', 'canva', 'chatgpt', 'openai'],
+  subscription: ['subscription', 'renewal', 'recurring', 'membership', 'apple.com', 'apple com', 'apple.com/bill', 'google', 'icloud', 'youtube', 'canva', 'chatgpt', 'openai'],
 };
 
 /** Words that suggest a business, so a name is not treated as a person. */
@@ -87,8 +87,12 @@ export function categorizeTransaction(
     return 'income';
   }
 
-  // Cash out at an agent / ATM: the payee is the agent, not what you spent on.
-  if (/\b(cash ?out|withdrawal|atm)\b/.test(sms)) return 'other';
+  // Loan repayments (XtraCash, QwikLoan, Fido…) taken from the wallet
+  if (/\b(repaid|repayment|loan)\b/.test(sms)) return 'loans';
+
+  // Cash out at an agent / ATM: the money left as cash. Counted as "Cash"
+  // spending; LogIt doesn't follow what the cash was spent on.
+  if (/\b(cash[- ]?out|withdrawal|atm)\b/.test(sms)) return 'cash';
 
   // Money out: the payee name is the best signal, then the full SMS text.
   const fromDesc = bestKeywordMatch(desc);

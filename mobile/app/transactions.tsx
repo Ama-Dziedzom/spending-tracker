@@ -24,7 +24,7 @@ function groupTransactionsByDate(transactions: TransactionWithWallet[]): { date:
     const groups: { [key: string]: TransactionWithWallet[] } = {};
 
     transactions.forEach(tx => {
-        const date = new Date(tx.created_at);
+        const date = new Date(tx.transaction_date || tx.created_at);
         const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
 
         if (!groups[dateKey]) {
@@ -91,7 +91,7 @@ export default function TransactionsPage() {
                         to_wallet:wallets!to_wallet_id(*)
                     )
                 `, { count: 'exact' })
-                .order('created_at', { ascending: false })
+                .order('transaction_date', { ascending: false })
                 .range(from, to);
 
             if (error) {
