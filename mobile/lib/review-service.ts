@@ -27,7 +27,8 @@ export async function getPendingReviews(): Promise<ReviewItem[]> {
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
     if (error) {
-        console.error('Error fetching review items:', error.message);
+        // Most likely the "needs_review" migration hasn't been run (no status column)
+        console.error('Error fetching review items (has the needs_review migration run?):', error.message);
         return [];
     }
     return data ?? [];
@@ -38,7 +39,10 @@ export async function getPendingReviewCount(): Promise<number> {
         .from('failed_parses')
         .select('id', { count: 'exact', head: true })
         .eq('status', 'pending');
-    if (error) return 0;
+    if (error) {
+        console.error('Error counting review items (has the needs_review migration run?):', error.message);
+        return 0;
+    }
     return count ?? 0;
 }
 

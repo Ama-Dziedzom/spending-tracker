@@ -168,9 +168,21 @@ export function getDefaultCategory(): Category {
 /**
  * Get a category by its ID or display name (case-insensitive)
  */
+// Names the SMS API used to save before it switched to category IDs.
+const LEGACY_CATEGORY_NAMES: Record<string, string> = {
+    'transportation': 'transport',
+    'utilities & bills': 'bills',
+    'health': 'healthcare',
+    'church & charity': 'gifts',
+    'transfers': 'transfer',
+    'cash withdrawal': 'other',
+    'fees & charges': 'other',
+};
+
 export function getCategoryByIdOrName(idOrName?: string): Category | undefined {
     if (!idOrName) return undefined;
-    return getCategoryById(idOrName) || getCategoryByName(idOrName);
+    const legacyId = LEGACY_CATEGORY_NAMES[idOrName.toLowerCase()];
+    return getCategoryById(idOrName) || getCategoryByName(idOrName) || (legacyId ? getCategoryById(legacyId) : undefined);
 }
 
 /**

@@ -204,6 +204,20 @@ class ShareViewModel: ObservableObject {
     }
 }
 
+// MARK: - Category display names (IDs match mobile/lib/categories.ts)
+
+private let categoryNames: [String: String] = [
+    "food": "Food & Dining", "transport": "Transport", "shopping": "Shopping",
+    "bills": "Bills & Utilities", "entertainment": "Entertainment", "healthcare": "Healthcare",
+    "education": "Education", "housing": "Housing", "travel": "Travel", "fitness": "Fitness",
+    "gifts": "Gifts & Donations", "transfer": "Transfer", "income": "Income",
+    "subscription": "Subscription", "other": "Other",
+]
+
+func categoryName(_ id: String) -> String {
+    categoryNames[id.lowercased()] ?? id
+}
+
 // MARK: - Root view (wraps async init)
 
 struct ShareRootView: View {
@@ -319,7 +333,7 @@ struct ShareView: View {
                 Divider()
 
                 row(label: "Merchant", value: tx.description)
-                row(label: "Category", value: tx.category)
+                row(label: "Category", value: categoryName(tx.category))
                 row(label: "Source", value: tx.source)
                 if let balance = tx.balance {
                     row(label: "Balance after", value: "GH₵ \(String(format: "%.2f", balance))")

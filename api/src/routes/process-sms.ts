@@ -38,6 +38,15 @@ interface WalletRef {
   created: boolean;
 }
 
+/** False for one-time codes and messages that mention no amount of money. */
+function looksLikeMoneyMessage(sms: string): boolean {
+  const text = sms.toLowerCase();
+  if (/\b(otp|one[- ]time (pass(word|code)|pin)|verification code|security code|your code is|do not share (this|your) (code|pin))\b/.test(text)) {
+    return false;
+  }
+  return /(ghs|gh₵|ghc|ghana cedis|¢)\s?[\d,]+(\.\d+)?/.test(text) || /[\d,]+(\.\d+)?\s?(ghs|ghana cedis)/.test(text);
+}
+
 function isShortcutRequest(req: AuthenticatedRequest): boolean {
   return !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
 }
@@ -184,6 +193,19 @@ processSmsRouter.post(
         return;
       }
 
+      // ── Step 0: Ignore things that aren't money movements ───────────────
+      // One-time codes and messages with no amount never belong in LogIt —
+      // not as transactions, not in "Needs review". Applies to every route
+      // (Shortcut, iOS share sheet, Android receiver).
+      if (!looksLikeMoneyMessage(rawSms)) {
+        if (wantsPlainText(req)) {
+          res.type('text/plain').send(`ℹ️ Skipped\nThis doesn't look like a transaction, so LogIt ignored it.`);
+          return;
+        }
+        res.json({ success: true, ignored: true, reason: 'not_a_transaction' });
+        return;
+      }
+
       // ── Step 1: Parse SMS ───────────────────────────────────────────────
       const parseResult = await parseSms(rawSms);
 
@@ -192,17 +214,25 @@ processSmsRouter.post(
         // "Needs review" list and the team can improve patterns.
         const { data: alreadyFailed } = await supabaseAdmin
           .from('failed_parses')
-          .select('id')
+          .select('id, status')
           .eq('user_id', userId)
           .eq('raw_sms', rawSms)
           .limit(1);
         if (!alreadyFailed || alreadyFailed.length === 0) {
-          await supabaseAdmin.from('failed_parses').insert({
+          const { error: failInsertError } = await supabaseAdmin.from('failed_parses').insert({
             user_id: userId,
             raw_sms: rawSms,
             reason: parseResult.reason ?? 'no_pattern_matched',
           });
+          if (failInsertError) console.error('failed_parses insert failed:', failInsertError.message);
+        } else if (alreadyFailed[0].status && alreadyFailed[0].status !== 'pending') {
+          // Shared again after being dismissed/resolved: put it back in "Needs review"
+          await supabaseAdmin
+            .from('failed_parses')
+            .update({ status: 'pending', resolved_at: null, created_at: new Date().toISOString() })
+            .eq('id', alreadyFailed[0].id);
         }
+        console.log(`⚠️ Unparsed SMS saved to Needs review for user ${userId}`);
 
         if (wantsPlainText(req)) {
           res.type('text/plain').status(400).send(`⚠️ Couldn't read this one\nIt's in Needs review in LogIt, where you can add it in a few taps.`);

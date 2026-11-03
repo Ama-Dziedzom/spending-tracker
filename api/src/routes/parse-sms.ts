@@ -131,9 +131,10 @@ export async function parseSms(rawSms: string): Promise<ParseResult> {
       isDebit = true;
     }
 
+    // Category IDs must match the app's (mobile/lib/categories.ts)
     const category = pattern.transfer_type
-      ? 'Transfers'
-      : categorizeTransaction(description, fm.source, cleanSms);
+      ? 'transfer'
+      : categorizeTransaction(description, fm.source, cleanSms, isDebit ? 'debit' : 'credit');
 
     return {
       parsed: true,
