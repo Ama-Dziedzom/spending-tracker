@@ -47,6 +47,32 @@ function looksLikeMoneyMessage(sms: string): boolean {
   return /(ghs|gh₵|ghc|ghana cedis|¢)\s?[\d,]+(\.\d+)?/.test(text) || /[\d,]+(\.\d+)?\s?(ghs|ghana cedis)/.test(text);
 }
 
+/**
+ * True when the text reads like an alert from a bank or MoMo provider, not a
+ * chat message that happens to mention money ("send me GHS 50"). Used because
+ * the iOS automation no longer filters by sender: any message containing
+ * "GHS" reaches us. Alerts carry machine phrasing (balances, transaction IDs,
+ * card/account endings, fees) that people rarely type to each other.
+ */
+export function looksLikeProviderAlert(sms: string): boolean {
+  const t = sms.toLowerCase().replace(/\s+/g, ' ');
+  const signals: RegExp[] = [
+    /\b(current|new|available|ledger|closing|actual) balance\b/,
+    /\bbal(ance)?\s*(is|:)?\s*(now\s*)?(ghs|gh₵|ghc)\s?[\d,]/,
+    /\b(financial )?trans(action)?\.? ?(id|no|number|ref)\b/,
+    /\btxn\b|\bref(erence)? ?(no|number)?\s*:\s*\w/,
+    /\b(card|acc(ount)?|a\/c) (ending|no\.?|number)\b/,
+    /\bhas been (credited|debited|repaid|reversed|completed)\b/,
+    /\b(was|were) (credited|debited)\b/,
+    /\b(cash[- ]out|cash withdrawal|atm withdrawal) (made|of|for)\b/,
+    /\bpayment (received|made) for\b/,
+    /\byour payment of\b/,
+    /\b(fee charged|transaction fee|e-?levy|fee was)\b/,
+    /\bthank you for using\b/,
+  ];
+  return signals.some((r) => r.test(t));
+}
+
 function isShortcutRequest(req: AuthenticatedRequest): boolean {
   return !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
 }
@@ -208,6 +234,17 @@ processSmsRouter.post(
 
       // ── Step 1: Parse SMS ───────────────────────────────────────────────
       const parseResult = await parseSms(rawSms);
+
+      if (!parseResult.parsed && !looksLikeProviderAlert(rawSms)) {
+        // A chat message that mentions money ("send me GHS 50"). Not ours to
+        // log, and not worth a spot in "Needs review".
+        if (wantsPlainText(req)) {
+          res.type('text/plain').send(`ℹ️ Skipped\nThis doesn't look like a bank or MoMo alert, so LogIt ignored it.`);
+          return;
+        }
+        res.json({ success: true, ignored: true, reason: 'not_a_provider_alert' });
+        return;
+      }
 
       if (!parseResult.parsed) {
         // Record the failure (once per message) so it shows in the user's

@@ -1,7 +1,8 @@
 import { View, Text, Pressable, Alert, ScrollView, Switch, RefreshControl, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { getPendingReviewCount } from '../../lib/review-service';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -21,6 +22,7 @@ import {
     Calendar02Icon,
     Clock01Icon,
     Tick01Icon,
+    InboxIcon,
 } from '@hugeicons/core-free-icons';
 import * as Haptics from 'expo-haptics';
 import { clsx, type ClassValue } from 'clsx';
@@ -127,6 +129,12 @@ const SettingsToggle = ({
 );
 
 export default function Settings() {
+    const [reviewCount, setReviewCount] = useState<number | null>(null);
+    useFocusEffect(
+        React.useCallback(() => {
+            getPendingReviewCount().then(setReviewCount);
+        }, [])
+    );
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [user, setUser] = useState<User | null>(null);
@@ -264,10 +272,19 @@ export default function Settings() {
                         <SettingsItem
                             icon={Mail01Icon}
                             label={Platform.OS === 'ios' ? "iOS Share Extension" : "SMS Auto-Logging"}
-                            value={Platform.OS === 'ios' ? "Configured & Active" : (smsEnabled ? "Enabled" : "Disabled")}
+                            value={Platform.OS === 'ios' ? "Share messages from Messages" : (smsEnabled ? "Enabled" : "Disabled")}
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 router.push('/sms-settings');
+                            }}
+                        />
+                        <SettingsItem
+                            icon={InboxIcon}
+                            label="Needs review"
+                            value={reviewCount === null ? undefined : reviewCount === 0 ? "All caught up" : `${reviewCount} waiting for you`}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push('/review');
                             }}
                         />
                     </SettingsSection>
