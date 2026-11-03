@@ -140,6 +140,37 @@ async function hasNewerSnapshot(walletId: string, smsDate: Date, excludeTxId: st
   return !!latest && new Date(latest).getTime() > smsDate.getTime();
 }
 
+/**
+ * Update a wallet's balance for this SMS: use the balance in the SMS when there
+ * is one, otherwise adjust by the amount. Skipped when the wallet already has a
+ * balance from a newer message (this older one is already reflected in it).
+ */
+async function applyBalance(walletId: string, tx: ParsedTx, smsDate: Date | null, txId: string): Promise<boolean> {
+  if (smsDate && (await hasNewerSnapshot(walletId, smsDate, txId))) {
+    console.log(`⏪ Older SMS for wallet ${walletId}: balance already reflects it, not changed`);
+    return false;
+  }
+
+  if (tx.balance !== null && tx.balance !== undefined) {
+    const { error } = await supabaseAdmin
+      .from('wallets')
+      .update({ current_balance: tx.balance, updated_at: new Date().toISOString() })
+      .eq('id', walletId);
+    if (error) console.error('Wallet snapshot update failed:', error.message);
+    return !error;
+  }
+
+  const { data: w } = await supabaseAdmin.from('wallets').select('current_balance').eq('id', walletId).single();
+  if (!w) return false;
+  const current = Number(w.current_balance) || 0;
+  const next = tx.type === 'debit' ? current - tx.amount : current + tx.amount;
+  const { error } = await supabaseAdmin
+    .from('wallets')
+    .update({ current_balance: next, updated_at: new Date().toISOString() })
+    .eq('id', walletId);
+  return !error;
+}
+
 processSmsRouter.post(
   '/process-sms',
   extractUser,
@@ -174,20 +205,60 @@ processSmsRouter.post(
 
       const transaction = parseResult.transaction as ParsedTx;
 
-      // ── Step 2: Skip duplicates ─────────────────────────────────────────
+      // ── Step 2: Duplicates ──────────────────────────────────────────────
+      // Same SMS already saved for this user. If it was saved before wallet
+      // routing existed (wallet_id is null), finish the job now: attach it to
+      // the right wallet and update the balance. Otherwise just report it.
       const { data: existing } = await supabaseAdmin
         .from('transactions')
-        .select('id, wallet_id')
+        .select('id, wallet_id, created_at, transaction_date')
         .eq('user_id', userId)
         .eq('raw_sms', rawSms)
+        .order('created_at', { ascending: true })
         .limit(1);
 
       if (existing && existing.length > 0) {
+        const prev = existing[0];
+        let linkedWallet: WalletRef | null = null;
+        let existingWalletName: string | null = null;
+
+        if (!prev.wallet_id) {
+          linkedWallet = await resolveWallet(userId, accountId, transaction);
+          if (linkedWallet) {
+            const smsDate = extractSmsDate(rawSms);
+            await supabaseAdmin
+              .from('transactions')
+              .update({
+                wallet_id: linkedWallet.id,
+                balance_snapshot: transaction.balance ?? null,
+                ...(smsDate ? { transaction_date: smsDate.toISOString() } : {}),
+              })
+              .eq('id', prev.id);
+            await applyBalance(linkedWallet.id, transaction, smsDate, prev.id);
+          }
+        } else {
+          const { data: w } = await supabaseAdmin.from('wallets').select('name').eq('id', prev.wallet_id).maybeSingle();
+          existingWalletName = w?.name ?? null;
+        }
+
+        const loggedOn = new Date(prev.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
         if (wantsPlainText(req)) {
-          res.type('text/plain').send(`ℹ️ Already logged\nThis message is already in LogIt.`);
+          const text = linkedWallet
+            ? `✅ Linked to ${linkedWallet.name}${linkedWallet.created ? ' (new)' : ''}\nThis message was logged on ${loggedOn} but wasn't in a wallet. It is now.`
+            : `ℹ️ Already logged\nSaved on ${loggedOn}${existingWalletName ? ` in ${existingWalletName}` : ' (not linked to a wallet)'}.`;
+          res.type('text/plain').send(text);
           return;
         }
-        res.json({ success: true, duplicate: true, data: existing[0] });
+        res.json({
+          success: true,
+          duplicate: true,
+          linkedNow: !!linkedWallet,
+          data: { ...prev, wallet_id: linkedWallet?.id ?? prev.wallet_id },
+          walletId: linkedWallet?.id ?? prev.wallet_id ?? null,
+          walletName: linkedWallet?.name ?? existingWalletName,
+          loggedOn: prev.created_at,
+        });
         return;
       }
 
@@ -214,38 +285,7 @@ processSmsRouter.post(
       }
 
       // ── Step 5: Update wallet balance ───────────────────────────────────
-      let balanceApplied = false;
-      if (wallet) {
-        const isOlder = smsDate ? await hasNewerSnapshot(wallet.id, smsDate, data.id) : false;
-
-        if (isOlder) {
-          console.log(`⏪ Older SMS for wallet ${wallet.id}: balance already reflects it, not changed`);
-        } else if (transaction.balance !== null && transaction.balance !== undefined) {
-          // Snapshot sync — use the balance from the SMS
-          const { error: updateError } = await supabaseAdmin
-            .from('wallets')
-            .update({ current_balance: transaction.balance, updated_at: new Date().toISOString() })
-            .eq('id', wallet.id);
-          if (updateError) console.error('Wallet snapshot update failed:', updateError.message);
-          else balanceApplied = true;
-        } else {
-          // Math sync — no balance in the SMS, adjust by the amount
-          const { data: w } = await supabaseAdmin
-            .from('wallets')
-            .select('current_balance')
-            .eq('id', wallet.id)
-            .single();
-          if (w) {
-            const current = Number(w.current_balance) || 0;
-            const next = transaction.type === 'debit' ? current - transaction.amount : current + transaction.amount;
-            const { error: mathError } = await supabaseAdmin
-              .from('wallets')
-              .update({ current_balance: next, updated_at: new Date().toISOString() })
-              .eq('id', wallet.id);
-            if (!mathError) balanceApplied = true;
-          }
-        }
-      }
+      const balanceApplied = wallet ? await applyBalance(wallet.id, transaction, smsDate, data.id) : false;
 
       // ── Step 6: Transfer matching (this user's pending transfers only) ──
       let transferSuggestions: unknown[] = [];
