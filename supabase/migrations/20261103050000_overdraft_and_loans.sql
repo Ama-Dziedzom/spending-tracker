@@ -14,13 +14,18 @@ INSERT INTO patterns (institution_name, institution_code, regex_pattern, field_m
 SELECT
   'MTN Mobile Money',
   'mtn_momo',
-  'GHS\s?([\d,]+\.?\d*)\s+has been used on\s+\S+\s+with access fee',
+  'GHS\s?([\d,]+\.?\d*)\s+has been used\b.*?\baccess fee',
   '{"amount":1,"description":null,"balance":null,"source":"MTN_MoMo","flags":"i","default_description":"MoMoBoost overdraft","type":"credit","category":"loans","affects_balance":false}',
   NULL,
   44
 WHERE NOT EXISTS (
-  SELECT 1 FROM patterns WHERE regex_pattern LIKE 'GHS\s?([\d,]+\.?\d*)\s+has been used on%'
+  SELECT 1 FROM patterns WHERE field_map->>'default_description' = 'MoMoBoost overdraft'
 );
+
+-- Looser match (the first version needed "used on X with access fee" exactly)
+UPDATE patterns
+SET regex_pattern = 'GHS\s?([\d,]+\.?\d*)\s+has been used\b.*?\baccess fee'
+WHERE field_map->>'default_description' = 'MoMoBoost overdraft';
 
 UPDATE transactions
 SET is_transfer = true,

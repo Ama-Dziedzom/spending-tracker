@@ -86,7 +86,7 @@ export function extractSmsDate(sms: string, now: Date = new Date()): Date | null
  */
 export function extractFee(sms: string): number {
   const num = (s: string | undefined) => (s ? parseFloat(s.replace(/,/g, '')) || 0 : 0);
-  const fee = sms.match(/\b(?:fee charged|fee was|transaction fee|access fee|cash-?out fee(?: of| is)?)\s*:?\s*(?:GHS|GH₵|GHC)?\s?([\d,]+(?:\.\d+)?)/i);
+  const fee = sms.match(/\b(?:fee charged|fee was|transaction fee|access fee|cash-?out fee)(?:\s+(?:of|is|was))?\s*:?\s*(?:GHS|GH₵|GHC)?\s?([\d,]+(?:\.\d+)?)/i);
   const tax = sms.match(/\b(?:tax(?: was| charged)?|e-?levy(?: charged)?)\s*:?\s*(?:GHS|GH₵|GHC)\s?([\d,]+(?:\.\d+)?)/i);
   const total = num(fee?.[1]) + num(tax?.[1]);
   return Math.round(total * 100) / 100;

@@ -352,7 +352,7 @@ processSmsRouter.post(
             .update({ status: 'pending', resolved_at: null, created_at: new Date().toISOString() })
             .eq('id', alreadyFailed[0].id);
         }
-        console.log(`⚠️ Unparsed SMS saved to Needs review for user ${userId}`);
+        console.log(`⚠️ Unparsed SMS saved to Needs review for user ${userId} len=${rawSms.length} preview="${previewSms(rawSms)}"`);
 
         if (wantsPlainText(req)) {
           res.type('text/plain').status(400).send(`⚠️ Couldn't read this one\nIt's in Needs review in LogIt, where you can add it in a few taps.`);
