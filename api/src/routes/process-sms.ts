@@ -78,6 +78,43 @@ function previewSms(sms: string): string {
   return sms.slice(0, 60).replace(/\d{5,}/g, (m) => '•'.repeat(m.length)).replace(/\s+/g, ' ');
 }
 
+/**
+ * iOS Shortcuts can hand over a shared message as formatted text (HTML or RTF)
+ * instead of plain text, e.g. "GHS&nbsp;5.00". Reduce it to the plain message.
+ */
+export function toPlainSms(input: string): string {
+  let t = input;
+  if (/^\s*\{\\rtf/.test(t)) {
+    t = t
+      .replace(/\\'([0-9a-f]{2})/gi, (_m, h) => String.fromCharCode(parseInt(h, 16)))
+      .replace(/\\u(-?\d+)\??/g, (_m, n) => String.fromCharCode((Number(n) + 65536) % 65536))
+      .replace(/\{\\(\*|fonttbl|colortbl|stylesheet|info)[^{}]*(\{[^{}]*\}[^{}]*)*\}/g, '')
+      .replace(/\\(par|line)\b ?/g, '\n')
+      .replace(/\\[a-z]+-?\d* ?/gi, '')
+      .replace(/[{}]/g, '');
+  }
+  if (/<[a-z!/][^>]*>/i.test(t) || /&(#\d+|#x[0-9a-f]+|[a-z]+);/i.test(t)) {
+    t = t
+      .replace(/<(style|script|head)[\s\S]*?<\/\1>/gi, '')
+      .replace(/<br\s*\/?>|<\/(p|div)>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)))
+      .replace(/&#x([0-9a-f]+);/gi, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+  }
+  // Unicode spaces and invisible characters → plain spaces. Plain messages
+  // are otherwise left exactly as sent, so duplicate detection still matches
+  // copies saved before this existed.
+  t = t.replace(/[\u00a0\u2000-\u200a\u202f\u205f\u3000]/g, ' ').replace(/[\u200b\ufeff]/g, '');
+  if (t !== input) t = t.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n');
+  return t.trim();
+}
+
 function isShortcutRequest(req: AuthenticatedRequest): boolean {
   return !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
 }
@@ -216,7 +253,8 @@ processSmsRouter.post(
   extractUser,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { rawSms, accountId } = req.body as { rawSms?: unknown; accountId?: string };
+      const { rawSms: rawInput, accountId } = req.body as { rawSms?: unknown; accountId?: string };
+      const rawSms = typeof rawInput === 'string' ? toPlainSms(rawInput) : rawInput;
       const userId = req.userId!;
 
       if (typeof rawSms !== 'string' || rawSms.trim().length === 0) {
