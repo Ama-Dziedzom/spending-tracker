@@ -14,6 +14,7 @@ import { Wallet, supabase } from '../lib/supabase';
 import { getCategoryColor, getCategoryIcon } from '../lib/categories';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { TransactionDetailBottomSheet } from '../components/transaction-detail-bottom-sheet';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 
 // Helper for money formatting
 const formatMoney = (amount: any) => {
@@ -65,6 +66,7 @@ export default function WalletDetailsPage() {
         }
     }, [walletId]);
 
+    useLiveRefresh(() => fetchData(), 'wallet-details');
     useEffect(() => {
         fetchData();
     }, [fetchData]);

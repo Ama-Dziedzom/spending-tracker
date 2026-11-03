@@ -34,6 +34,7 @@ import { getPendingReviewCount } from '../../lib/review-service';
 import { useTabContext } from './_layout';
 
 import { COLORS } from '../../constants/theme';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 // Get greeting based on time of day
 function getGreeting(): string {
@@ -115,6 +116,7 @@ export default function Dashboard() {
     React.useEffect(() => {
         fetchData();
     }, []);
+    useLiveRefresh(() => fetchData(), 'home');
 
     // Register fetchData with tab context so FAB can trigger refresh
     useEffect(() => {

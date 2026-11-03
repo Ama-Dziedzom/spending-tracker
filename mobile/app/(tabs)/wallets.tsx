@@ -23,6 +23,7 @@ import { Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useCallback } from 'react';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 const formatMoney = (val: number | string | undefined | null) => {
     if (val === undefined || val === null) return '0.00';
@@ -70,6 +71,7 @@ export default function Wallets() {
         }
     }, []);
 
+    useLiveRefresh(() => fetchWallets(), 'wallets');
     React.useEffect(() => {
         fetchWallets();
     }, [fetchWallets]);

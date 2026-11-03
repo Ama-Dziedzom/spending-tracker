@@ -15,6 +15,7 @@ import {
     guessFromSms,
     resolveReview,
 } from '../lib/review-service';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 
 function formatReceived(iso: string): string {
     const d = new Date(iso);
@@ -40,6 +41,7 @@ export default function ReviewScreen() {
         setRefreshing(false);
     }, []);
 
+    useLiveRefresh(() => load(), 'review');
     useEffect(() => {
         load();
     }, [load]);

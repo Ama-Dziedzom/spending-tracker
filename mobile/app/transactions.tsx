@@ -60,6 +60,7 @@ function formatSectionDate(dateString: string): string {
 }
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useLiveRefresh } from '../lib/useLiveRefresh';
 
 export default function TransactionsPage() {
     const router = useRouter();
@@ -130,6 +131,8 @@ export default function TransactionsPage() {
         setHasMore(true);
         fetchTransactions(0);
     }, []);
+
+    useLiveRefresh(() => fetchTransactions(0, false), 'activity');
 
     const loadMore = () => {
         if (!isLoadingMore && hasMore) {
