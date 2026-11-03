@@ -73,6 +73,11 @@ export function looksLikeProviderAlert(sms: string): boolean {
   return signals.some((r) => r.test(t));
 }
 
+/** First 60 chars for logs, with long digit runs masked (phones, accounts). */
+function previewSms(sms: string): string {
+  return sms.slice(0, 60).replace(/\d{5,}/g, (m) => '•'.repeat(m.length)).replace(/\s+/g, ' ');
+}
+
 function isShortcutRequest(req: AuthenticatedRequest): boolean {
   return !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
 }
@@ -224,6 +229,7 @@ processSmsRouter.post(
       // not as transactions, not in "Needs review". Applies to every route
       // (Shortcut, iOS share sheet, Android receiver).
       if (!looksLikeMoneyMessage(rawSms)) {
+        console.log(`ℹ️ Skipped (no amount/OTP) user=${userId} len=${rawSms.length} preview="${previewSms(rawSms)}"`);
         if (wantsPlainText(req)) {
           res.type('text/plain').send(`ℹ️ Skipped\nThis doesn't look like a transaction, so LogIt ignored it.`);
           return;
@@ -236,6 +242,7 @@ processSmsRouter.post(
       const parseResult = await parseSms(rawSms);
 
       if (!parseResult.parsed && !looksLikeProviderAlert(rawSms)) {
+        console.log(`ℹ️ Skipped (not an alert) user=${userId} len=${rawSms.length} preview="${previewSms(rawSms)}"`);
         // A chat message that mentions money ("send me GHS 50"). Not ours to
         // log, and not worth a spot in "Needs review".
         if (wantsPlainText(req)) {
