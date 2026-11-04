@@ -145,6 +145,20 @@ export function toPlainSms(input: string): string {
   return t.trim();
 }
 
+/**
+ * Data, bundles or calls paid for with airtime (MTN, Telecel, AT network
+ * messages). The money was already counted when the airtime was bought, so
+ * these are not logged. Purchases paid from MoMo carry wallet markers
+ * (transaction ID, "Mobile Money", wallet balance) and are not caught here.
+ */
+export function isPaidWithAirtime(sms: string): boolean {
+  const t = sms.toLowerCase();
+  const isBundle = /\b(bundle|data|internet|\d+(\.\d+)?\s?(mb|gb)|minutes|mins|sms pack|kokrokoo|zone|social)\b/.test(t);
+  const fromAirtime = /\b(airtime|main (account|balance)|credit balance|deducted from your (airtime|account balance))\b/.test(t);
+  const fromWallet = /(mobile ?money|\bmomo\b|financial transaction|transaction id|wallet|cash out|payment received)/.test(t);
+  return isBundle && fromAirtime && !fromWallet;
+}
+
 function isShortcutRequest(req: AuthenticatedRequest): boolean {
   return !!(req.body?.secret || req.body?.['x-shortcut-secret'] || req.headers?.['x-shortcut-secret']);
 }
@@ -311,6 +325,17 @@ processSmsRouter.post(
           return;
         }
         res.json({ success: true, ignored: true, reason: 'not_a_transaction' });
+        return;
+      }
+
+      // Bundles bought with airtime: already counted when the airtime was bought
+      if (isPaidWithAirtime(rawSms)) {
+        console.log(`ℹ️ Skipped (paid with airtime) user=${userId} preview="${previewSms(rawSms)}"`);
+        if (wantsPlainText(req)) {
+          res.type('text/plain').send(`ℹ️ Paid with airtime\nAlready counted when you bought the airtime, so LogIt left it.`);
+          return;
+        }
+        res.json({ success: true, ignored: true, reason: 'paid_with_airtime' });
         return;
       }
 
