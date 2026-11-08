@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, Alert, ActivityIndicator } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, G } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -67,7 +68,7 @@ export default function LoginScreen() {
     const [method, setMethod] = useState<'phone' | 'email'>('phone');
     const [phone, setPhone] = useState('');
     const [phoneFocused, setPhoneFocused] = useState(false);
-    const phoneInputRef = useRef<TextInput>(null);
+    const phoneInputRef = useRef<TextInputInstance>(null);
     const e164 = useMemo(() => toE164(phone, '+233'), [phone]);
     const network = ghanaNetwork(e164);
 
@@ -112,8 +113,8 @@ export default function LoginScreen() {
     }, [handleBiometricLogin]);
     
     // Input element refs for keyboard navigation
-    const emailInputRef = useRef<TextInput>(null);
-    const passwordInputRef = useRef<TextInput>(null);
+    const emailInputRef = useRef<TextInputInstance>(null);
+    const passwordInputRef = useRef<TextInputInstance>(null);
 
     // Interactive email domain autocomplete selection
     const handleDomainSelect = (domain: string) => {
@@ -151,7 +152,7 @@ export default function LoginScreen() {
 
             {/* Premium, brand-aligned gradient background */}
             <View style={StyleSheet.absoluteFill}>
-                <Svg style={StyleSheet.absoluteFillObject} width={width} height={height}>
+                <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
                     <Defs>
                         <RadialGradient id="ub"
                             cx={width * 0.55} cy={0} r={height * 0.65}

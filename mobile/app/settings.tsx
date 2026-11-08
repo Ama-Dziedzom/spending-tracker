@@ -2,9 +2,9 @@ import { View, Text, Pressable, Alert, ScrollView, Switch, RefreshControl, Platf
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { getPendingReviewCount } from '../../lib/review-service';
+import { getPendingReviewCount } from '../lib/review-service';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -26,13 +26,14 @@ import {
     MoneyReceive01Icon,
     SmartPhone01Icon,
 } from '@hugeicons/core-free-icons';
-import { formatPhone } from '../../lib/phone';
+import { formatPhone } from '../lib/phone';
 import * as Haptics from 'expo-haptics';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { COLORS } from '../../constants/theme';
+import { COLORS } from '../constants/theme';
+import { RoundButton } from '@/components/ui';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -207,6 +208,10 @@ export default function Settings() {
         <View style={{ paddingTop: insets.top }} className="flex-1 bg-slate-50">
             {/* Header */}
             <View className="px-6 flex-row items-center justify-center mb-2">
+                {/* Settings is now a pushed screen, not a tab (handoff §6). */}
+                <View style={{ position: 'absolute', left: 24 }}>
+                    <RoundButton icon="back" label="Back" tone="card" onPress={() => router.back()} />
+                </View>
                 <Text className="text-slate-900 font-manrope-bold text-[24px]">Settings</Text>
             </View>
             <StatusBar style="dark" />

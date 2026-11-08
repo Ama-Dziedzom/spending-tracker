@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, ActivityIndicator } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -56,7 +57,7 @@ export default function PasswordScreen() {
     const [showPassword, setShowPassword] = useState(false);
 
     // Ref for password secure text input to force focus on whole pill tap
-    const passwordInputRef = useRef<TextInput>(null);
+    const passwordInputRef = useRef<TextInputInstance>(null);
 
     // Rule 1: Must be 8 characters long
     const isMinLengthMet = useMemo(() => password.length >= 8, [password]);
@@ -85,7 +86,7 @@ export default function PasswordScreen() {
 
             {/* Premium, brand-aligned gradient background */}
             <View style={StyleSheet.absoluteFill}>
-                <Svg style={StyleSheet.absoluteFillObject} width={width} height={height}>
+                <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
                     <Defs>
                         <RadialGradient id="ub"
                             cx={width * 0.55} cy={0} r={height * 0.65}

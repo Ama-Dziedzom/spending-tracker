@@ -1,0 +1,136 @@
+import React from 'react';
+import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { HIT_SLOP } from '@/constants/theme';
+import { useTheme } from '@/lib/theme';
+import { Icon, type IconName } from './icon';
+import { Spinner } from './loaders';
+import { Text } from './text';
+
+type Variant = 'primary' | 'secondary' | 'ink' | 'danger';
+
+interface ButtonProps {
+    label: string;
+    onPress: () => void;
+    /**
+     * primary   – brand/accent fill, white label (main CTA).
+     * secondary – bg/muted fill, text/primary label (safe choice, "Keep").
+     * ink       – brand/ink-button (navy; inverts in dark), e.g. "Check", "Discard".
+     * danger    – status/danger, only for destructive confirmation.
+     */
+    variant?: Variant;
+    /** 'lg' = 15pt / 15 vertical (full-width CTAs); 'md' = 13pt / 10 (dialogs); 'sm' = 13pt / 9 (inline). */
+    size?: 'lg' | 'md' | 'sm';
+    icon?: IconName;
+    busy?: boolean;
+    /** Label shown while busy, e.g. "Sending code". */
+    busyLabel?: string;
+    disabled?: boolean;
+    fill?: boolean;
+    style?: StyleProp<ViewStyle>;
+}
+
+export function Button({
+    label, onPress, variant = 'primary', size = 'lg', icon, busy, busyLabel, disabled, fill, style,
+}: ButtonProps) {
+    const { colors } = useTheme();
+    const palette = {
+        primary: { bg: colors.brand.accent, fg: colors.brand['on-accent'] },
+        secondary: { bg: colors.bg.muted, fg: colors.text.primary },
+        ink: { bg: colors.brand['ink-button'], fg: colors.brand['on-ink-button'] },
+        danger: { bg: colors.status.danger, fg: colors.brand['on-accent'] },
+    }[variant];
+    const pad = { lg: { v: 15, h: 20, font: 15 }, md: { v: 10, h: 16, font: 13 }, sm: { v: 9, h: 16, font: 13 } }[size];
+    const inactive = disabled || busy;
+
+    return (
+        <Pressable
+            onPress={onPress}
+            disabled={inactive}
+            hitSlop={size === 'lg' ? undefined : HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !!disabled, busy: !!busy }}
+            accessibilityLabel={busy && busyLabel ? busyLabel : label}
+            style={({ pressed }) => [
+                {
+                    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    backgroundColor: palette.bg,
+                    paddingVertical: pad.v, paddingHorizontal: pad.h,
+                    borderRadius: 999,
+                    minHeight: size === 'lg' ? 50 : undefined,
+                    opacity: busy ? 0.85 : disabled ? 0.5 : pressed ? 0.85 : 1,
+                },
+                fill && { flex: 1 },
+                style,
+            ]}
+        >
+            {busy && variant === 'primary' && <Spinner size={18} color={palette.fg} />}
+            {!busy && icon && <Icon name={icon} size={18} color={palette.fg} />}
+            <Text weight="bold" size={pad.font} style={{ color: palette.fg }}>
+                {busy && busyLabel ? busyLabel : label}
+            </Text>
+        </Pressable>
+    );
+}
+
+interface ChipProps {
+    label: string;
+    icon?: IconName;
+    onPress?: () => void;
+    /**
+     * shortcut – bg/surface with a small shadow (Log cash / Paste a message / Set salary).
+     * muted    – bg/muted (answer source "From 14 transactions").
+     * tag      – tinted status/category tag (e.g. "42 less than last week").
+     */
+    variant?: 'shortcut' | 'muted' | 'tag';
+    /** For 'tag': the tone. */
+    tone?: 'success' | 'warn' | 'danger' | 'accent' | 'neutral';
+    trailingChevron?: boolean;
+}
+
+export function Chip({ label, icon, onPress, variant = 'shortcut', tone = 'neutral', trailingChevron }: ChipProps) {
+    const { colors, shadows } = useTheme();
+
+    let bg = colors.bg.surface;
+    let fg = colors.text.primary;
+    let iconColor = colors.brand['accent-text'];
+    if (variant === 'muted') {
+        bg = colors.bg.muted; fg = colors.text.secondary; iconColor = colors.text.secondary;
+    } else if (variant === 'tag') {
+        const t = {
+            success: [colors.status['success-tint'], colors.status.success],
+            warn: [colors.status['warn-tint'], colors.status.warn],
+            danger: [colors.status['danger-tint'], colors.status.danger],
+            accent: [colors.brand['accent-tint'], colors.brand['accent-text']],
+            neutral: [colors.bg.muted, colors.text.secondary],
+        }[tone];
+        bg = t[0]; fg = t[1]; iconColor = t[1];
+    }
+
+    const body = (
+        <View
+            style={[
+                { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, backgroundColor: bg },
+                variant === 'shortcut' && { paddingLeft: 11, paddingRight: 12, paddingVertical: 10, ...shadows.small },
+                variant === 'muted' && { paddingLeft: 10, paddingRight: 12, paddingVertical: 7, gap: 6 },
+                variant === 'tag' && { paddingHorizontal: 10, paddingVertical: 6 },
+            ]}
+        >
+            {icon && <Icon name={icon} size={variant === 'shortcut' ? 16 : 14} color={iconColor} />}
+            <Text
+                size={variant === 'shortcut' ? 13 : 12}
+                weight={variant === 'tag' ? 'bold' : 'semibold'}
+                style={{ color: fg }}
+            >
+                {label}
+            </Text>
+            {trailingChevron && <Icon name="next" size={12} color={fg} />}
+        </View>
+    );
+
+    if (!onPress) return body;
+    return (
+        <Pressable onPress={onPress} hitSlop={HIT_SLOP} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+            {body}
+        </Pressable>
+    );
+}

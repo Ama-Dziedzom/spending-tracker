@@ -95,7 +95,7 @@ export default function SuccessScreen() {
 
             {/* Premium, brand-aligned gradient background */}
             <View style={StyleSheet.absoluteFill}>
-                <Svg style={StyleSheet.absoluteFillObject} width={width} height={height}>
+                <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
                     <Defs>
                         <RadialGradient id="ub"
                             cx={width * 0.5} cy={height * 0.3} r={height * 0.7}

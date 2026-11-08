@@ -20,7 +20,7 @@ export default function WelcomeScreen() {
         <View style={styles.root}>
 
             {/* ── Gradient background ───────────────────────────────── */}
-            <Svg style={StyleSheet.absoluteFillObject} width={width} height={height}>
+            <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
                 <Defs>
                     <RadialGradient id="ub"
                         cx={width * 0.55} cy={0} r={height * 0.65}

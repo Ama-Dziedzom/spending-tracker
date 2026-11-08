@@ -317,18 +317,29 @@ export default function Dashboard() {
                                     <Text className="text-[24px] font-manrope-bold text-white">Hello, {userName}</Text>
                                     <Text className="text-[16px] font-manrope text-white/60">Welcome Back</Text>
                                 </View>
-                                <Pressable
-                                    onPress={() => router.push('/notifications')}
-                                    className="flex-row items-center bg-white/15 rounded-full p-1 pl-4 border border-white/10 shadow-sm"
-                                >
-                                    <HugeiconsIcon icon={Notification01Icon} size={20} color="#FFFFFF" />
-                                    <View className="w-8 h-8 rounded-full overflow-hidden ml-3">
+                                <View className="flex-row items-center bg-white/15 rounded-full p-1 pl-4 border border-white/10 shadow-sm">
+                                    <Pressable
+                                        onPress={() => router.push('/notifications')}
+                                        hitSlop={12}
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Notifications"
+                                    >
+                                        <HugeiconsIcon icon={Notification01Icon} size={20} color="#FFFFFF" />
+                                    </Pressable>
+                                    {/* v1: Settings opens from the avatar (handoff §6). */}
+                                    <Pressable
+                                        onPress={() => router.push('/settings')}
+                                        hitSlop={6}
+                                        accessibilityRole="button"
+                                        accessibilityLabel="Settings"
+                                        className="w-8 h-8 rounded-full overflow-hidden ml-3"
+                                    >
                                         <Image
                                             source={require('../../assets/images/ama-avatar.png')}
                                             className="w-full h-full"
                                         />
-                                    </View>
-                                </Pressable>
+                                    </Pressable>
+                                </View>
                             </View>
 
                             {/* Balance Section */}

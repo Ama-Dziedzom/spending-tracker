@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,12 +31,12 @@ export default function OtpScreen() {
 
     // Refs for all 6 individual OTP input cells
     const inputRefs = [
-        useRef<TextInput>(null),
-        useRef<TextInput>(null),
-        useRef<TextInput>(null),
-        useRef<TextInput>(null),
-        useRef<TextInput>(null),
-        useRef<TextInput>(null),
+        useRef<TextInputInstance>(null),
+        useRef<TextInputInstance>(null),
+        useRef<TextInputInstance>(null),
+        useRef<TextInputInstance>(null),
+        useRef<TextInputInstance>(null),
+        useRef<TextInputInstance>(null),
     ];
 
     const isComplete = useMemo(() => otp.every(digit => digit !== ''), [otp]);
@@ -121,7 +122,7 @@ export default function OtpScreen() {
             const result = await verifyPhoneChange(phone, code);
             if (!result.success) { setError(phoneAuthMessage(result.error)); return; }
             setError(null);
-            router.dismissTo('/(tabs)/settings');
+            router.dismissTo('/settings');
             return;
         }
         if (!email) return;
@@ -146,7 +147,7 @@ export default function OtpScreen() {
 
             {/* Premium, brand-aligned gradient background */}
             <View style={StyleSheet.absoluteFill}>
-                <Svg style={StyleSheet.absoluteFillObject} width={width} height={height}>
+                <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
                     <Defs>
                         <RadialGradient id="ub"
                             cx={width * 0.55} cy={0} r={height * 0.65}

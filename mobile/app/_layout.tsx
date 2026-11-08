@@ -1,14 +1,15 @@
 import 'react-native-gesture-handler';
 import { AppState, Platform } from 'react-native';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, useFonts } from '@expo-google-fonts/manrope';
+import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold, useFonts } from '@expo-google-fonts/manrope';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemeProvider as LogItThemeProvider, useTheme } from '@/lib/theme';
+import { ToastProvider } from '@/components/ui/toast';
 import '../global.css';
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -21,12 +22,12 @@ import { flushPendingSms, requestLogNotifications } from '@/lib/pending-sms';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [loaded, error] = useFonts({
     'Manrope-Regular': Manrope_400Regular,
     'Manrope-Medium': Manrope_500Medium,
     'Manrope-SemiBold': Manrope_600SemiBold,
     'Manrope-Bold': Manrope_700Bold,
+    'Manrope-ExtraBold': Manrope_800ExtraBold,
   });
 
   useEffect(() => {
@@ -71,7 +72,33 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <LogItThemeProvider>
+          <ToastProvider>
+            <AppStack />
+          </ToastProvider>
+        </LogItThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
+  );
+}
+
+function AppStack() {
+  const { scheme, colors } = useTheme();
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: {
+      ...base.colors,
+      background: colors.bg.canvas,
+      card: colors.bg.surface,
+      text: colors.text.primary,
+      border: colors.line.default,
+      primary: colors.brand.accent,
+    },
+  };
+
+  return (
+        <ThemeProvider value={navTheme}>
           <Stack screenOptions={{
             gestureEnabled: true,
             gestureDirection: 'horizontal',
@@ -85,16 +112,14 @@ export default function RootLayout() {
             <Stack.Screen name="password" options={{ headerShown: false, animation: 'slide_from_right' }} />
             <Stack.Screen name="success" options={{ headerShown: false, animation: 'fade' }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="transactions" options={{ headerShown: false }} />
+            <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="wallet-details" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="review" options={{ headerShown: false }} />
             <Stack.Screen name="expected-income" options={{ headerShown: false }} />
             <Stack.Screen name="add-phone" options={{ headerShown: false }} />
           </Stack>
-          <StatusBar style="dark" />
+          <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         </ThemeProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
   );
 }

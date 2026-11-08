@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, Pressable, TextInput, ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import BottomSheet, { BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
@@ -62,7 +63,7 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess, prefi
     const [step, setStep] = useState<'form' | 'category' | 'wallet'>('form');
 
     // Amount input ref for focus
-    const amountInputRef = useRef<TextInput>(null);
+    const amountInputRef = useRef<TextInputInstance>(null);
 
     useEffect(() => {
         if (isVisible && !lastVisible) {

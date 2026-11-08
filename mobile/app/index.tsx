@@ -41,7 +41,7 @@ export default function SplashScreen() {
 
     return (
         <View style={styles.container}>
-            <Svg style={StyleSheet.absoluteFillObject} width={width} height={height}>
+            <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
                 <Defs>
                     <RadialGradient
                         id="upperBlue"

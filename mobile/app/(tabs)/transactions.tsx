@@ -12,10 +12,10 @@ import {
     Calendar01Icon,
     FilterIcon,
 } from '@hugeicons/core-free-icons';
-import { TransactionWithWallet, formatCurrency, formatTransactionDate } from '../lib/transaction-service';
-import { Transaction, supabase } from '../lib/supabase';
-import { TransactionDetailBottomSheet } from '../components/transaction-detail-bottom-sheet';
-import { getCategoryById, getCategoryColor, getCategoryIcon, getCategoryByIdOrName } from '../lib/categories';
+import { TransactionWithWallet, formatCurrency, formatTransactionDate } from '../../lib/transaction-service';
+import { Transaction, supabase } from '../../lib/supabase';
+import { TransactionDetailBottomSheet } from '../../components/transaction-detail-bottom-sheet';
+import { getCategoryById, getCategoryColor, getCategoryIcon, getCategoryByIdOrName } from '../../lib/categories';
 
 const PAGE_SIZE = 20;
 
@@ -60,7 +60,7 @@ function formatSectionDate(dateString: string): string {
 }
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useLiveRefresh } from '../lib/useLiveRefresh';
+import { useLiveRefresh } from '../../lib/useLiveRefresh';
 
 export default function TransactionsPage() {
     const router = useRouter();

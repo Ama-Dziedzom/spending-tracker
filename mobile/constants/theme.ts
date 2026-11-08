@@ -1,3 +1,140 @@
+import tokens from './tokens.json';
+import type { TextStyle, ViewStyle } from 'react-native';
+
+// ============================================================================
+// LogIt v1 design tokens — docs/design-handoff.md §3–4
+// Colours live in tokens.json (exported from Figma). Read them in components
+// through useTheme() from '@/lib/theme', or Tailwind classes such as
+// `bg-bg-surface` / `text-text-secondary`. Never hard-code hex in components.
+// ============================================================================
+
+export type ColorScheme = 'light' | 'dark';
+type TokenName = keyof typeof tokens.light;
+
+type Nest<T extends string> = {
+  [G in T extends `${infer A}/${string}` ? A : never]: {
+    [N in T extends `${G}/${infer B}` ? B : never]: string;
+  };
+};
+/** theme.colors.text.secondary, theme.colors.cat['food-tint'], … */
+export type Palette = Nest<TokenName>;
+
+function nest(flat: Record<string, string>): Palette {
+  const out: Record<string, Record<string, string>> = {};
+  for (const [token, hex] of Object.entries(flat)) {
+    const [group, name] = token.split('/');
+    (out[group] ??= {})[name] = hex;
+  }
+  return out as Palette;
+}
+
+export const PALETTE: Record<ColorScheme, Palette> = {
+  light: nest(tokens.light),
+  dark: nest(tokens.dark),
+};
+
+/**
+ * The only colours the design leaves untokenised (handoff §3, §12.4).
+ * The MTN network dot is added when the Wallets screen is built (value from Figma).
+ */
+export const RAW = {
+  onBand: '#FFFFFF', // text on the blue band, at 100 / 85 / 75 %
+  onBandSecondary: 'rgba(255,255,255,0.85)',
+  onBandTertiary: 'rgba(255,255,255,0.75)',
+  /** Round buttons and pills sitting on the band. */
+  onBandFill: 'rgba(255,255,255,0.16)',
+  /** Icon circle inside a toast (white at 14 % on bg/inverse). */
+  onInverseFill: 'rgba(255,255,255,0.14)',
+  bandEllipses: ['#8FA8FF', '#6B5BFF', '#0B2493'] as const, // at 40–45 % opacity
+  toastUndo: '#9DB4FF',
+  /** Initials avatar artwork (Figma "LogIt / Avatar" 989:63). Same in both modes. */
+  avatarInitialsBg: '#FFCC00',
+  avatarInitialsInk: '#081750',
+} as const;
+
+/** Category keys, matching the cat/* tokens. */
+export type CategoryColor =
+  | 'people' | 'food' | 'shopping' | 'airtime' | 'bills' | 'transport'
+  | 'cash' | 'fees' | 'loans' | 'subscription';
+
+export const FONT = {
+  medium: 'Manrope-Medium',
+  semibold: 'Manrope-SemiBold',
+  bold: 'Manrope-Bold',
+  extrabold: 'Manrope-ExtraBold',
+} as const;
+
+/** Type roles from the Figma "Type" frame (999:216). Colour is applied separately. */
+export const TYPE = {
+  hero: { fontFamily: FONT.extrabold, fontSize: 36, letterSpacing: -36 * 0.03 },
+  screenTitle: { fontFamily: FONT.bold, fontSize: 24, letterSpacing: -24 * 0.02 },
+  cardTitle: { fontFamily: FONT.bold, fontSize: 17 },
+  row: { fontFamily: FONT.semibold, fontSize: 14 },
+  body: { fontFamily: FONT.medium, fontSize: 14 },
+  answer: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 15 * 1.45 },
+  meta: { fontFamily: FONT.medium, fontSize: 12 },
+  sectionLabel: { fontFamily: FONT.bold, fontSize: 11, letterSpacing: 11 * 0.06, textTransform: 'uppercase' },
+  tabLabel: { fontFamily: FONT.semibold, fontSize: 11 },
+} satisfies Record<string, TextStyle>;
+
+export const SPACE = {
+  gutter: 16,
+  cardPadding: 16,
+  cardGap: 12,
+} as const;
+
+export const RADIUS = {
+  card: 24,
+  pill: 999,
+  sheet: 32,
+  /** Category tiles: ≈32 % of their size. */
+  tile: (size: number) => Math.round(size * 0.32),
+} as const;
+
+export const ICON_SIZE = { sm: 16, md: 18, lg: 20, xl: 24 } as const;
+export const ICON_STROKE = 1.5;
+
+/** 44×44 minimum touch target; round header buttons are 38px, so pad by 3. */
+export const HIT_SLOP = { top: 3, bottom: 3, left: 3, right: 3 } as const;
+
+/** Card shadow: light mode only. Dark mode relies on the surface colour step. */
+export function cardShadow(scheme: ColorScheme): ViewStyle {
+  return shadows(scheme).card;
+}
+
+/**
+ * Shadow presets from Figma. Light mode only; dark mode drops them (handoff §4).
+ * Shadow colour is text/primary (ink) in light mode; the FAB glows in brand/accent.
+ * RN has no spread, so radius ≈ blur / 2.
+ */
+export function shadows(scheme: ColorScheme) {
+  const none: ViewStyle = {};
+  if (scheme === 'dark') {
+    return { card: none, small: none, toast: none, tabBar: none, fab: none, bubble: none };
+  }
+  const ink = PALETTE.light.text.primary;
+  const s = (y: number, blur: number, opacity: number, color = ink): ViewStyle => ({
+    shadowColor: color,
+    shadowOffset: { width: 0, height: y },
+    shadowOpacity: opacity,
+    shadowRadius: blur / 2,
+    elevation: Math.max(1, Math.round(y / 2)),
+  });
+  return {
+    card: s(10, 30, 0.08), // 0 10 30 −6
+    small: s(1, 3, 0.1), // segmented thumb, shortcut chips
+    toast: s(12, 28, 0.22),
+    tabBar: s(8, 24, 0.1),
+    fab: s(8, 20, 0.35, PALETTE.light.brand.accent),
+    bubble: s(6, 18, 0.1),
+  };
+}
+
+// ============================================================================
+// Legacy colours (pre-v1). Remove once every screen is on useTheme().
+// ============================================================================
+
+/** @deprecated Use useTheme().colors from '@/lib/theme'. */
 export const COLORS = {
   primary: '#0F4CFF',
   primaryLight: '#DAE2FF',
