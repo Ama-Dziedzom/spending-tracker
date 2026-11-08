@@ -1,6 +1,5 @@
 import React, { useState, useRef, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, ActivityIndicator } from 'react-native';
-import type { TextInputInstance } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, G } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../lib/useAuth';
@@ -70,8 +69,8 @@ export default function SignupScreen() {
     const [phoneFocused, setPhoneFocused] = useState(false);
     
     // Input element refs for absolute tap-target UX focusing
-    const nameInputRef = useRef<TextInputInstance>(null);
-    const phoneInputRef = useRef<TextInputInstance>(null);
+    const nameInputRef = useRef<TextInput>(null);
+    const phoneInputRef = useRef<TextInput>(null);
 
     const isFullNameValid = useMemo(() => fullName.trim().length >= 2, [fullName]);
 

@@ -2,20 +2,24 @@
  * Transaction categorization.
  *
  * Returns the app's category IDs (mobile/lib/categories.ts): food, transport,
- * shopping, bills, entertainment, healthcare, education, housing, travel,
+ * shopping, bills, airtime, entertainment, healthcare, education, housing, travel,
  * fitness, gifts, transfer, income, subscription, cash, loans, fees, other.
  * Keep the two lists in sync — the app shows anything it doesn't recognise as "Other".
  */
 
 type CategoryId =
-  | 'food' | 'transport' | 'shopping' | 'bills' | 'entertainment' | 'healthcare'
+  | 'food' | 'transport' | 'shopping' | 'bills' | 'airtime' | 'entertainment' | 'healthcare'
   | 'education' | 'housing' | 'travel' | 'fitness' | 'gifts' | 'transfer'
   | 'income' | 'subscription' | 'cash' | 'loans' | 'fees' | 'other';
 
 /** Keywords per category, including common Ghanaian merchants and billers. */
 const KEYWORDS: Partial<Record<Exclude<CategoryId, 'transfer' | 'income' | 'other'>, string[]>> = {
+  // Airtime and mobile data are their own category in the v1 app (not Bills).
+  airtime: [
+    'airtime', 'bundle', 'data', 'mobile data', 'top up', 'top-up', 'topup', 'recharge',
+  ],
   bills: [
-    'airtime', 'bundle', 'data', 'ecg', 'electricity', 'prepaid', 'postpaid', 'power',
+    'ecg', 'electricity', 'prepaid', 'postpaid', 'power',
     'gwcl', 'ghana water', 'water', 'internet', 'broadband', 'fibre', 'vodafone broadband',
     'surfline', 'busy', 'utility', 'bill', 'nedco', 'dstv', 'gotv', 'startimes', 'multichoice',
   ],

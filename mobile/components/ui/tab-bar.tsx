@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
-import type { BottomTabBarProps } from 'expo-router/tabs';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '@/lib/theme';
@@ -35,7 +35,7 @@ interface Props extends BottomTabBarProps {
  * button. Use as `tabBar={(p) => <FloatingTabBar {...p} onAdd={…} />}`.
  * Routes not in TAB_ICONS are hidden.
  */
-export function FloatingTabBar({ state, descriptors, emitter, navigateToTab, onAdd }: Props) {
+export function FloatingTabBar({ state, descriptors, navigation, onAdd }: Props) {
     const { colors, shadows } = useTheme();
     const insets = useSafeAreaInsets();
     const currentName = state.routes[state.index]?.name;
@@ -69,11 +69,11 @@ export function FloatingTabBar({ state, descriptors, emitter, navigateToTab, onA
                             accessibilityState={{ selected: focused }}
                             accessibilityLabel={label}
                             onPress={() => {
-                                const e = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                                const e = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
                                 // From Transactions, tapping Spending goes back to Spending.
                                 if (!onTabRoot && !e.defaultPrevented) {
                                     Haptics.selectionAsync().catch(() => {});
-                                    navigateToTab(route.key);
+                                    navigation.navigate(route.name, route.params);
                                 }
                             }}
                             style={{

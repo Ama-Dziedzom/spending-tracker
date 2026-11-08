@@ -7,7 +7,10 @@ import { getWallets } from '@/lib/wallet-service';
 
 // Context to share the add trigger and dashboard refresh between tabs.
 interface TabContextType {
+    /** Opens the "Add to LogIt" chooser. */
     openAddTransaction: () => void;
+    /** Skips the chooser and opens the add form directly (e.g. the Log cash shortcut). */
+    openAdd: (choice: AddChoice) => void;
     refreshDashboard: () => void;
     setRefreshDashboard: (fn: () => void) => void;
 }
@@ -28,12 +31,6 @@ export default function TabLayout() {
     const [prefill, setPrefill] = useState<{ type?: 'expense'; walletId?: string } | undefined>();
     const refreshFnRef = useRef<() => void>(() => {});
 
-    const contextValue: TabContextType = useMemo(() => ({
-        openAddTransaction: () => setAddSheetVisible(true),
-        refreshDashboard: () => refreshFnRef.current(),
-        setRefreshDashboard: (fn) => { refreshFnRef.current = fn; },
-    }), []);
-
     const onChoose = useCallback(async (choice: AddChoice) => {
         if (choice === 'cash') {
             // Preselect the first cash wallet, if there is one.
@@ -44,6 +41,13 @@ export default function TabLayout() {
         }
         setFormVisible(true);
     }, []);
+
+    const contextValue: TabContextType = useMemo(() => ({
+        openAddTransaction: () => setAddSheetVisible(true),
+        openAdd: (choice) => { onChoose(choice); },
+        refreshDashboard: () => refreshFnRef.current(),
+        setRefreshDashboard: (fn) => { refreshFnRef.current = fn; },
+    }), [onChoose]);
 
     return (
         <TabContext.Provider value={contextValue}>

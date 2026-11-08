@@ -361,7 +361,7 @@ struct LogItClient {
     private static func categoryName(_ id: String?) -> String {
         let names: [String: String] = [
             "food": "Food & Dining", "transport": "Transport", "shopping": "Shopping",
-            "bills": "Bills & Utilities", "entertainment": "Entertainment", "healthcare": "Healthcare",
+            "bills": "Bills & Utilities", "airtime": "Airtime & Data", "entertainment": "Entertainment", "healthcare": "Healthcare",
             "education": "Education", "housing": "Housing", "travel": "Travel", "fitness": "Fitness",
             "gifts": "Gifts & Donations", "transfer": "Transfer", "income": "Income",
             "subscription": "Subscription", "cash": "Cash", "loans": "Loans",

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, ActivityIndicator } from 'react-native';
-import type { TextInputInstance } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,12 +30,12 @@ export default function OtpScreen() {
 
     // Refs for all 6 individual OTP input cells
     const inputRefs = [
-        useRef<TextInputInstance>(null),
-        useRef<TextInputInstance>(null),
-        useRef<TextInputInstance>(null),
-        useRef<TextInputInstance>(null),
-        useRef<TextInputInstance>(null),
-        useRef<TextInputInstance>(null),
+        useRef<TextInput>(null),
+        useRef<TextInput>(null),
+        useRef<TextInput>(null),
+        useRef<TextInput>(null),
+        useRef<TextInput>(null),
+        useRef<TextInput>(null),
     ];
 
     const isComplete = useMemo(() => otp.every(digit => digit !== ''), [otp]);

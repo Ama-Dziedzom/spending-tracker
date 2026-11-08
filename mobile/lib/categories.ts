@@ -21,6 +21,7 @@ import {
     Cash01Icon,
     BankIcon,
     PercentIcon,
+    SmartPhone01Icon,
 } from '@hugeicons/core-free-icons';
 
 // Define icon type from an actual icon
@@ -62,7 +63,15 @@ export const CATEGORIES: Category[] = [
         name: 'Bills & Utilities',
         icon: Invoice02Icon,
         color: '#6366F1',
-        keywords: ['electricity', 'water', 'ecg', 'gwcl', 'dstv', 'internet', 'subscription', 'bill', 'utility', 'prepaid', 'postpaid', 'airtime', 'bundle']
+        keywords: ['electricity', 'water', 'ecg', 'gwcl', 'dstv', 'internet', 'subscription', 'bill', 'utility', 'prepaid', 'postpaid']
+    },
+    {
+        // v1 design: airtime and data are their own category (cat/airtime).
+        id: 'airtime',
+        name: 'Airtime & Data',
+        icon: SmartPhone01Icon,
+        color: '#B58208',
+        keywords: ['airtime', 'bundle', 'data bundle', 'mobile data', 'top up', 'top-up', 'topup', 'recharge']
     },
     {
         id: 'entertainment',
@@ -132,7 +141,7 @@ export const CATEGORIES: Category[] = [
         name: 'Subscription',
         icon: Invoice02Icon,
         color: '#6366F1',
-        keywords: ['subscription', 'renew', 'recurring', 'payment', 'bill', 'utility', 'prepaid', 'postpaid', 'airtime', 'bundle']
+        keywords: ['subscription', 'renew', 'recurring', 'payment', 'bill', 'utility', 'prepaid', 'postpaid']
     },
     {
         id: 'cash',

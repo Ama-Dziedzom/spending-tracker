@@ -1,6 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, ScrollView, Platform, TouchableOpacity, Pressable, ActivityIndicator } from 'react-native';
-import type { TextInputInstance } from 'react-native';
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,7 +56,7 @@ export default function PasswordScreen() {
     const [showPassword, setShowPassword] = useState(false);
 
     // Ref for password secure text input to force focus on whole pill tap
-    const passwordInputRef = useRef<TextInputInstance>(null);
+    const passwordInputRef = useRef<TextInput>(null);
 
     // Rule 1: Must be 8 characters long
     const isMinLengthMet = useMemo(() => password.length >= 8, [password]);

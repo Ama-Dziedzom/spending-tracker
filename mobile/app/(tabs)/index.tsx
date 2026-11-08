@@ -1,656 +1,205 @@
-import { View, Text, Image, Pressable, ScrollView, Linking, Platform, RefreshControl, useWindowDimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Linking, Platform, Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
-    Message02Icon,
-    AiMagicIcon,
-    ArrowRight01Icon,
-    AddCircleHalfDotIcon,
-    Wallet01Icon,
-    BankIcon,
-    Wallet03Icon,
-    Alert01Icon,
-    Notification01Icon,
-    Calendar01Icon,
-    ViewIcon,
-    ViewOffSlashIcon,
-    InboxIcon,
-    MoneyReceive01Icon,
-} from '@hugeicons/core-free-icons';
-import { getWallets } from '../../lib/wallet-service';
-import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName, getGlobalAnalytics } from '../../lib/transaction-service';
-import { Wallet, supabase, Transaction } from '../../lib/supabase';
-import { ActivityIndicator, Alert } from 'react-native';
-import { LinkTransactionsBottomSheet } from '../../components/link-transactions-bottom-sheet';
-import { SelectWalletTypeBottomSheet } from '../../components/select-wallet-type-bottom-sheet';
-import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bottom-sheet';
-import { TransactionDetailBottomSheet } from '../../components/transaction-detail-bottom-sheet';
-import { createWallets, CreateWalletInput } from '../../lib/wallet-service';
-import { assignTransactionToWallet } from '../../lib/transaction-service';
-import { getPendingReviewCount } from '../../lib/review-service';
+    ActionBanner, Avatar, Banner, Chip, RoundButton, Screen, TAB_BAR_SPACE, Text, TopBar,
+    type AvatarChoice,
+} from '@/components/ui';
+import { SpendingCard, SpendingCardSkeleton, type Period } from '@/components/spending/spending-card';
+import { FirstRunCard, SalaryPromptCard } from '@/components/spending/prompt-cards';
+import { DayDetailSheet } from '@/components/spending/day-detail-sheet';
+import { LinkWalletsFlow } from '@/components/spending/link-wallets-flow';
+import { TransactionDetailBottomSheet } from '@/components/transaction-detail-bottom-sheet';
+import { AddTransactionBottomSheet } from '@/components/add-transaction-bottom-sheet';
 import { useTabContext } from './_layout';
+import { supabase, type Wallet } from '@/lib/supabase';
+import { getWallets } from '@/lib/wallet-service';
+import type { TransactionWithWallet } from '@/lib/transaction-service';
+import { getPendingReviewCount } from '@/lib/review-service';
+import { getIncomePrompts, logExpectedIncome, markIncomeReceived, snoozeIncome, type IncomePrompt } from '@/lib/income-service';
+import { fetchSpendingWindow, summarise, type SpendingSummary } from '@/lib/spending-service';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
+import { longDate, sameDay } from '@/lib/format';
+import { RAW } from '@/constants/theme';
 
-import { COLORS } from '../../constants/theme';
-import { useLiveRefresh } from '../../lib/useLiveRefresh';
-import { AddTransactionBottomSheet } from '../../components/add-transaction-bottom-sheet';
-import { IncomePrompt, getIncomePrompts, logExpectedIncome, markIncomeReceived, ordinal, snoozeIncome } from '../../lib/income-service';
-
-// Get greeting based on time of day
-function getGreeting(): string {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-}
-
-export default function Dashboard() {
+/**
+ * Spending (v1 home, Figma section 993:49). What went out, when, and what
+ * needs a look. Check lives here as a banner.
+ */
+export default function Spending() {
     const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const { height: windowHeight } = useWindowDimensions();
-    const tabContext = useTabContext();
+    const tabs = useTabContext();
+
+    const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(false);
+    const [period, setPeriod] = useState<Period>('week');
+
+    const [name, setName] = useState<string | null>(null);
+    const [avatar, setAvatar] = useState<AvatarChoice | null>(null);
+    const [txs, setTxs] = useState<TransactionWithWallet[]>([]);
+    const [summary, setSummary] = useState<SpendingSummary | null>(null);
     const [wallets, setWallets] = useState<Wallet[]>([]);
-    const [transactions, setTransactions] = useState<TransactionWithWallet[]>([]);
-    const [spentThisMonth, setSpentThisMonth] = useState(0);
-    const [unmatchedCount, setUnmatchedCount] = useState(0);
     const [reviewCount, setReviewCount] = useState(0);
-    // "Did your salary come in?" (banks that don't text credit alerts)
+    const [unmatchedCount, setUnmatchedCount] = useState(0);
     const [incomePrompt, setIncomePrompt] = useState<IncomePrompt | null>(null);
+
+    const [dayOpen, setDayOpen] = useState<Date | null>(null);
+    const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
     const [incomeSheetFor, setIncomeSheetFor] = useState<IncomePrompt | null>(null);
-    const [incomeBusy, setIncomeBusy] = useState(false);
-    const [isBalanceVisible, setIsBalanceVisible] = useState(true);
-    const [isLinkSheetVisible, setIsLinkSheetVisible] = useState(false);
-    const [userName, setUserName] = useState<string>('there');
+    const [linkOpen, setLinkOpen] = useState(false);
 
-    // Wallet Creation Flow State
-    const [isSelectTypeSheetVisible, setIsSelectTypeSheetVisible] = useState(false);
-    const [isConfigureSheetVisible, setIsConfigureSheetVisible] = useState(false);
-    const [selectedWalletTypes, setSelectedWalletTypes] = useState<string[]>([]);
-    const [isSavingWallet, setIsSavingWallet] = useState(false);
-    const [activeTransaction, setActiveTransaction] = useState<Transaction | null>(null);
-    const [transferState, setTransferState] = useState<{ isTransfer: boolean, sourceId: string | null } | null>(null);
-
-    // Transaction Detail State
-    const [selectedTransactionForDetail, setSelectedTransactionForDetail] = useState<TransactionWithWallet | null>(null);
-    const [isTransactionDetailVisible, setIsTransactionDetailVisible] = useState(false);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
-            // Fetch user info
             const { data: { user } } = await supabase.auth.getUser();
-            if (user?.user_metadata?.full_name) {
-                // Get first name only
-                const firstName = user.user_metadata.full_name.split(' ')[0];
-                setUserName(firstName);
-            } else if (user?.email) {
-                // Fallback to email prefix
-                setUserName(user.email.split('@')[0]);
-            }
+            const meta = user?.user_metadata ?? {};
+            setName((meta.full_name as string | undefined)?.split(' ')[0] ?? user?.email?.split('@')[0] ?? null);
+            setAvatar((meta.avatar as AvatarChoice | undefined) ?? null);
 
-            const [walletsData, monthAnalytics, transactionsData, pendingReviews, incomePrompts] = await Promise.all([
+            const [window, walletList, pending, prompts, unmatched] = await Promise.all([
+                fetchSpendingWindow(),
                 getWallets(),
-                getGlobalAnalytics('month'),
-                getRecentTransactions(5),
                 getPendingReviewCount(),
                 getIncomePrompts(),
+                supabase.from('transactions').select('*', { count: 'exact', head: true }).is('wallet_id', null),
             ]);
-            setReviewCount(pendingReviews);
-            setIncomePrompt(incomePrompts[0] ?? null);
-
-            // Get count of unmatched transactions
-            const { count, error: unmatchedError } = await supabase
-                .from('transactions')
-                .select('*', { count: 'exact', head: true })
-                .is('wallet_id', null);
-
-            if (unmatchedError) console.error('Error counting unmatched transactions:', unmatchedError);
-
-            setWallets(walletsData);
-            setSpentThisMonth(monthAnalytics.totalSpent);
-            setTransactions(transactionsData);
-            setUnmatchedCount(count || 0);
-        } catch (error) {
-            console.error('Error fetching dashboard data:', error);
+            setTxs(window);
+            setSummary(summarise(window));
+            setWallets(walletList);
+            setReviewCount(pending);
+            setIncomePrompt(prompts[0] ?? null);
+            setUnmatchedCount(unmatched.count ?? 0);
+            setError(false);
+        } catch (e) {
+            console.error('Error loading Spending:', e);
+            setError(true);
         } finally {
-            setIsLoading(false);
+            setLoading(false);
             setRefreshing(false);
         }
-    };
-
-    React.useEffect(() => {
-        fetchData();
     }, []);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
     useLiveRefresh(() => fetchData(), 'home');
+    useEffect(() => { tabs?.setRefreshDashboard(fetchData); }, [tabs, fetchData]);
 
-    // Register fetchData with tab context so FAB can trigger refresh
-    useEffect(() => {
-        if (tabContext?.setRefreshDashboard) {
-            tabContext.setRefreshDashboard(fetchData);
-        }
-    }, [tabContext]);
-
-    const onRefresh = useCallback(() => {
-        setRefreshing(true);
-        fetchData();
-    }, []);
-
-    const handleOpenMessages = async () => {
+    const openMessages = async () => {
         try {
-            if (Platform.OS === 'ios') {
-                const messagesUrl = 'messages://';
-                const canOpen = await Linking.canOpenURL(messagesUrl);
-                if (canOpen) {
-                    await Linking.openURL(messagesUrl);
-                } else {
-                    await Linking.openURL('sms:');
-                }
-            } else {
-                await Linking.openURL('sms:');
-            }
-        } catch (error) {
-            console.error('Error opening messages:', error);
-            Alert.alert('Error', 'Could not open messages app. Please open it manually to copy your transaction SMS.');
+            const url = Platform.OS === 'ios' && (await Linking.canOpenURL('messages://')) ? 'messages://' : 'sms:';
+            await Linking.openURL(url);
+        } catch {
+            Alert.alert('Couldn’t open Messages', 'Open your Messages app, then share a MoMo or bank alert to LogIt.');
         }
     };
 
-    const handleCreateWalletFromLink = (tx: Transaction, isTransfer?: boolean, sourceId?: string | null) => {
-        setActiveTransaction(tx);
-        setTransferState(isTransfer ? { isTransfer, sourceId: sourceId || null } : null);
-        setIsLinkSheetVisible(false);
-        // Delay to allow link sheet to close
-        setTimeout(() => {
-            setIsSelectTypeSheetVisible(true);
-        }, 800);
-    };
-
-    const handleSelectType = (types: string[]) => {
-        setSelectedWalletTypes(types);
-        setIsSelectTypeSheetVisible(false);
-        setTimeout(() => {
-            setIsConfigureSheetVisible(true);
-        }, 800);
-    };
-
-    const handleConfigureWallet = async (data: any) => {
-        setIsSavingWallet(true);
-        try {
-            const desc = activeTransaction?.description?.toLowerCase() || '';
-
-            const walletsToCreate: CreateWalletInput[] = [];
-
-            if (data.momo) {
-                walletsToCreate.push({
-                    name: 'Mobile Money',
-                    type: 'momo',
-                    icon: 'wallet-03',
-                    color: '#1642E5',
-                    initial_balance: 0,
-                    source_identifier: data.momo.provider,
-                });
-            }
-
-            if (data.bank) {
-                walletsToCreate.push({
-                    name: data.bank.name || 'Bank Wallet',
-                    type: 'bank',
-                    icon: 'bank',
-                    color: '#1642E5',
-                    initial_balance: 0,
-                });
-            }
-
-            if (data.cash) {
-                walletsToCreate.push({
-                    name: data.cash.name || 'Cash Wallet',
-                    type: 'cash',
-                    icon: 'money-01',
-                    color: '#1642E5',
-                    initial_balance: 0,
-                });
-            }
-
-            let createdWallets: Wallet[] = [];
-            if (walletsToCreate.length > 0) {
-                createdWallets = await createWallets(walletsToCreate);
-            }
-
-            // If we are coming from a detected transaction, link it to the most relevant wallet
-            if (activeTransaction && createdWallets.length > 0) {
-                // Find the best wallet factor to link to (e.g. MoMo transaction to MoMo wallet)
-                let targetWallet = createdWallets[0];
-
-                if (createdWallets.length > 1) {
-                    const isMomo = desc.includes('mtn') || desc.includes('momo') || desc.includes('telecel') || desc.includes('vodafone');
-                    const momoWallet = createdWallets.find(w => w.type === 'momo');
-                    const bankWallet = createdWallets.find(w => w.type === 'bank');
-
-                    if (isMomo && momoWallet) targetWallet = momoWallet;
-                    else if (!isMomo && bankWallet) targetWallet = bankWallet;
-                }
-
-                if (transferState?.isTransfer) {
-                    // Logic: If source was already selected, this new wallet is the DESTINATION.
-                    // If source was NOT selected, this new wallet is the SOURCE.
-                    // However, usually they create a wallet because it's the one that RECEIVED or SENT the money.
-
-                    if (transferState.sourceId) {
-                        // We have a source, so this is to the NEW wallet
-                        await processTransfer(
-                            activeTransaction.id,
-                            transferState.sourceId,
-                            targetWallet.id,
-                            Number(activeTransaction.amount),
-                            activeTransaction.description
-                        );
-                    } else {
-                        // This new wallet is the source, but we don't have a destination yet.
-                        // In this case, maybe we should just assign it?
-                        // Or better: for now, assume single assignment if flow is interrupted.
-                        // But let's try to be smart: if it's a transfer, we usually need the other side.
-                        await assignTransactionToWallet(activeTransaction.id, targetWallet.id);
-                    }
-                } else {
-                    await assignTransactionToWallet(activeTransaction.id, targetWallet.id);
-                }
-            }
-
-            // First handle success message and cleanup
-            if (activeTransaction && createdWallets.length > 0) {
-                // Small delay to allow sheet closing animation to start
-                setTimeout(() => {
-                    Alert.alert('Success', 'Wallet created and transaction linked!');
-                }, 500);
-            }
-
-            setActiveTransaction(null);
-            setTransferState(null);
-
-        } catch (error) {
-            console.error('Error saving wallet:', error);
-            Alert.alert('Error', 'Failed to save your wallet. Please try again.');
-        } finally {
-            setIsSavingWallet(false);
-        }
-    };
-
-    const handleCloseTransactionDetail = useCallback(() => {
-        setIsTransactionDetailVisible(false);
-        setSelectedTransactionForDetail(null);
-    }, []);
+    const firstRun = !loading && !error && summary?.empty && wallets.length === 0;
+    const bigDay = summary?.week.bigDay?.date;
 
     return (
-        <View className="flex-1 bg-white">
-            <StatusBar style="light" />
-            <LinearGradient
-                colors={['#0F4CFF', '#1642E5', '#0E1F5B']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={{ flex: 1 }}
-            >
-                <View className="flex-1" style={{ paddingTop: insets.top }}>
-                    <ScrollView
-                        className="flex-1"
-                        contentContainerStyle={{ flexGrow: 1 }}
-                        showsVerticalScrollIndicator={false}
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={onRefresh}
-                                tintColor="#FFFFFF"
-                                colors={['#FFFFFF']}
-                            />
+        <>
+            <Screen
+                bottomInset={TAB_BAR_SPACE}
+                header={
+                    <TopBar
+                        left={
+                            <Pressable
+                                onPress={() => router.push('/settings')}
+                                accessibilityRole="button"
+                                accessibilityLabel="Settings"
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}
+                            >
+                                <Avatar choice={avatar} name={name} size={38} />
+                                <View style={{ flexShrink: 1 }}>
+                                    <Text size={16} weight="bold" tone="onBand">{name ? `Hi ${name}` : 'Hi there'}</Text>
+                                    <Text variant="meta" weight="semibold" style={{ color: RAW.onBandTertiary }}>{longDate(new Date())}</Text>
+                                </View>
+                            </Pressable>
                         }
-                    >
-                        <View style={{
-                            paddingHorizontal: 24,
-                            paddingBottom: 60,
-                            minHeight: !isLoading && wallets.length === 0 ? windowHeight * 0.82 : undefined,
-                        }}>
-                            {/* Header */}
-                            <View className="flex-row items-center justify-between mt-4 mb-10">
-                                <View>
-                                    <Text className="text-[24px] font-manrope-bold text-white">Hello, {userName}</Text>
-                                    <Text className="text-[16px] font-manrope text-white/60">Welcome Back</Text>
-                                </View>
-                                <View className="flex-row items-center bg-white/15 rounded-full p-1 pl-4 border border-white/10 shadow-sm">
-                                    <Pressable
-                                        onPress={() => router.push('/notifications')}
-                                        hitSlop={12}
-                                        accessibilityRole="button"
-                                        accessibilityLabel="Notifications"
-                                    >
-                                        <HugeiconsIcon icon={Notification01Icon} size={20} color="#FFFFFF" />
-                                    </Pressable>
-                                    {/* v1: Settings opens from the avatar (handoff §6). */}
-                                    <Pressable
-                                        onPress={() => router.push('/settings')}
-                                        hitSlop={6}
-                                        accessibilityRole="button"
-                                        accessibilityLabel="Settings"
-                                        className="w-8 h-8 rounded-full overflow-hidden ml-3"
-                                    >
-                                        <Image
-                                            source={require('../../assets/images/ama-avatar.png')}
-                                            className="w-full h-full"
-                                        />
-                                    </Pressable>
-                                </View>
-                            </View>
-
-                            {/* Balance Section */}
-                            {isLoading ? (
-                                <View className="py-20 items-center">
-                                    <ActivityIndicator size="large" color="#FFFFFF" />
-                                </View>
-                            ) : wallets.length === 0 ? (
-                                <View className="items-center mb-14 mt-12">
-                                    <View style={{ opacity: 1 }}>
-                                        <Image
-                                            source={require('../../assets/images/empty state ill.png')}
-                                            style={{ width: 240, height: 136, marginBottom: 24 }}
-                                            resizeMode="contain"
-                                        />
-                                    </View>
-                                    <Text className="text-[24px] font-manrope-bold text-white mt-2">
-                                        Nothing to track yet
-                                    </Text>
-                                    <Text className="text-[16px] font-manrope text-white/60 text-center mt-2 px-10">
-                                        Forward a mobile money message and watch your first wallet appear
-                                    </Text>
-                                    <Pressable
-                                        onPress={handleOpenMessages}
-                                        className="bg-white rounded-full px-10 py-4 mt-8"
-                                    >
-                                        <Text className="text-[16px] font-manrope-bold" style={{ color: COLORS.primary }}>
-                                            Share an SMS
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            ) : (
-                                <View className="items-center mb-4 mt-8">
-                                    <View className="flex-row items-center gap-2 mb-1">
-                                        <Text className="text-white/60 text-[14px] font-manrope-bold uppercase tracking-[1px]">
-                                            SPENT THIS MONTH
-                                        </Text>
-                                        <Pressable
-                                            onPress={() => setIsBalanceVisible(!isBalanceVisible)}
-                                            className="p-1"
-                                            hitSlop={8}
-                                        >
-                                            <HugeiconsIcon
-                                                icon={isBalanceVisible ? ViewOffSlashIcon : ViewIcon}
-                                                size={16}
-                                                color="#FFFFFF99"
-                                            />
-                                        </Pressable>
-                                    </View>
-                                    <Text className="text-white text-[48px] font-manrope-bold">
-                                        GHS {isBalanceVisible
-                                            ? spentThisMonth.toLocaleString('en-US', { minimumFractionDigits: 2 })
-                                            : '••••••'
-                                        }
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
-
-                        {/* White Container Content */}
-                        <View className="flex-1 bg-white rounded-t-[48px] px-6 pt-2 pb-10" style={{
-                            shadowColor: '#000',
-                            shadowOffset: { width: 0, height: -15 },
-                            shadowOpacity: 0.1,
-                            shadowRadius: 20,
-                            elevation: 20,
-                        }}>
-                            {/* Drag Handle */}
-                            {/* <View className="w-12 h-1 bg-slate-100 rounded-full self-center mb-6" /> */}
-
-                            {/* Smart Detection Banner */}
-                            {!isLoading && unmatchedCount > 0 && (
-                                <Pressable
-                                    onPress={() => setIsLinkSheetVisible(true)}
-                                    className="bg-[#F8FAFF] border-[1px] border-[#DAE2FF] rounded-[24px] p-5 mb-8 flex-row items-center gap-4"
-                                >
-                                    <View className="w-12 h-12 rounded-full bg-[#0F4CFF]/10 items-center justify-center">
-                                        <HugeiconsIcon icon={AiMagicIcon} size={24} color="#0F4CFF" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <View className="flex-row items-center gap-2">
-                                            <Text className="text-[16px] font-manrope-bold text-slate-900">
-                                                {unmatchedCount} smart detections
-                                            </Text>
-                                            <View className="bg-rose-500 w-2 h-2 rounded-full" />
-                                        </View>
-                                        <Text className="text-[14px] font-manrope text-slate-500">
-                                            Assign them for proper tracking
-                                        </Text>
-                                    </View>
-                                    <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#0F4CFF" />
-                                </Pressable>
-                            )}
-
-                            {/* Expected income — "Did your salary come in?" */}
-                            {!isLoading && incomePrompt && (
-                                <View className="bg-[#F0FDF4] border-[1px] border-[#BBF7D0] rounded-[24px] p-5 mb-8">
-                                    <View className="flex-row items-center gap-4">
-                                        <View className="w-12 h-12 rounded-full bg-[#10B981]/15 items-center justify-center">
-                                            <HugeiconsIcon icon={MoneyReceive01Icon} size={24} color="#047857" />
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="text-[16px] font-manrope-bold text-slate-900">
-                                                Did your {incomePrompt.item.label.toLowerCase()} come in?
-                                            </Text>
-                                            <Text className="text-[14px] font-manrope text-slate-500">
-                                                About {formatCurrency(incomePrompt.item.amount)}
-                                                {wallets.find((w) => w.id === incomePrompt.item.wallet_id)?.name ? ` into ${wallets.find((w) => w.id === incomePrompt.item.wallet_id)?.name}` : ''}, usually on the {ordinal(incomePrompt.item.day_of_month)}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    <View className="flex-row gap-2 mt-4">
-                                        <Pressable
-                                            disabled={incomeBusy}
-                                            onPress={async () => {
-                                                setIncomeBusy(true);
-                                                await logExpectedIncome(incomePrompt);
-                                                setIncomeBusy(false);
-                                                fetchData();
-                                            }}
-                                            className="flex-1 h-11 rounded-full items-center justify-center bg-[#047857]"
-                                            accessibilityRole="button"
-                                        >
-                                            <Text className="text-white font-manrope-bold text-[14px]">Yes</Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={() => setIncomeSheetFor(incomePrompt)}
-                                            className="flex-1 h-11 rounded-full items-center justify-center bg-white border border-[#BBF7D0]"
-                                            accessibilityRole="button"
-                                        >
-                                            <Text className="text-[#047857] font-manrope-bold text-[14px]">Different amount</Text>
-                                        </Pressable>
-                                        <Pressable
-                                            onPress={async () => {
-                                                await snoozeIncome(incomePrompt.item.id);
-                                                fetchData();
-                                            }}
-                                            className="h-11 px-4 rounded-full items-center justify-center"
-                                            accessibilityRole="button"
-                                        >
-                                            <Text className="text-slate-500 font-manrope-semibold text-[14px]">Not yet</Text>
-                                        </Pressable>
-                                    </View>
-                                </View>
-                            )}
-
-                            {/* Needs Review Banner — SMS LogIt couldn't read */}
-                            {!isLoading && reviewCount > 0 && (
-                                <Pressable
-                                    onPress={() => router.push('/review')}
-                                    className="bg-[#FFFBEB] border-[1px] border-[#FDE68A] rounded-[24px] p-5 mb-8 flex-row items-center gap-4"
-                                    accessibilityRole="button"
-                                >
-                                    <View className="w-12 h-12 rounded-full bg-[#F59E0B]/15 items-center justify-center">
-                                        <HugeiconsIcon icon={InboxIcon} size={24} color="#B45309" />
-                                    </View>
-                                    <View className="flex-1">
-                                        <Text className="text-[16px] font-manrope-bold text-slate-900">
-                                            {reviewCount} {reviewCount === 1 ? 'message needs' : 'messages need'} a look
-                                        </Text>
-                                        <Text className="text-[14px] font-manrope text-slate-500">
-                                            LogIt couldn’t read {reviewCount === 1 ? 'it' : 'them'} on its own
-                                        </Text>
-                                    </View>
-                                    <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#B45309" />
-                                </Pressable>
-                            )}
-
-                            {/* Recent Transactions Section */}
-                            {transactions.length > 0 && !isLoading ? (
-                                <View className="mb-6 mt-8">
-                                    <View className="flex-row justify-between items-center mb-6">
-                                        <Text className="text-[20px] font-manrope-bold text-slate-900">Recent Transactions</Text>
-                                        <Pressable onPress={() => router.push('/transactions')}>
-                                            <Text className="text-[18px] font-manrope-semibold" style={{ color: COLORS.primary }}>See all</Text>
-                                        </Pressable>
-                                    </View>
-                                    <View className="gap-0.5">
-                                        {transactions.map((tx) => {
-                                            const category = getCategoryByIdOrName(tx.category);
-                                            const isIncome = tx.type === 'income' || tx.type === 'credit';
-                                            const categoryColor = category?.color || '#94A3B8';
-
-                                            return (
-                                                <Pressable
-                                                    key={tx.id}
-                                                    onPress={() => {
-                                                        console.log('[Dashboard] Transaction tapped:', tx.id, tx.description);
-                                                        setSelectedTransactionForDetail(tx);
-                                                        setIsTransactionDetailVisible(true);
-                                                        console.log('[Dashboard] State set - isVisible should be true');
-                                                    }}
-                                                    className="flex-row items-center justify-between p-4 bg-white rounded-[24px]"
-                                                >
-                                                    <View className="flex-row items-center gap-4 flex-1 mr-3">
-                                                        <View
-                                                            className="w-12 h-12 rounded-full items-center justify-center"
-                                                            style={{ backgroundColor: `${categoryColor}15` }}
-                                                        >
-                                                            <HugeiconsIcon
-                                                                icon={category?.icon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
-                                                                size={20}
-                                                                color={isIncome ? '#10B981' : categoryColor}
-                                                            />
-                                                        </View>
-                                                        <View className="flex-1">
-                                                            <Text className="text-[16px] font-manrope-bold text-slate-900" numberOfLines={1}>
-                                                                {tx.description}
-                                                            </Text>
-                                                            <Text className="text-[13px] font-manrope text-slate-400">
-                                                                {tx.date_source === 'estimated' ? '≈ ' : ''}{formatTransactionDate(tx.transaction_date || tx.created_at)}
-                                                            </Text>
-                                                        </View>
-                                                    </View>
-                                                    <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-emerald-500' : 'text-slate-900'}`}>
-                                                        {isIncome ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '₵')}
-                                                    </Text>
-                                                </Pressable>
-                                            );
-                                        })}
-                                    </View>
-                                </View>
-                            ) : !isLoading && transactions.length === 0 && wallets.length > 0 && (
-                                <View className="items-center py-20 px-8">
-                                    <View className="w-16 h-16 bg-slate-50 rounded-full items-center justify-center mb-4">
-                                        <HugeiconsIcon icon={Wallet01Icon} size={32} color="#CBD5E1" />
-                                    </View>
-                                    <Text className="text-slate-900 font-manrope-bold text-[18px] text-center mb-2">No activity yet</Text>
-                                    <Text className="text-slate-400 font-manrope text-center">Your recent transactions will show up here.</Text>
-                                </View>
-                            )}
-
-                            {/* Actions - Only shown in empty states */}
-                            {!isLoading && transactions.length === 0 && wallets.length > 0 && (
-                                <View className="mt-4 gap-4">
-                                    {/* Recommended: SMS Tracking */}
-                                    <Pressable
-                                        onPress={handleOpenMessages}
-                                        className="bg-[#0F4CFF] rounded-[32px] p-6 relative overflow-hidden"
-                                    >
-                                        <View className="absolute -right-16 -top-12 opacity-[0.07]">
-                                            <HugeiconsIcon icon={Message02Icon} size={202} color="white" fill="white" />
-                                        </View>
-
-                                        <View className="flex-row justify-between items-start mb-6">
-                                            <View className="w-12 h-12 rounded-full bg-white items-center justify-center">
-                                                <HugeiconsIcon icon={Message02Icon} size={24} color="#0F4CFF" />
-                                            </View>
-                                            <View className="bg-white/10 rounded-full px-3 py-2 flex-row items-center gap-1">
-                                                <HugeiconsIcon icon={AiMagicIcon} size={14} color="white" />
-                                                <Text className="text-white text-[12px] font-manrope-semibold">AI Detection</Text>
-                                            </View>
-                                        </View>
-
-                                        <View className="flex-row items-end justify-between">
-                                            <View className="flex-1 mr-4">
-                                                <Text className="text-white text-[20px] font-manrope-bold mb-1">
-                                                    Share a transaction SMS
-                                                </Text>
-                                                <Text className="text-white/80 text-[16px] font-manrope">
-                                                    Log SMS for auto-tracking
-                                                </Text>
-                                            </View>
-                                            <View className="pb-1">
-                                                <HugeiconsIcon icon={ArrowRight01Icon} size={24} color="white" />
-                                            </View>
-                                        </View>
-                                    </Pressable>
-
-                                    {/* Manual Entry */}
-                                    <Pressable
-                                        onPress={() => router.push('/(tabs)/wallets')}
-                                        className="border-2 border-dashed border-slate-100 rounded-[24px] p-6 flex-row items-center gap-4"
-                                    >
-                                        <View className="w-12 h-12 rounded-full bg-slate-50 items-center justify-center">
-                                            <HugeiconsIcon icon={AddCircleHalfDotIcon} size={24} color="#64748B" />
-                                        </View>
-                                        <Text className="text-[18px] font-manrope-semibold text-slate-500">
-                                            Add wallet manually
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            )}
-                        </View>
-                    </ScrollView>
-                </View>
-            </LinearGradient>
-
-            <LinkTransactionsBottomSheet
-                isVisible={isLinkSheetVisible}
-                onClose={() => setIsLinkSheetVisible(false)}
-                onSuccess={fetchData}
-                onCreateWallet={handleCreateWalletFromLink}
-            />
-
-            <SelectWalletTypeBottomSheet
-                isVisible={isSelectTypeSheetVisible}
-                onClose={() => setIsSelectTypeSheetVisible(false)}
-                onSelect={handleSelectType}
-            />
-
-            <ConfigureWalletBottomSheet
-                isVisible={isConfigureSheetVisible}
-                selectedWallets={selectedWalletTypes}
-                onClose={() => setIsConfigureSheetVisible(false)}
-                onConfigure={handleConfigureWallet}
-                onFinish={() => {
-                    setIsConfigureSheetVisible(false);
-                    fetchData();
+                        right={<RoundButton icon="bell" label="Notifications" onPress={() => router.push('/notifications')} />}
+                    />
+                }
+                scrollProps={{
+                    refreshControl: (
+                        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={RAW.onBand} colors={[RAW.onBand]} />
+                    ),
                 }}
-                isLoading={isSavingWallet}
+            >
+                {incomePrompt && !loading && (
+                    <SalaryPromptCard
+                        prompt={incomePrompt}
+                        walletName={wallets.find((w) => w.id === incomePrompt.item.wallet_id)?.name}
+                        onYes={async () => { await logExpectedIncome(incomePrompt); await fetchData(); }}
+                        onDifferent={() => setIncomeSheetFor(incomePrompt)}
+                        onNotYet={async () => { await snoozeIncome(incomePrompt.item.id); fetchData(); }}
+                    />
+                )}
+
+                {loading ? (
+                    <SpendingCardSkeleton />
+                ) : error && !summary ? (
+                    <Banner
+                        tone="danger"
+                        title="Couldn’t load your spending"
+                        body="Check your connection and try again. Nothing you logged is lost."
+                        action={{ label: 'Try again', onPress: () => { setLoading(true); fetchData(); } }}
+                    />
+                ) : firstRun ? (
+                    <FirstRunCard onAutopilot={() => router.push('/sms-settings')} onPaste={openMessages} />
+                ) : summary && (
+                    <SpendingCard
+                        summary={summary}
+                        period={period}
+                        onPeriod={setPeriod}
+                        compact={!!incomePrompt}
+                        onMore={() => router.push('/transactions')}
+                        onDay={setDayOpen}
+                        onTransaction={setDetailTx}
+                    />
+                )}
+
+                {!loading && reviewCount > 0 && (
+                    <ActionBanner
+                        icon="check"
+                        title={`${reviewCount} ${reviewCount === 1 ? 'message' : 'messages'} to check`}
+                        body={`I couldn’t tell what ${reviewCount === 1 ? 'it was' : 'they were'}`}
+                        actionLabel="Check"
+                        onPress={() => router.push('/review')}
+                    />
+                )}
+
+                {!loading && unmatchedCount > 0 && (
+                    <Banner
+                        tone="info"
+                        icon="wallet"
+                        title={`${unmatchedCount} ${unmatchedCount === 1 ? 'payment needs' : 'payments need'} a wallet`}
+                        body="Tell LogIt which account they came from."
+                        action={{ label: 'Link', onPress: () => setLinkOpen(true) }}
+                    />
+                )}
+
+                {!loading && !firstRun && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        <Chip icon="cash" label="Log cash" onPress={() => tabs?.openAdd('cash')} />
+                        <Chip icon="paste" label="Paste a message" onPress={openMessages} />
+                        <Chip icon="receive" label="Set salary" onPress={() => router.push('/expected-income')} />
+                    </View>
+                )}
+            </Screen>
+
+            <DayDetailSheet
+                date={dayOpen}
+                transactions={txs}
+                isBiggest={!!dayOpen && !!bigDay && sameDay(dayOpen, bigDay)}
+                onClose={() => setDayOpen(null)}
+                onTransaction={setDetailTx}
+                onSeeAll={() => router.push('/transactions')}
+            />
+
+            <TransactionDetailBottomSheet
+                isVisible={!!detailTx}
+                transaction={detailTx}
+                onClose={() => setDetailTx(null)}
+                onCategoryUpdated={fetchData}
             />
 
             <AddTransactionBottomSheet
@@ -671,12 +220,7 @@ export default function Dashboard() {
                 } : undefined}
             />
 
-            <TransactionDetailBottomSheet
-                isVisible={isTransactionDetailVisible}
-                transaction={selectedTransactionForDetail}
-                onClose={handleCloseTransactionDetail}
-                onCategoryUpdated={fetchData}
-            />
-        </View>
+            <LinkWalletsFlow visible={linkOpen} onClose={() => setLinkOpen(false)} onDone={fetchData} />
+        </>
     );
 }
