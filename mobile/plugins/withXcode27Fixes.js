@@ -1,19 +1,20 @@
-// Expo Config Plugin — iOS build fixes for Xcode 27 that the SDK 58 template
-// doesn't cover yet.
+// Expo Config Plugin — makes the iOS app build and launch with Xcode 27 / iOS 27.
 //
 // What this does at `expo prebuild` time:
-//  1. Raises every pod's deployment target to 15.1 (Xcode 27 rejects lower).
-//  2. Embeds the prebuilt React.framework, which CocoaPods can leave out of the
+//  1. Adopts the UIScene lifecycle (SceneDelegate + Info.plist scene manifest).
+//     Apps built with the iOS 27 SDK are killed at launch without it.
+//  2. Raises every pod's deployment target to 15.1 (Xcode 27 rejects lower).
+//  3. Embeds the prebuilt React.framework, which CocoaPods can leave out of the
 //     embed script ("Library not loaded: @rpath/React.framework/React").
-//  3. Disables user script sandboxing so the JS bundling phase can write
+//  4. Disables user script sandboxing so the JS bundling phase can write
 //     main.jsbundle into the build products.
-//
-// Removed in the SDK 58 upgrade because the template now handles them:
-//  - UIScene lifecycle (template ships SceneDelegate.swift + scene manifest).
-//  - Quoting the react-native-xcode.sh call (template quotes it; re-quoting broke it).
-//  - Building fmt as C++17 (RN 0.88 ships fmt 12.1.0).
+//  5. Builds the fmt pod as C++17 (Xcode 26.4+ rejects fmt 11.0.2's consteval use).
+//  6. Quotes the react-native-xcode.sh invocation in the JS bundling phase, which
+//     otherwise breaks when the project path contains a space ("My Projects").
 
 const {
+  withAppDelegate,
+  withInfoPlist,
   withXcodeProject,
   withDangerousMod,
 } = require('@expo/config-plugins');
@@ -22,11 +23,124 @@ const fs = require('fs');
 
 const MARKER = '@xcode27-fixes';
 
-// ─── Steps 1 & 2: Podfile ──────────────────────────────────────────────────────
+// ─── Step 1: UIScene lifecycle ────────────────────────────────────────────────
+
+const WINDOW_SETUP = `#if os(iOS) || os(tvOS)
+    window = UIWindow(frame: UIScreen.main.bounds)
+    factory.startReactNative(
+      withModuleName: "main",
+      in: window,
+      launchOptions: launchOptions)
+#endif
+`;
+
+const WINDOW_SETUP_REPLACEMENT = `    // ${MARKER}: the window and React Native root are created in SceneDelegate:
+    // apps built with the iOS 27 SDK must adopt the UIScene lifecycle or they are killed at launch.
+`;
+
+const SCENE_DELEGATE = `// ${MARKER}
+class SceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene,
+          let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+          let factory = appDelegate.reactNativeFactory else { return }
+
+    var launchOptions: [UIApplication.LaunchOptionsKey: Any] = [:]
+    if let url = connectionOptions.urlContexts.first?.url {
+      launchOptions[.url] = url
+    }
+
+    let window = UIWindow(windowScene: windowScene)
+    self.window = window
+    appDelegate.window = window
+    factory.startReactNative(
+      withModuleName: "main",
+      in: window,
+      launchOptions: launchOptions)
+
+    if let userActivity = connectionOptions.userActivities.first {
+      self.scene(scene, continue: userActivity)
+    }
+  }
+
+  // Linking API
+  func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+    for context in URLContexts {
+      _ = RCTLinkingManager.application(UIApplication.shared, open: context.url, options: [:])
+    }
+  }
+
+  // Universal Links
+  func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+    _ = RCTLinkingManager.application(UIApplication.shared, continue: userActivity, restorationHandler: { _ in })
+  }
+}
+
+`;
+
+function withSceneDelegate(config) {
+  return withAppDelegate(config, (mod) => {
+    if (mod.modResults.language !== 'swift') {
+      throw new Error('withXcode27Fixes: expected a Swift AppDelegate');
+    }
+    let src = mod.modResults.contents;
+    if (src.includes(MARKER)) return mod;
+
+    if (!src.includes(WINDOW_SETUP)) {
+      throw new Error('withXcode27Fixes: could not find the window setup in AppDelegate.swift');
+    }
+    src = src.replace(WINDOW_SETUP, WINDOW_SETUP_REPLACEMENT);
+
+    const anchor = 'class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {';
+    if (!src.includes(anchor)) {
+      throw new Error('withXcode27Fixes: could not find ReactNativeDelegate in AppDelegate.swift');
+    }
+    src = src.replace(anchor, SCENE_DELEGATE + anchor);
+
+    mod.modResults.contents = src;
+    return mod;
+  });
+}
+
+function withSceneManifest(config) {
+  return withInfoPlist(config, (mod) => {
+    mod.modResults.UIApplicationSceneManifest = {
+      UIApplicationSupportsMultipleScenes: false,
+      UISceneConfigurations: {
+        UIWindowSceneSessionRoleApplication: [
+          {
+            UISceneConfigurationName: 'Default Configuration',
+            UISceneDelegateClassName: '$(PRODUCT_MODULE_NAME).SceneDelegate',
+          },
+        ],
+      },
+    };
+    return mod;
+  });
+}
+
+// ─── Steps 2, 3 & 5: Podfile ─────────────────────────────────────────────────────
 
 const DEPLOYMENT_TARGET_FIX = `
     # ${MARKER}
     installer.pods_project.targets.each do |target|
+      # Workaround for Xcode 26.4+ (Apple Clang 21) rejecting fmt 11.0.2's
+      # consteval FMT_STRING usage. Consteval doesn't exist pre-C++20, so
+      # building just the \`fmt\` pod against C++17 falls back to its
+      # runtime-checked format path. Remove once RN ships fmt >= 12.1.0
+      # (tracked in facebook/react-native#55601).
+      if target.name == 'fmt'
+        target.build_configurations.each do |config|
+          config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'gnu++17'
+        end
+      end
+
       # Xcode 27 rejects deployment targets below iOS 15.
       target.build_configurations.each do |config|
         if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 15.1
@@ -77,7 +191,7 @@ function withPodfileFixes(config) {
   ]);
 }
 
-// ─── Step 3: script sandboxing ────────────────────────────────────────────────
+// ─── Step 4: script sandboxing ────────────────────────────────────────────────
 
 function withScriptSandboxingDisabled(config) {
   return withXcodeProject(config, (mod) => {
@@ -90,8 +204,29 @@ function withScriptSandboxingDisabled(config) {
   });
 }
 
+// ─── Step 6: quote the JS bundling script path ────────────────────────────────
+
+const UNQUOTED_BUNDLE_CALL =
+  '`\\"$NODE_BINARY\\" --print \\"require(\'path\').dirname(require.resolve(\'react-native/package.json\')) + \'/scripts/react-native-xcode.sh\'\\"`';
+const QUOTED_BUNDLE_CALL =
+  'source \\"$(\\"$NODE_BINARY\\" --print \\"require(\'path\').dirname(require.resolve(\'react-native/package.json\')) + \'/scripts/react-native-xcode.sh\'\\")\\"';
+
+function withQuotedBundleScript(config) {
+  return withXcodeProject(config, (mod) => {
+    const phases = mod.modResults.hash.project.objects['PBXShellScriptBuildPhase'] || {};
+    for (const phase of Object.values(phases)) {
+      if (typeof phase !== 'object' || !phase.shellScript) continue;
+      phase.shellScript = phase.shellScript.replace(UNQUOTED_BUNDLE_CALL, QUOTED_BUNDLE_CALL);
+    }
+    return mod;
+  });
+}
+
 module.exports = function withXcode27Fixes(config) {
+  config = withSceneDelegate(config);
+  config = withSceneManifest(config);
   config = withPodfileFixes(config);
   config = withScriptSandboxingDisabled(config);
+  config = withQuotedBundleScript(config);
   return config;
 };
