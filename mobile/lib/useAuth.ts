@@ -167,6 +167,71 @@ export function useAuth() {
         }
     }, []);
 
+    // ── Phone (the default for real users) ─────────────────────────────
+
+    /**
+     * Text a 6-digit code to a phone number (E.164). `create` is true on
+     * sign up; on log in it's false, so a typo can't create a stray account.
+     */
+    const sendPhoneCode = useCallback(async (phone: string, opts: { create: boolean; fullName?: string }): Promise<AuthResult> => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOtp({
+                phone,
+                options: {
+                    shouldCreateUser: opts.create,
+                    ...(opts.fullName ? { data: { full_name: opts.fullName } } : {}),
+                },
+            });
+            return error ? { success: false, error: error.message } : { success: true };
+        } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : 'An unexpected error occurred' };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    /** Check the texted code. On success the user is signed in. */
+    const verifyPhoneCode = useCallback(async (phone: string, token: string): Promise<AuthResult> => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+            return error ? { success: false, error: error.message } : { success: true };
+        } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : 'An unexpected error occurred' };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    /**
+     * Add a phone number to the signed-in account (people who signed up
+     * with email). Keeps their user id, so all their transactions stay theirs.
+     */
+    const addPhoneToAccount = useCallback(async (phone: string): Promise<AuthResult> => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.updateUser({ phone });
+            return error ? { success: false, error: error.message } : { success: true };
+        } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : 'An unexpected error occurred' };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const verifyPhoneChange = useCallback(async (phone: string, token: string): Promise<AuthResult> => {
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'phone_change' });
+            return error ? { success: false, error: error.message } : { success: true };
+        } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : 'An unexpected error occurred' };
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     /**
      * Show a standardized error alert.
      */
@@ -181,6 +246,10 @@ export function useAuth() {
         setPasswordAndProfile,
         signIn,
         resendOtp,
+        sendPhoneCode,
+        verifyPhoneCode,
+        addPhoneToAccount,
+        verifyPhoneChange,
         showError,
     };
 }

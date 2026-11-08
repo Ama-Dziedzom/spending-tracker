@@ -90,6 +90,7 @@ export default function RootLayout() {
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="review" options={{ headerShown: false }} />
             <Stack.Screen name="expected-income" options={{ headerShown: false }} />
+            <Stack.Screen name="add-phone" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style="dark" />
         </ThemeProvider>

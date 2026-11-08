@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, Dimensions, TextInput, KeyboardAvoidingView, Sc
 import Svg, { Defs, RadialGradient, Stop, Rect, Path, G } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../lib/useAuth';
+import { toE164, ghanaNetwork, phoneAuthMessage } from '../lib/phone';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { User, ChevronDown, Mail } from 'lucide-react-native';
+import { User, ChevronDown } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import BottomSheet, { BottomSheetView, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { HugeiconsIcon } from '@hugeicons/react-native';
@@ -20,8 +21,6 @@ const COUNTRIES = [
     { flag: '🇬🇧', code: '+44', name: 'United Kingdom' },
     { flag: '🇺🇸', code: '+1', name: 'United States' },
 ];
-
-const SUGGESTED_DOMAINS = ['@gmail.com', '@yahoo.com', '@outlook.com', '@icloud.com'];
 
 // Premium brand SVGs for high resolution rendering
 function GoogleIcon() {
@@ -60,44 +59,29 @@ function AppleIcon() {
 export default function SignupScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { loading, signUpWithEmail, showError } = useAuth();
+    const { loading, sendPhoneCode, showError } = useAuth();
     
     // Sign up field states
     const [fullName, setFullName] = useState('');
-    const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     
     const [fullNameFocused, setFullNameFocused] = useState(false);
-    const [emailFocused, setEmailFocused] = useState(false);
     const [phoneFocused, setPhoneFocused] = useState(false);
     
     // Input element refs for absolute tap-target UX focusing
     const nameInputRef = useRef<TextInput>(null);
-    const emailInputRef = useRef<TextInput>(null);
     const phoneInputRef = useRef<TextInput>(null);
 
-    // Form input validation hooks (includes robust email format check)
-    const isEmailValid = useMemo(() => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }, [email]);
-
-    const isFullNameValid = useMemo(() => {
-        return fullName.trim().length >= 2;
-    }, [fullName]);
-
-    const isPhoneValid = useMemo(() => {
-        const cleaned = phone.replace(/[^0-9]/g, '');
-        return cleaned.length >= 7 && cleaned.length <= 15;
-    }, [phone]);
-
-    const isFormValid = useMemo(() => {
-        return isFullNameValid && isEmailValid && isPhoneValid;
-    }, [isFullNameValid, isEmailValid, isPhoneValid]);
+    const isFullNameValid = useMemo(() => fullName.trim().length >= 2, [fullName]);
 
     // Interactive country bottom sheet states
     const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+    // Phone is the account: one number, one LogIt
+    const e164 = useMemo(() => toE164(phone, selectedCountry.code), [phone, selectedCountry]);
+    const network = ghanaNetwork(e164);
+    const isFormValid = isFullNameValid && !!e164;
 
     // Bottom sheet setup
     const bottomSheetRef = useRef<BottomSheet>(null);
@@ -115,22 +99,6 @@ export default function SignupScreen() {
             setIsSheetOpen(true);
         }
     }, []);
-
-    // Interactive email domain autocomplete selection
-    const handleDomainSelect = (domain: string) => {
-        const atIndex = email.indexOf('@');
-        let username = email;
-        if (atIndex > -1) {
-            username = email.substring(0, atIndex);
-        }
-        const completedEmail = username + domain;
-        setEmail(completedEmail);
-        
-        // Auto-focus next field (Phone Number) for fluid continuation!
-        setTimeout(() => {
-            phoneInputRef.current?.focus();
-        }, 50);
-    };
 
     return (
         <View style={styles.root}>
@@ -209,7 +177,7 @@ export default function SignupScreen() {
                     {/* Header section with brand typography */}
                     <View style={styles.header}>
                         <Text style={styles.title}>Let’s Get You Set Up</Text>
-                        <Text style={styles.subtitle}>Enter your details to get started</Text>
+                        <Text style={styles.subtitle}>Your name and phone number, that’s all</Text>
                     </View>
 
                     {/* Overlapping premium white card sheet */}
@@ -241,60 +209,6 @@ export default function SignupScreen() {
 
                         <View style={{ height: 16 }} />
 
-                        {/* EMAIL BLOCK */}
-                        <Text style={styles.label}>EMAIL ADDRESS</Text>
-                        <Pressable 
-                            onPress={() => emailInputRef.current?.focus()}
-                            style={[
-                                styles.inputContainer,
-                                emailFocused && styles.inputContainerFocused
-                            ]}
-                        >
-                            <Mail size={20} color={emailFocused ? '#1642E5' : '#ADAEAF'} style={styles.inputIcon} />
-                            <TextInput
-                                ref={emailInputRef}
-                                style={styles.textInput}
-                                placeholder="john@example.com"
-                                placeholderTextColor="#C4C9D3"
-                                keyboardType="email-address"
-                                value={email}
-                                onChangeText={setEmail}
-                                onFocus={() => setEmailFocused(true)}
-                                onBlur={() => {
-                                    // Timeout prevents tag unmounting before onPress fires
-                                    setTimeout(() => setEmailFocused(false), 180);
-                                }}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                            />
-                        </Pressable>
-
-                        {/* Email Domain Autocomplete Tags Row (visible only when focused) */}
-                        {emailFocused && (
-                            <View style={styles.domainTagsContainer}>
-                                <ScrollView 
-                                    horizontal 
-                                    showsHorizontalScrollIndicator={false}
-                                    keyboardShouldPersistTaps="always"
-                                    style={styles.domainTagsScrollView}
-                                    contentContainerStyle={styles.domainTagsContent}
-                                >
-                                    {SUGGESTED_DOMAINS.map((domain) => (
-                                        <TouchableOpacity
-                                            key={domain}
-                                            style={styles.domainTag}
-                                            onPress={() => handleDomainSelect(domain)}
-                                            activeOpacity={0.6}
-                                        >
-                                            <Text style={styles.domainTagText}>{domain}</Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
-                            </View>
-                        )}
-
-                        <View style={{ height: emailFocused ? 12 : 16 }} />
-
                         {/* PHONE NUMBER BLOCK */}
                         <Text style={styles.label}>PHONE NUMBER</Text>
                         <View>
@@ -318,7 +232,7 @@ export default function SignupScreen() {
                                 <TextInput
                                     ref={phoneInputRef}
                                     style={styles.textInput}
-                                    placeholder="00 000 0000"
+                                    placeholder="24 412 3456"
                                     placeholderTextColor="#C4C9D3"
                                     keyboardType="phone-pad"
                                     value={phone}
@@ -326,8 +240,17 @@ export default function SignupScreen() {
                                     onFocus={() => setPhoneFocused(true)}
                                     onBlur={() => setPhoneFocused(false)}
                                     autoCorrect={false}
+                                    textContentType="telephoneNumber"
+                                    autoComplete="tel"
                                 />
                             </Pressable>
+                            <Text style={styles.phoneHint}>
+                                {network
+                                    ? `${network} number · we’ll text you a code`
+                                    : phone.length > 3 && !e164
+                                        ? 'Check the number, it looks too short or long'
+                                        : 'We’ll text you a code. No password needed.'}
+                            </Text>
                         </View>
 
                         <View style={{ height: 26 }} />
@@ -341,14 +264,16 @@ export default function SignupScreen() {
                                 (!isFormValid || loading) && styles.btnPrimaryDisabled
                             ]}
                             onPress={async () => {
-                                const result = await signUpWithEmail(email);
+                                if (!e164) return;
+                                const name = fullName.trim();
+                                const result = await sendPhoneCode(e164, { create: true, fullName: name });
                                 if (result.success) {
                                     router.push({
                                         pathname: '/otp',
-                                        params: { email, fullName, phone: `${selectedCountry.code}${phone}` }
+                                        params: { mode: 'phone', intent: 'signup', phone: e164, fullName: name }
                                     });
                                 } else {
-                                    showError('Sign Up Failed', result.error || 'Could not create account. Please try again.');
+                                    showError('Couldn’t send your code', phoneAuthMessage(result.error));
                                 }
                             }}
                         >
@@ -580,6 +505,13 @@ const styles = StyleSheet.create({
         fontFamily: 'Manrope-SemiBold',
         fontSize: 13,
         color: '#1642E5',
+    },
+    phoneHint: {
+        fontFamily: 'Manrope-Medium',
+        fontSize: 13,
+        color: '#8B95A5',
+        marginTop: 8,
+        marginLeft: 4,
     },
     countryPicker: {
         flexDirection: 'row',

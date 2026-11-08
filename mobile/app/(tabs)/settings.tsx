@@ -24,7 +24,9 @@ import {
     Tick01Icon,
     InboxIcon,
     MoneyReceive01Icon,
+    SmartPhone01Icon,
 } from '@hugeicons/core-free-icons';
+import { formatPhone } from '../../lib/phone';
 import * as Haptics from 'expo-haptics';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -133,6 +135,7 @@ export default function Settings() {
     const [reviewCount, setReviewCount] = useState<number | null>(null);
     useFocusEffect(
         React.useCallback(() => {
+            supabase.auth.getUser().then(({ data }) => setUser(data.user));
             getPendingReviewCount().then(setReviewCount);
         }, [])
     );
@@ -233,10 +236,21 @@ export default function Settings() {
                             onPress={() => { }}
                         />
                         <SettingsItem
-                            icon={Mail01Icon}
-                            label="Email Address"
-                            value={user?.email || 'Set your email'}
+                            icon={SmartPhone01Icon}
+                            label="Phone Number"
+                            value={user?.phone ? formatPhone(user.phone) : 'Add to log in by text'}
+                            onPress={user?.phone ? undefined : () => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push('/add-phone');
+                            }}
                         />
+                        {user?.email ? (
+                            <SettingsItem
+                                icon={Mail01Icon}
+                                label="Email Address"
+                                value={user.email}
+                            />
+                        ) : null}
                     </SettingsSection>
 
                     {/* General Preferences */}

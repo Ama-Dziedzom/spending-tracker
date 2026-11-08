@@ -9,6 +9,7 @@ import { biometrics } from '../utils/biometrics';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft02Icon } from '@hugeicons/core-free-icons';
 import { useAuth } from '../lib/useAuth';
+import { toE164, ghanaNetwork, phoneAuthMessage } from '../lib/phone';
 
 const { width, height } = Dimensions.get('window');
 
@@ -60,7 +61,25 @@ export default function LoginScreen() {
     const [emailFocused, setEmailFocused] = useState(false);
     const [passwordFocused, setPasswordFocused] = useState(false);
     const [isBioEnabled, setIsBioEnabled] = useState(false);
-    const { loading, signIn, showError } = useAuth();
+    const { loading, signIn, sendPhoneCode, showError } = useAuth();
+
+    // Phone is the default; email + password stays for accounts made before phone sign-in
+    const [method, setMethod] = useState<'phone' | 'email'>('phone');
+    const [phone, setPhone] = useState('');
+    const [phoneFocused, setPhoneFocused] = useState(false);
+    const phoneInputRef = useRef<TextInput>(null);
+    const e164 = useMemo(() => toE164(phone, '+233'), [phone]);
+    const network = ghanaNetwork(e164);
+
+    const handleSendCode = useCallback(async () => {
+        if (!e164) return;
+        const result = await sendPhoneCode(e164, { create: false });
+        if (result.success) {
+            router.push({ pathname: '/otp', params: { mode: 'phone', intent: 'login', phone: e164 } });
+        } else {
+            showError('Couldn’t send your code', phoneAuthMessage(result.error));
+        }
+    }, [e164, sendPhoneCode, router, showError]);
 
     const handleBiometricLogin = useCallback(async () => {
         const result = await biometrics.attemptBiometricLogin();
@@ -80,6 +99,7 @@ export default function LoginScreen() {
             const enabled = await biometrics.isBiometricLoginEnabled();
             setIsBioEnabled(enabled);
             if (enabled) {
+                setMethod('email');
                 const bioEmail = await biometrics.getBiometricUserEmail();
                 if (bioEmail) {
                     setEmail(bioEmail);
@@ -200,6 +220,49 @@ export default function LoginScreen() {
                     {/* Overlapping premium white card sheet */}
                     <View style={[styles.card, { paddingBottom: insets.bottom + 28 }]}>
                         
+                        {method === 'phone' ? (
+                            <>
+                                <Text style={styles.label}>PHONE NUMBER</Text>
+                                <Pressable
+                                    onPress={() => phoneInputRef.current?.focus()}
+                                    style={[styles.inputContainer, phoneFocused && styles.inputContainerFocused]}
+                                >
+                                    <Text style={styles.phonePrefix}>🇬🇭  +233</Text>
+                                    <View style={styles.phoneDivider} />
+                                    <TextInput
+                                        ref={phoneInputRef}
+                                        style={styles.textInput}
+                                        placeholder="24 412 3456"
+                                        placeholderTextColor="#C4C9D3"
+                                        keyboardType="phone-pad"
+                                        textContentType="telephoneNumber"
+                                        autoComplete="tel"
+                                        value={phone}
+                                        onChangeText={setPhone}
+                                        onFocus={() => setPhoneFocused(true)}
+                                        onBlur={() => setPhoneFocused(false)}
+                                        autoCorrect={false}
+                                        returnKeyType="send"
+                                        onSubmitEditing={handleSendCode}
+                                    />
+                                </Pressable>
+                                <Text style={styles.phoneHint}>
+                                    {network ? `${network} number · we’ll text you a code` : 'We’ll text you a code to log in.'}
+                                </Text>
+
+                                <View style={{ height: 24 }} />
+
+                                <TouchableOpacity
+                                    disabled={!e164 || loading}
+                                    activeOpacity={0.85}
+                                    style={[styles.btnPrimary, (!e164 || loading) && styles.btnPrimaryDisabled]}
+                                    onPress={handleSendCode}
+                                >
+                                    {loading ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.btnPrimaryText}>Send code</Text>}
+                                </TouchableOpacity>
+                            </>
+                        ) : (
+                            <>
                         {/* EMAIL ADDRESS BLOCK */}
                         <Text style={styles.label}>EMAIL ADDRESS</Text>
                         <Pressable 
@@ -328,6 +391,18 @@ export default function LoginScreen() {
                                 </TouchableOpacity>
                             )}
                         </View>
+                            </>
+                        )}
+
+                        <TouchableOpacity
+                            onPress={() => setMethod(method === 'phone' ? 'email' : 'phone')}
+                            activeOpacity={0.6}
+                            style={styles.switchMethod}
+                        >
+                            <Text style={styles.switchMethodText}>
+                                {method === 'phone' ? 'Log in with email instead' : 'Use your phone number'}
+                            </Text>
+                        </TouchableOpacity>
 
                         {/* OR SEPARATOR */}
                         <View style={styles.separatorContainer}>
@@ -454,6 +529,34 @@ const styles = StyleSheet.create({
         letterSpacing: 0.8,
         marginBottom: 8,
         marginLeft: 4,
+    },
+    phonePrefix: {
+        fontFamily: 'Manrope-Medium',
+        fontSize: 16,
+        color: '#1E293B',
+    },
+    phoneDivider: {
+        width: 1.5,
+        height: 24,
+        backgroundColor: '#E8ECFC',
+        marginHorizontal: 14,
+    },
+    phoneHint: {
+        fontFamily: 'Manrope-Medium',
+        fontSize: 13,
+        color: '#8B95A5',
+        marginTop: 8,
+        marginLeft: 4,
+    },
+    switchMethod: {
+        alignSelf: 'center',
+        marginTop: 16,
+        paddingVertical: 6,
+    },
+    switchMethodText: {
+        fontFamily: 'Manrope-SemiBold',
+        fontSize: 15,
+        color: '#1642E5',
     },
     inputContainer: {
         flexDirection: 'row',

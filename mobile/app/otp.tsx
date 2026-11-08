@@ -7,14 +7,21 @@ import { StatusBar } from 'expo-status-bar';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft02Icon } from '@hugeicons/core-free-icons';
 import { useAuth } from '../lib/useAuth';
+import { supabase } from '../lib/supabase';
+import { formatPhone, phoneAuthMessage } from '../lib/phone';
 
 const { width, height } = Dimensions.get('window');
 
 export default function OtpScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { email, fullName, phone } = useLocalSearchParams<{ email: string; fullName?: string; phone?: string }>();
-    const { loading, verifyOtp, resendOtp, showError } = useAuth();
+    // mode: 'email' (old sign up), 'phone' (sign up / log in by text), 'phone_change' (add a phone to this account)
+    // intent: 'signup' | 'login' — only used for phone mode
+    const { email, fullName, phone, mode = 'email', intent } = useLocalSearchParams<{
+        email?: string; fullName?: string; phone?: string; mode?: 'email' | 'phone' | 'phone_change'; intent?: 'signup' | 'login';
+    }>();
+    const { loading, verifyOtp, resendOtp, sendPhoneCode, verifyPhoneCode, addPhoneToAccount, verifyPhoneChange, showError } = useAuth();
+    const byText = mode === 'phone' || mode === 'phone_change';
 
     const [otp, setOtp] = useState(['', '', '', '', '', '']);
     const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -78,21 +85,46 @@ export default function OtpScreen() {
     };
 
     const handleResend = useCallback(async () => {
-        if (resendCooldown > 0 || !email) return;
+        if (resendCooldown > 0) return;
+        if (byText ? !phone : !email) return;
         setError(null);
-        const result = await resendOtp(email);
+        const result = mode === 'phone'
+            ? await sendPhoneCode(phone!, { create: intent === 'signup', fullName })
+            : mode === 'phone_change'
+                ? await addPhoneToAccount(phone!)
+                : await resendOtp(email!);
         if (result.success) {
             setOtp(['', '', '', '', '', '']);
             setResendCooldown(60);
             inputRefs[0].current?.focus();
         } else {
-            showError('Resend Failed', result.error || 'Could not resend code. Please try again.');
+            showError('Resend Failed', byText ? phoneAuthMessage(result.error) : (result.error || 'Could not resend code. Please try again.'));
         }
-    }, [email, resendCooldown, resendOtp, showError]);
+    }, [email, phone, mode, intent, fullName, byText, resendCooldown, resendOtp, sendPhoneCode, addPhoneToAccount, showError]);
 
     const handleVerify = useCallback(async () => {
-        if (!email) return;
         const code = otp.join('');
+        if (mode === 'phone' && phone) {
+            const result = await verifyPhoneCode(phone, code);
+            if (!result.success) { setError(phoneAuthMessage(result.error)); return; }
+            setError(null);
+            if (intent === 'signup') {
+                // Name was sent with the code request; save it again in case this number already had an account
+                if (fullName) await supabase.auth.updateUser({ data: { full_name: fullName } });
+                router.replace('/success');
+            } else {
+                router.replace('/(tabs)');
+            }
+            return;
+        }
+        if (mode === 'phone_change' && phone) {
+            const result = await verifyPhoneChange(phone, code);
+            if (!result.success) { setError(phoneAuthMessage(result.error)); return; }
+            setError(null);
+            router.dismissTo('/(tabs)/settings');
+            return;
+        }
+        if (!email) return;
         const result = await verifyOtp(email, code);
         if (result.success) {
             setError(null);
@@ -103,7 +135,7 @@ export default function OtpScreen() {
         } else {
             setError(result.error || 'Incorrect code. Please try again.');
         }
-    }, [email, fullName, phone, otp, verifyOtp, router]);
+    }, [email, fullName, phone, mode, intent, otp, verifyOtp, verifyPhoneCode, verifyPhoneChange, router]);
 
     return (
         <KeyboardAvoidingView
@@ -172,8 +204,8 @@ export default function OtpScreen() {
 
                 {/* Header section with brand typography */}
                 <View style={styles.header}>
-                    <Text style={styles.title}>We just sent an email</Text>
-                    <Text style={styles.subtitle}>Verify account OTP</Text>
+                    <Text style={styles.title}>{byText ? 'Check your messages' : 'We just sent an email'}</Text>
+                    <Text style={styles.subtitle}>{byText ? 'We texted you a 6-digit code' : 'Verify account OTP'}</Text>
                 </View>
 
                 {/* Overlapping premium white card sheet */}
@@ -182,7 +214,7 @@ export default function OtpScreen() {
                     {/* Centered Descriptive Prompts */}
                     <View style={styles.promptContainer}>
                         <Text style={styles.promptTextNormal}>Enter the security code we sent to</Text>
-                        <Text style={styles.promptTextBold}>{email || 'your email'}</Text>
+                        <Text style={styles.promptTextBold}>{byText ? (formatPhone(phone) || 'your phone') : (email || 'your email')}</Text>
                     </View>
 
                     <View style={{ height: 36 }} />

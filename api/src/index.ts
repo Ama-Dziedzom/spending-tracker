@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { parseSmsRouter } from './routes/parse-sms.js';
 import { processSmsRouter } from './routes/process-sms.js';
+import { authSmsRouter } from './routes/auth-sms.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -14,6 +15,8 @@ app.use(cors({
   origin: '*',
   allowedHeaders: ['authorization', 'x-client-info', 'apikey', 'content-type'],
 }));
+// Supabase auth hook needs the raw body to check its signature
+app.use('/api', authSmsRouter);
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
