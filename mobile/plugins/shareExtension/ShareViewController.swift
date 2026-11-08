@@ -52,6 +52,7 @@ class ShareViewModel: ObservableObject {
         case unparseable
         case saving
         case saved
+        case queued      // no connection: saved, LogIt sends it later
         case error(String)
     }
 
@@ -106,6 +107,8 @@ class ShareViewModel: ObservableObject {
             } else {
                 state = .unparseable
             }
+        } catch let error as URLError where Self.isOffline(error) {
+            queueForLater(text)
         } catch {
             state = .error(error.localizedDescription)
         }
@@ -134,9 +137,37 @@ class ShareViewModel: ObservableObject {
                 let result = try? JSONDecoder().decode(ProcessResult.self, from: data)
                 state = .error(result?.error ?? "Save failed (\(statusCode))")
             }
+        } catch let error as URLError where Self.isOffline(error) {
+            queueForLater(rawSms)
         } catch {
             state = .error(error.localizedDescription)
         }
+    }
+
+    // MARK: Offline queue
+    // Same store as the "Log Message" action and the Android receiver:
+    // "pending_sms" (JSON array of texts) in the App Group. The app sends them
+    // when it opens (lib/pending-sms.ts); the API ignores duplicates.
+
+    private func queueForLater(_ sms: String) {
+        let d = UserDefaults(suiteName: appGroupId)
+        var list: [String] = []
+        if let raw = d?.string(forKey: "pending_sms"), let data = raw.data(using: .utf8),
+           let saved = try? JSONSerialization.jsonObject(with: data) as? [String] {
+            list = saved
+        }
+        if !list.contains(sms) { list.append(sms) }
+        if let data = try? JSONSerialization.data(withJSONObject: Array(list.suffix(100))),
+           let raw = String(data: data, encoding: .utf8) {
+            d?.set(raw, forKey: "pending_sms")
+        }
+        state = .queued
+    }
+
+    static func isOffline(_ error: URLError) -> Bool {
+        [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost,
+         .cannotConnectToHost, .dnsLookupFailed, .internationalRoamingOff, .dataNotAllowed]
+            .contains(error.code)
     }
 
     // MARK: Networking with automatic session refresh
@@ -259,6 +290,8 @@ struct ShareView: View {
                         savingView
                     case .saved:
                         savedView
+                    case .queued:
+                        queuedView
                     case .error(let msg):
                         errorView(msg)
                     }
@@ -391,6 +424,25 @@ struct ShareView: View {
                 .foregroundColor(successGreen)
             Text("Logged!")
                 .font(.title2.weight(.semibold))
+        }
+    }
+
+    private var queuedView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tray.and.arrow.down.fill")
+                .font(.system(size: 48))
+                .foregroundColor(brandBlue)
+            Text("Saved for later")
+                .font(.headline)
+            Text("You're offline. LogIt will log this as soon as you're back online and open the app.")
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
+                .padding(.horizontal)
+            Button("Done") {
+                extensionContext.completeRequest(returningItems: nil)
+            }
+            .buttonStyle(PrimaryButtonStyle(color: brandBlue))
         }
     }
 
