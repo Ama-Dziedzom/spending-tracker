@@ -12,7 +12,7 @@ import {
     ReviewPrefill,
     dismissReview,
     getPendingReviews,
-    guessFromSms,
+    prefillFor,
     resolveReview,
 } from '../lib/review-service';
 import { useLiveRefresh } from '../lib/useLiveRefresh';
@@ -100,7 +100,7 @@ export default function ReviewScreen() {
                     </View>
                 ) : (
                     items.map((item) => {
-                        const guess = guessFromSms(item.raw_sms);
+                        const guess = prefillFor(item);
                         return (
                             <View key={item.id} className="bg-[#F8FAFF] border border-[#DAE2FF] rounded-[24px] p-5 mb-4">
                                 <View className="flex-row items-center gap-2 mb-3">

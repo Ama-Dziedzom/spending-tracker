@@ -19,6 +19,7 @@ import { parseSms } from './parse-sms.js';
 import { PROVIDERS, extractSmsDate } from '../lib/sms-helpers.js';
 import { recordAnchor, estimateDateFromId } from '../lib/date-estimate.js';
 import { extractUser, type AuthenticatedRequest } from '../middleware/auth.js';
+import { readUnknownSms, maskSms, shapeOf } from '../lib/fallback-reader.js';
 
 export const processSmsRouter = Router();
 
@@ -38,6 +39,42 @@ interface ParsedTx {
 
 /** An undated message is treated as late when its estimated time is this far before now. */
 const LATE_SHARE_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * "Help LogIt read more banks" (off unless the user turns it on in
+ * Settings): keep a masked template of an alert no pattern could read, so a
+ * new pattern can be written for everyone. Only placeholders are stored —
+ * never amounts, names, numbers or dates. Never blocks or fails logging.
+ */
+async function shareMaskedSample(userId: string, rawSms: string, guess: ReturnType<typeof readUnknownSms>): Promise<void> {
+  try {
+    const { data } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (data.user?.user_metadata?.share_samples !== true) return;
+    const template = maskSms(rawSms);
+    const shape = shapeOf(template);
+    const { data: existing } = await supabaseAdmin
+      .from('pattern_samples')
+      .select('id, seen_count')
+      .eq('user_id', userId)
+      .eq('shape', shape)
+      .limit(1);
+    if (existing && existing.length) {
+      await supabaseAdmin
+        .from('pattern_samples')
+        .update({ seen_count: existing[0].seen_count + 1, last_seen: new Date().toISOString() })
+        .eq('id', existing[0].id);
+    } else {
+      // The guess is kept without its numbers: just which parts were found
+      const found = {
+        amount: guess.amount !== null, balance: guess.balance !== null, direction: guess.direction,
+        counterparty: guess.counterparty !== null, reference: guess.reference !== null, confidence: guess.confidence,
+      };
+      await supabaseAdmin.from('pattern_samples').insert({ user_id: userId, shape, template, provider_guess: guess.provider, guess: found });
+    }
+  } catch (e) {
+    console.warn('pattern sample not saved:', e instanceof Error ? e.message : e);
+  }
+}
 
 async function userFullName(userId: string): Promise<string | null> {
   try {
@@ -363,12 +400,19 @@ processSmsRouter.post(
           .eq('user_id', userId)
           .eq('raw_sms', rawSms)
           .limit(1);
+        // Best guess at what an unfamiliar alert says; pre-fills the Check card
+        const guess = readUnknownSms(rawSms);
         if (!alreadyFailed || alreadyFailed.length === 0) {
-          const { error: failInsertError } = await supabaseAdmin.from('failed_parses').insert({
+          const failRow = {
             user_id: userId,
             raw_sms: rawSms,
             reason: parseResult.reason ?? 'no_pattern_matched',
-          });
+          };
+          let { error: failInsertError } = await supabaseAdmin.from('failed_parses').insert({ ...failRow, guess });
+          // Before the unknown_senders migration runs there's no guess column
+          if (failInsertError && /guess/i.test(failInsertError.message)) {
+            ({ error: failInsertError } = await supabaseAdmin.from('failed_parses').insert(failRow));
+          }
           if (failInsertError) console.error('failed_parses insert failed:', failInsertError.message);
         } else if (alreadyFailed[0].status && alreadyFailed[0].status !== 'pending') {
           // Shared again after being dismissed/resolved: put it back in "Needs review"
@@ -377,6 +421,7 @@ processSmsRouter.post(
             .update({ status: 'pending', resolved_at: null, created_at: new Date().toISOString() })
             .eq('id', alreadyFailed[0].id);
         }
+        await shareMaskedSample(userId, rawSms, guess);
         console.log(`⚠️ Unparsed SMS saved to Needs review for user ${userId} len=${rawSms.length} preview="${previewSms(rawSms)}"`);
 
         if (wantsPlainText(req)) {

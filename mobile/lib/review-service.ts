@@ -11,6 +11,19 @@ export interface ReviewItem {
     raw_sms: string;
     reason: string;
     created_at: string;
+    /** The server's fallback reading of an unfamiliar alert (may be missing) */
+    guess?: ServerGuess | null;
+}
+
+/** Shape written by api/src/lib/fallback-reader.ts */
+export interface ServerGuess {
+    amount: number | null;
+    direction: 'debit' | 'credit' | null;
+    balance: number | null;
+    counterparty: string | null;
+    reference: string | null;
+    provider: string | null;
+    confidence: number;
 }
 
 export interface ReviewPrefill {
@@ -21,17 +34,25 @@ export interface ReviewPrefill {
 }
 
 export async function getPendingReviews(): Promise<ReviewItem[]> {
-    const { data, error } = await supabase
+    let { data, error }: { data: ReviewItem[] | null; error: { message: string } | null } = await supabase
         .from('failed_parses')
-        .select('id, raw_sms, reason, created_at')
+        .select('id, raw_sms, reason, created_at, guess')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
+    // Before the unknown_senders migration there's no guess column
+    if (error && /guess/i.test(error.message)) {
+        ({ data, error } = await supabase
+            .from('failed_parses')
+            .select('id, raw_sms, reason, created_at')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false }));
+    }
     if (error) {
         // Most likely the "needs_review" migration hasn't been run (no status column)
         console.error('Error fetching review items (has the needs_review migration run?):', error.message);
         return [];
     }
-    return data ?? [];
+    return (data ?? []) as ReviewItem[];
 }
 
 export async function getPendingReviewCount(): Promise<number> {
@@ -94,4 +115,31 @@ export function guessFromSms(sms: string): ReviewPrefill {
     if (d && !isNaN(d.getTime()) && d.getTime() <= Date.now() + 86400000) prefill.date = d.toISOString();
 
     return prefill;
+}
+
+/**
+ * Pre-fill for a Check card: the server's reading when it found something,
+ * topped up with the on-device guess (which also reads dates).
+ */
+export function prefillFor(item: ReviewItem): ReviewPrefill {
+    const local = guessFromSms(item.raw_sms);
+    const g = item.guess;
+    if (!g) return local;
+    return {
+        amount: g.amount !== null && g.amount !== undefined ? String(g.amount) : local.amount,
+        type: g.direction === 'credit' ? 'income' : g.direction === 'debit' ? 'expense' : local.type,
+        description: g.counterparty ?? local.description,
+        date: local.date,
+    };
+}
+
+/** "Help LogIt read more banks": share masked message shapes (off by default). */
+export async function getShareSamples(): Promise<boolean> {
+    const { data } = await supabase.auth.getUser();
+    return data.user?.user_metadata?.share_samples === true;
+}
+
+export async function setShareSamples(on: boolean): Promise<boolean> {
+    const { error } = await supabase.auth.updateUser({ data: { share_samples: on } });
+    return !error;
 }

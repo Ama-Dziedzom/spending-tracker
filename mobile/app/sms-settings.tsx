@@ -18,6 +18,7 @@ import { COLORS } from '../constants/theme';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase, getSession } from '../lib/supabase';
 import { syncSessionToAppGroup } from '../lib/shareSync';
+import { getShareSamples, setShareSamples } from '../lib/review-service';
 
 function formatAgo(iso: string): string {
     const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -45,6 +46,7 @@ export default function SmsSettings() {
     const [hasPermission, setHasPermission] = useState(false);
     const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null);
     const [lastSmsAt, setLastSmsAt] = useState<string | null>(null);
+    const [shareSamples, setShareSamplesState] = useState(false);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -55,6 +57,7 @@ export default function SmsSettings() {
             const session = await getSession();
             setIsSignedIn(!!session);
             if (session) {
+                getShareSamples().then(setShareSamplesState);
                 const { data } = await supabase
                     .from('transactions')
                     .select('created_at')
@@ -277,14 +280,43 @@ export default function SmsSettings() {
                     </View>
                 </Animated.View>
                 
+                {/* Help LogIt read more banks (opt-in) */}
+                <Animated.View {...{ entering: FadeInDown.delay(150).duration(600) } as any} className="mb-6">
+                    <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm shadow-slate-200/50">
+                        <View className="flex-row items-center justify-between">
+                            <View className="flex-1 pr-4">
+                                <Text className="text-slate-900 font-manrope-bold text-[16px]">Help LogIt read more banks</Text>
+                                <Text className="text-slate-500 font-manrope text-[13px] leading-5 mt-1.5">
+                                    When a message can’t be read, share its wording with every amount, name and number removed, so LogIt can learn your bank.
+                                </Text>
+                            </View>
+                            <Switch
+                                value={shareSamples}
+                                onValueChange={async (on) => {
+                                    setShareSamplesState(on);
+                                    Haptics.selectionAsync();
+                                    const ok = await setShareSamples(on);
+                                    if (!ok) {
+                                        setShareSamplesState(!on);
+                                        Alert.alert('Couldn’t save that', 'Check your connection and try again.');
+                                    }
+                                }}
+                                disabled={!isSignedIn}
+                                trackColor={{ false: '#E2E8F0', true: COLORS.primary }}
+                                thumbColor="#FFFFFF"
+                            />
+                        </View>
+                    </View>
+                </Animated.View>
+
                 {/* Security Card */}
                 <Animated.View {...{ entering: FadeInDown.delay(200).duration(600) } as any}>
                     <View className="bg-indigo-50/50 rounded-[32px] p-6 border border-indigo-50 flex-row items-start">
                         <HugeiconsIcon icon={InformationCircleIcon} size={22} color={COLORS.primary} className="mt-0.5" />
                         <View className="ml-4 flex-1">
-                            <Text className="text-slate-900 font-manrope-bold text-[16px]">Privacy & Bank-Grade Security</Text>
+                            <Text className="text-slate-900 font-manrope-bold text-[16px]">Your messages stay yours</Text>
                             <Text className="text-slate-500 font-manrope text-[13px] leading-5 mt-1.5">
-                                LogIt only listens to and processes local SMS messages that match certified bank and Mobile Money format keys. None of your private chats or personal messages are ever read or transmitted.
+                                LogIt only reads bank and Mobile Money alerts, and chats that mention money are ignored. Each alert is sent securely to your own account to be read, and only you can see your transactions.
                             </Text>
                         </View>
                     </View>
