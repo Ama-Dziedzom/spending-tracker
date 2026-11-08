@@ -155,6 +155,19 @@ export default function WalletDetailsPage() {
                             <Text className="text-white/60 text-[12px] font-manrope-semibold uppercase tracking-wider">Outflow This Month</Text>
                         </View>
                     </View>
+
+                    {/* Spending but no money in: often the bank just doesn't text credit alerts */}
+                    {wallet.type === 'bank' && !walletAnalytics?.totalInflow && (walletAnalytics?.totalSpent ?? 0) > 0 && (
+                        <Pressable
+                            onPress={() => router.push('/expected-income')}
+                            className="mt-5 px-4 py-2.5 rounded-full bg-white/15"
+                            accessibilityRole="button"
+                        >
+                            <Text className="text-white text-[13px] font-manrope-semibold text-center">
+                                No money in? Some banks don’t text credit alerts. Add your salary ›
+                            </Text>
+                        </Pressable>
+                    )}
                 </View>
             </LinearGradient>
 

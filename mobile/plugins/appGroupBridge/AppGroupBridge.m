@@ -1,4 +1,5 @@
 #import <React/RCTBridgeModule.h>
+#import <UserNotifications/UserNotifications.h>
 
 // Exposes AppGroupBridge.swift to the JS side via NativeModules.AppGroupBridge
 @interface RCT_EXTERN_MODULE(AppGroupBridge, NSObject)
@@ -26,6 +27,18 @@ RCT_EXPORT_METHOD(getItem:(NSString *)key
 {
   NSUserDefaults *defaults = [[NSUserDefaults alloc] initWithSuiteName:@"group.com.ama.spendingtracker"];
   resolve([defaults stringForKey:key]);
+}
+
+// Asks once for permission to show notifications, so the "Log Message" action
+// can post LogIt's own "Spent GHS …" notification. Resolves YES/NO.
+RCT_EXPORT_METHOD(requestNotifications:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+{
+  [[UNUserNotificationCenter currentNotificationCenter]
+      requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionBadge)
+                    completionHandler:^(BOOL granted, NSError * _Nullable error) {
+    resolve(@(granted));
+  }];
 }
 
 @end

@@ -29,6 +29,8 @@ interface Props {
         description?: string;
         date?: string; // ISO; defaults to now
         rawSms?: string;
+        walletId?: string;
+        categoryId?: string;
     };
 }
 
@@ -69,6 +71,7 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess, prefi
                 if (prefill.amount) setAmount(prefill.amount);
                 if (prefill.type) setTransactionType(prefill.type);
                 if (prefill.description) setDescription(prefill.description);
+                if (prefill.categoryId) setSelectedCategory(CATEGORIES.find((c) => c.id === prefill.categoryId) ?? null);
             }
             loadWallets();
             // Auto-focus amount after a short delay
@@ -87,8 +90,11 @@ export function AddTransactionBottomSheet({ isVisible, onClose, onSuccess, prefi
         try {
             const data = await getWallets();
             setWallets(data);
-            // Auto-select first wallet if available
-            if (data.length > 0 && !selectedWallet) {
+            // Pre-selected wallet (e.g. salary account), else the first one
+            const preset = prefill?.walletId ? data.find((w) => w.id === prefill.walletId) : undefined;
+            if (preset) {
+                setSelectedWallet(preset);
+            } else if (data.length > 0 && !selectedWallet) {
                 setSelectedWallet(data[0]);
             }
         } catch (error) {

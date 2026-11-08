@@ -15,6 +15,7 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.concurrent.thread
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -56,6 +57,9 @@ class SmsReceiver : BroadcastReceiver() {
                     return@thread
                 }
 
+                // ── Step 0: Send anything saved while offline ───────────────
+                flushPending(context, apiUrl, authToken, defaultAccountId)
+
                 // ── Step 1: POST to backend ──────────────────────────────────
                 var logResult = postTransaction(apiUrl, authToken, rawSms, defaultAccountId)
 
@@ -77,6 +81,11 @@ class SmsReceiver : BroadcastReceiver() {
                 } else {
                     showNotification(context, "❌ Logging Failed", "Server returned status ${logResult.statusCode}")
                 }
+            } catch (e: java.io.IOException) {
+                // No connection (or it dropped mid-request): keep the message and
+                // send it next time. The API ignores duplicates, so retrying is safe.
+                enqueuePending(context, rawSms)
+                showNotification(context, "Saved offline", "LogIt will log this when you're back online.")
             } catch (e: Exception) {
                 showNotification(context, "❌ Error Auto-Logging Transaction", e.localizedMessage ?: "Unknown error")
             } finally {
@@ -150,6 +159,8 @@ class SmsReceiver : BroadcastReceiver() {
         conn.requestMethod = "POST"
         conn.setRequestProperty("Content-Type", "application/json")
         conn.setRequestProperty("Authorization", "Bearer $token")
+        conn.connectTimeout = 15000
+        conn.readTimeout = 25000
         conn.doOutput = true
 
         val jsonBody = JSONObject().apply {
@@ -171,6 +182,54 @@ class SmsReceiver : BroadcastReceiver() {
         }
 
         return RequestResult(statusCode, responseBody)
+    }
+
+    // ── Offline queue ────────────────────────────────────────────────────────
+    // Messages that couldn't be sent are kept in "pending_sms" (a JSON array of
+    // strings, same key and format as the iOS App Group). They are sent before
+    // the next message here, and by the app when it opens (lib/pending-sms.ts).
+
+    private val PENDING_KEY = "pending_sms"
+    private val PENDING_MAX = 100
+
+    @Synchronized
+    private fun readPending(context: Context): MutableList<String> {
+        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(PENDING_KEY, null) ?: return mutableListOf()
+        return try {
+            val arr = JSONArray(raw)
+            MutableList(arr.length()) { arr.getString(it) }
+        } catch (e: Exception) {
+            mutableListOf()
+        }
+    }
+
+    @Synchronized
+    private fun writePending(context: Context, list: List<String>) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+        if (list.isEmpty()) prefs.remove(PENDING_KEY) else prefs.putString(PENDING_KEY, JSONArray(list).toString())
+        prefs.apply()
+    }
+
+    private fun enqueuePending(context: Context, sms: String) {
+        val list = readPending(context)
+        if (!list.contains(sms)) list.add(sms)
+        writePending(context, list.takeLast(PENDING_MAX))
+    }
+
+    private fun flushPending(context: Context, apiUrl: String, token: String, accountId: String) {
+        val list = readPending(context)
+        if (list.isEmpty()) return
+        val remaining = list.toMutableList()
+        for (sms in list) {
+            try {
+                val result = postTransaction(apiUrl, token, sms, accountId)
+                if (result.statusCode == 401) break          // signed out: keep the rest
+                if (result.statusCode in 200..299 || result.statusCode == 400) remaining.remove(sms)
+            } catch (e: java.io.IOException) {
+                break                                         // still offline
+            }
+        }
+        writePending(context, remaining)
     }
 
     private fun refreshSupabaseToken(context: Context, supabaseUrl: String, anonKey: String, refreshToken: String): Boolean {

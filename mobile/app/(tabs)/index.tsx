@@ -19,6 +19,7 @@ import {
     ViewIcon,
     ViewOffSlashIcon,
     InboxIcon,
+    MoneyReceive01Icon,
 } from '@hugeicons/core-free-icons';
 import { getWallets } from '../../lib/wallet-service';
 import { getRecentTransactions, TransactionWithWallet, formatCurrency, formatTransactionDate, formatTransactionTime, processTransfer, getCategoryByIdOrName, getGlobalAnalytics } from '../../lib/transaction-service';
@@ -35,6 +36,8 @@ import { useTabContext } from './_layout';
 
 import { COLORS } from '../../constants/theme';
 import { useLiveRefresh } from '../../lib/useLiveRefresh';
+import { AddTransactionBottomSheet } from '../../components/add-transaction-bottom-sheet';
+import { IncomePrompt, getIncomePrompts, logExpectedIncome, markIncomeReceived, ordinal, snoozeIncome } from '../../lib/income-service';
 
 // Get greeting based on time of day
 function getGreeting(): string {
@@ -56,6 +59,10 @@ export default function Dashboard() {
     const [spentThisMonth, setSpentThisMonth] = useState(0);
     const [unmatchedCount, setUnmatchedCount] = useState(0);
     const [reviewCount, setReviewCount] = useState(0);
+    // "Did your salary come in?" (banks that don't text credit alerts)
+    const [incomePrompt, setIncomePrompt] = useState<IncomePrompt | null>(null);
+    const [incomeSheetFor, setIncomeSheetFor] = useState<IncomePrompt | null>(null);
+    const [incomeBusy, setIncomeBusy] = useState(false);
     const [isBalanceVisible, setIsBalanceVisible] = useState(true);
     const [isLinkSheetVisible, setIsLinkSheetVisible] = useState(false);
     const [userName, setUserName] = useState<string>('there');
@@ -85,13 +92,15 @@ export default function Dashboard() {
                 setUserName(user.email.split('@')[0]);
             }
 
-            const [walletsData, monthAnalytics, transactionsData, pendingReviews] = await Promise.all([
+            const [walletsData, monthAnalytics, transactionsData, pendingReviews, incomePrompts] = await Promise.all([
                 getWallets(),
                 getGlobalAnalytics('month'),
                 getRecentTransactions(5),
                 getPendingReviewCount(),
+                getIncomePrompts(),
             ]);
             setReviewCount(pendingReviews);
+            setIncomePrompt(incomePrompts[0] ?? null);
 
             // Get count of unmatched transactions
             const { count, error: unmatchedError } = await supabase
@@ -414,6 +423,58 @@ export default function Dashboard() {
                                 </Pressable>
                             )}
 
+                            {/* Expected income — "Did your salary come in?" */}
+                            {!isLoading && incomePrompt && (
+                                <View className="bg-[#F0FDF4] border-[1px] border-[#BBF7D0] rounded-[24px] p-5 mb-8">
+                                    <View className="flex-row items-center gap-4">
+                                        <View className="w-12 h-12 rounded-full bg-[#10B981]/15 items-center justify-center">
+                                            <HugeiconsIcon icon={MoneyReceive01Icon} size={24} color="#047857" />
+                                        </View>
+                                        <View className="flex-1">
+                                            <Text className="text-[16px] font-manrope-bold text-slate-900">
+                                                Did your {incomePrompt.item.label.toLowerCase()} come in?
+                                            </Text>
+                                            <Text className="text-[14px] font-manrope text-slate-500">
+                                                About {formatCurrency(incomePrompt.item.amount)}
+                                                {wallets.find((w) => w.id === incomePrompt.item.wallet_id)?.name ? ` into ${wallets.find((w) => w.id === incomePrompt.item.wallet_id)?.name}` : ''}, usually on the {ordinal(incomePrompt.item.day_of_month)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <View className="flex-row gap-2 mt-4">
+                                        <Pressable
+                                            disabled={incomeBusy}
+                                            onPress={async () => {
+                                                setIncomeBusy(true);
+                                                await logExpectedIncome(incomePrompt);
+                                                setIncomeBusy(false);
+                                                fetchData();
+                                            }}
+                                            className="flex-1 h-11 rounded-full items-center justify-center bg-[#047857]"
+                                            accessibilityRole="button"
+                                        >
+                                            <Text className="text-white font-manrope-bold text-[14px]">Yes</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={() => setIncomeSheetFor(incomePrompt)}
+                                            className="flex-1 h-11 rounded-full items-center justify-center bg-white border border-[#BBF7D0]"
+                                            accessibilityRole="button"
+                                        >
+                                            <Text className="text-[#047857] font-manrope-bold text-[14px]">Different amount</Text>
+                                        </Pressable>
+                                        <Pressable
+                                            onPress={async () => {
+                                                await snoozeIncome(incomePrompt.item.id);
+                                                fetchData();
+                                            }}
+                                            className="h-11 px-4 rounded-full items-center justify-center"
+                                            accessibilityRole="button"
+                                        >
+                                            <Text className="text-slate-500 font-manrope-semibold text-[14px]">Not yet</Text>
+                                        </Pressable>
+                                    </View>
+                                </View>
+                            )}
+
                             {/* Needs Review Banner — SMS LogIt couldn't read */}
                             {!isLoading && reviewCount > 0 && (
                                 <Pressable
@@ -579,6 +640,24 @@ export default function Dashboard() {
                     fetchData();
                 }}
                 isLoading={isSavingWallet}
+            />
+
+            <AddTransactionBottomSheet
+                isVisible={!!incomeSheetFor}
+                onClose={() => setIncomeSheetFor(null)}
+                onSuccess={async () => {
+                    if (incomeSheetFor) await markIncomeReceived(incomeSheetFor.item.id);
+                    setIncomeSheetFor(null);
+                    fetchData();
+                }}
+                prefill={incomeSheetFor ? {
+                    type: 'income',
+                    amount: String(incomeSheetFor.item.amount),
+                    description: incomeSheetFor.item.label,
+                    date: incomeSheetFor.dueDate.toISOString(),
+                    walletId: incomeSheetFor.item.wallet_id ?? undefined,
+                    categoryId: 'income',
+                } : undefined}
             />
 
             <TransactionDetailBottomSheet

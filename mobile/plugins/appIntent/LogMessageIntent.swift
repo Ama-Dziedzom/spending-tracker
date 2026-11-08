@@ -16,6 +16,7 @@
 
 import AppIntents
 import Foundation
+import UserNotifications
 
 // MARK: - Intent
 
@@ -44,6 +45,10 @@ struct LogMessageIntent: AppIntent {
         guard client.isSignedIn else { throw LogItIntentError.notSignedIn }
 
         var tally = Tally()
+
+        // Messages saved while offline go first (oldest first).
+        tally.sentFromQueue = await client.flushPending()
+
         for raw in messages {
             let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
@@ -53,6 +58,9 @@ struct LogMessageIntent: AppIntent {
         }
 
         let summary = tally.summary
+        // LogIt's own notification (with the app's name and icon). Turn off
+        // "Show When Run" on the action to see only this one.
+        if tally.worthNotifying { await LogItNotifier.post(summary) }
         return .result(value: summary, dialog: "\(summary)")
     }
 }
@@ -89,6 +97,57 @@ struct LogItAppShortcuts: AppShortcutsProvider {
     }
 }
 
+// MARK: - Offline queue
+//
+// "pending_sms" in the App Group: a JSON array of message texts. The Android
+// receiver uses the same key and format, and the app sends them when it opens
+// (lib/pending-sms.ts). Retrying is safe: the API ignores duplicates.
+
+enum PendingQueue {
+    static let key = "pending_sms"
+    static let max = 100
+
+    static func all(defaults: UserDefaults?) -> [String] {
+        guard let raw = defaults?.string(forKey: key), let data = raw.data(using: .utf8),
+              let list = try? JSONSerialization.jsonObject(with: data) as? [String] else { return [] }
+        return list
+    }
+
+    static func save(_ list: [String], defaults: UserDefaults?) {
+        if list.isEmpty { defaults?.removeObject(forKey: key); return }
+        if let data = try? JSONSerialization.data(withJSONObject: Array(list.suffix(max))),
+           let raw = String(data: data, encoding: .utf8) {
+            defaults?.set(raw, forKey: key)
+        }
+    }
+
+    static func add(_ sms: String, defaults: UserDefaults?) {
+        var list = all(defaults: defaults)
+        if !list.contains(sms) { list.append(sms) }
+        save(list, defaults: defaults)
+    }
+}
+
+// MARK: - Notifications
+
+enum LogItNotifier {
+    /// Shows the result as a LogIt notification, if the user allowed them.
+    static func post(_ text: String) async {
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+
+        let lines = text.split(separator: "\n", maxSplits: 1).map(String.init)
+        let content = UNMutableNotificationContent()
+        content.title = lines.first ?? "LogIt"
+        if lines.count > 1 { content.body = lines[1] }
+        content.sound = nil
+        content.threadIdentifier = "logit.logged"
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        try? await center.add(request)
+    }
+}
+
 // MARK: - Outcomes
 
 enum LogOutcome {
@@ -97,6 +156,7 @@ enum LogOutcome {
     case needsReview
     case ignored
     case failed(String)
+    case queued               // no connection: saved, sent later
     case notSignedIn
 }
 
@@ -106,6 +166,11 @@ struct Tally {
     var review = 0
     var ignored = 0
     var failures: [String] = []
+    var queued = 0
+    var sentFromQueue = 0
+
+    /** Chat messages and duplicates on their own aren't worth a notification. */
+    var worthNotifying: Bool { !logged.isEmpty || review > 0 || queued > 0 || !failures.isEmpty || sentFromQueue > 0 }
 
     mutating func add(_ outcome: LogOutcome) {
         switch outcome {
@@ -114,28 +179,36 @@ struct Tally {
         case .needsReview: review += 1
         case .ignored: ignored += 1
         case .failed(let why): failures.append(why)
+        case .queued: queued += 1
         case .notSignedIn: break
         }
     }
 
     var summary: String {
         // One message: say exactly what happened to it.
-        let total = logged.count + duplicates + review + ignored + failures.count
+        let earlier = sentFromQueue > 0 ? "\n+ \(sentFromQueue) saved offline earlier, now logged" : ""
+        let total = logged.count + duplicates + review + ignored + failures.count + queued
         if total == 1 {
-            if let line = logged.first { return "✅ \(line)" }
-            if duplicates == 1 { return "ℹ️ Already in LogIt" }
-            if review == 1 { return "⚠️ Couldn't read this one. It's in Needs review in LogIt." }
-            if ignored == 1 { return "Not a bank or MoMo alert, so LogIt left it." }
-            return "⛔ Couldn't reach LogIt. \(failures.first ?? "")"
+            if queued == 1 { return "📥 No connection. Saved, and LogIt will log it when you're back online." }
+            return single + earlier
         }
-
         var parts: [String] = []
         if !logged.isEmpty { parts.append("✅ Logged \(logged.count)") }
         if duplicates > 0 { parts.append("\(duplicates) already in LogIt") }
         if review > 0 { parts.append("\(review) in Needs review") }
         if ignored > 0 { parts.append("\(ignored) not transactions") }
+        if queued > 0 { parts.append("📥 \(queued) saved until you're online") }
         if !failures.isEmpty { parts.append("⛔ \(failures.count) failed") }
-        return parts.isEmpty ? "Nothing to log" : parts.joined(separator: " · ")
+        if parts.isEmpty { return sentFromQueue > 0 ? "✅ \(sentFromQueue) saved offline earlier, now logged" : "Nothing to log" }
+        return parts.joined(separator: " · ") + earlier
+    }
+
+    private var single: String {
+        if let line = logged.first { return "✅ \(line)" }
+        if duplicates == 1 { return "ℹ️ Already in LogIt" }
+        if review == 1 { return "⚠️ Couldn't read this one. It's in Needs review in LogIt." }
+        if ignored == 1 { return "Not a bank or MoMo alert, so LogIt left it." }
+        return "⛔ Couldn't reach LogIt. \(failures.first ?? "")"
     }
 }
 
@@ -175,9 +248,47 @@ struct LogItClient {
                 if status == 401 { return .notSignedIn }
             }
             return LogItClient.outcome(data: data, status: status)
+        } catch let error as URLError where LogItClient.isOffline(error) {
+            PendingQueue.add(sms, defaults: defaults)
+            return .queued
         } catch {
             return .failed(error.localizedDescription)
         }
+    }
+
+    /// Sends messages saved while offline. Returns how many were logged (or
+    /// already in LogIt); stops at the first sign the network is still down.
+    func flushPending() async -> Int {
+        let pending = PendingQueue.all(defaults: defaults)
+        guard !pending.isEmpty else { return 0 }
+        var client = self
+        var sent = 0
+        var remaining = pending
+        for sms in pending {
+            do {
+                var (_, status) = try await client.post(sms)
+                if status == 401 {
+                    guard await client.refreshSession() else { break }
+                    (_, status) = try await client.post(sms)
+                }
+                if (200..<300).contains(status) || status == 400 {
+                    remaining.removeAll { $0 == sms }
+                    if (200..<300).contains(status) { sent += 1 }
+                } else {
+                    break
+                }
+            } catch {
+                break
+            }
+        }
+        PendingQueue.save(remaining, defaults: defaults)
+        return sent
+    }
+
+    static func isOffline(_ error: URLError) -> Bool {
+        [.notConnectedToInternet, .networkConnectionLost, .timedOut, .cannotFindHost,
+         .cannotConnectToHost, .dnsLookupFailed, .internationalRoamingOff, .dataNotAllowed]
+            .contains(error.code)
     }
 
     private func post(_ sms: String) async throws -> (Data, Int) {

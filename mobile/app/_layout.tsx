@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,6 +15,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { syncSessionToAppGroup } from '@/lib/shareSync';
+import { flushPendingSms, requestLogNotifications } from '@/lib/pending-sms';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -49,6 +50,20 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Send messages saved while offline, at launch and whenever LogIt comes back
+  // to the foreground. Also ask (once) to show LogIt's own notifications.
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      flushPendingSms();
+      requestLogNotifications();
+    });
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') flushPendingSms();
+    });
+    return () => sub.remove();
+  }, []);
+
   if (!loaded && !error) {
     return null;
   }
@@ -74,6 +89,7 @@ export default function RootLayout() {
             <Stack.Screen name="wallet-details" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="review" options={{ headerShown: false }} />
+            <Stack.Screen name="expected-income" options={{ headerShown: false }} />
           </Stack>
           <StatusBar style="dark" />
         </ThemeProvider>

@@ -34,7 +34,7 @@ const IOS_AUTOPILOT_STEPS: string[][] = [
     ['Open ', 'Shortcuts', ', go to ', 'Automation', ' and tap ', '+', '.'],
     ['Choose ', 'Message', '. Under Message Contains, type ', 'GHS', '. Leave Sender empty.'],
     ['Choose ', 'Run Immediately', ' if you see it, then tap ', 'Next', '.'],
-    ['Add the action ', 'Log Message', ' from LogIt. Set Messages to ', 'Shortcut Input', '.'],
+    ['Add the action ', 'Log Message', ' from LogIt. Set Messages to ', 'Shortcut Input', ' and turn off ', 'Show When Run', '. LogIt sends its own notification.'],
     ['Tap ', 'Done', '. From now on, MoMo and bank alerts log themselves as they arrive.', ''],
 ];
 

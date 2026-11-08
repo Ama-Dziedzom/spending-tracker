@@ -23,6 +23,7 @@ import {
     Clock01Icon,
     Tick01Icon,
     InboxIcon,
+    MoneyReceive01Icon,
 } from '@hugeicons/core-free-icons';
 import * as Haptics from 'expo-haptics';
 import { clsx, type ClassValue } from 'clsx';
@@ -276,6 +277,15 @@ export default function Settings() {
                             onPress={() => {
                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                 router.push('/sms-settings');
+                            }}
+                        />
+                        <SettingsItem
+                            icon={MoneyReceive01Icon}
+                            label="Expected income"
+                            value="Salary & more"
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                router.push('/expected-income');
                             }}
                         />
                         <SettingsItem
