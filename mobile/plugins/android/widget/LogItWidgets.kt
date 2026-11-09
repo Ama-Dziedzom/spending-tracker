@@ -68,9 +68,11 @@ object LogItWidgets {
         } ?: emptyList()
 
         /** Older than an hour: say how old instead of pretending. */
+        val updatedMillis: Long? get() = parse(updatedAt)
+
         val staleLabel: String?
             get() {
-                val t = parse(updatedAt) ?: return null
+                val t = updatedMillis ?: return null
                 val mins = ((System.currentTimeMillis() - t) / 60_000).toInt()
                 return when {
                     mins < 60 -> null
@@ -104,6 +106,105 @@ object LogItWidgets {
             )
         }
     }
+
+    // ─── Background updates ──────────────────────────────────────────────────
+    // When SmsReceiver logs an alert with the app closed, add it to the
+    // snapshot so the widgets are current right away. Same rules as the app
+    // (flowOf in lib/spending-service.ts) and the iPhone Shortcut.
+
+    private val TONES = setOf("food", "transport", "shopping", "bills", "airtime", "subscription", "cash", "loans", "fees")
+
+    private fun edit(ctx: Context, change: (JSONObject) -> Unit) {
+        val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val snap = prefs.getString(KEY, null)?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return
+        if (!snap.optBoolean("signedIn")) return
+        roll(snap)
+        change(snap)
+        snap.put("updatedAt", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(java.util.Date()))
+        prefs.edit().putString(KEY, snap.toString()).commit()
+        updateAll(ctx)
+    }
+
+    /** A snapshot from an earlier day or week starts today (and the week) from zero. */
+    private fun roll(s: JSONObject) {
+        val now = java.util.Calendar.getInstance().apply { firstDayOfWeek = java.util.Calendar.MONDAY }
+        val then = java.util.Calendar.getInstance().apply {
+            firstDayOfWeek = java.util.Calendar.MONDAY
+            timeInMillis = Snap(s).updatedMillis ?: 0L
+        }
+        val sameDay = now.get(java.util.Calendar.YEAR) == then.get(java.util.Calendar.YEAR) &&
+            now.get(java.util.Calendar.DAY_OF_YEAR) == then.get(java.util.Calendar.DAY_OF_YEAR)
+        val today = (now.get(java.util.Calendar.DAY_OF_WEEK) + 5) % 7
+        val weekStart = (now.clone() as java.util.Calendar).apply {
+            add(java.util.Calendar.DAY_OF_YEAR, -today)
+            set(java.util.Calendar.HOUR_OF_DAY, 0); set(java.util.Calendar.MINUTE, 0); set(java.util.Calendar.SECOND, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }
+        if (!sameDay) { s.put("todaySpent", 0.0); s.put("todayPayments", 0) }
+        var days = s.optJSONArray("days")
+        if (then.before(weekStart) || days == null || days.length() != 7) {
+            s.put("weekSpent", 0.0)
+            s.put("weekChange", JSONObject.NULL)
+            days = org.json.JSONArray()
+            "MTWTFSS".forEach { days.put(JSONObject().put("letter", it.toString()).put("value", 0.0)) }
+        }
+        for (i in 0 until 7) days.getJSONObject(i).put("isToday", i == today).put("future", i > today)
+        s.put("days", days)
+        s.put("dateLabel", SimpleDateFormat("EEE d MMM", Locale.UK).format(now.time))
+    }
+
+    /** Same as merchantName in lib/money-window.ts. */
+    private fun name(description: String): String {
+        val first = description.split(",").first().trim()
+        if (first != first.uppercase()) return first
+        return first.split(Regex("\\s+")).joinToString(" ") { w ->
+            if (w.length <= 3 && w.all { it.isUpperCase() }) w else w.take(1) + w.drop(1).lowercase()
+        }
+    }
+
+    /** A logged alert (the /process-sms response). */
+    fun addLogged(ctx: Context, responseBody: String) {
+        val json = runCatching { JSONObject(responseBody) }.getOrNull() ?: return
+        if (json.optBoolean("duplicate") || json.optBoolean("ignored")) return
+        val tx = json.optJSONObject("data") ?: return
+        val amount = tx.optDouble("amount", 0.0)
+        val type = tx.optString("type")
+        val category = tx.optString("category").takeIf { it != "null" } ?: ""
+        val side = tx.optString("transfer_side")
+        val transfer = tx.optBoolean("is_transfer")
+        val spent = if (transfer) side == "from" && category.isNotEmpty() && category != "transfer" else type == "expense" || type == "debit"
+        val incoming = if (transfer) side == "to" && category.isNotEmpty() && category != "transfer" && category != "income" else type == "income" || type == "credit"
+        if (!spent && !incoming) return  // moved between your own wallets
+        edit(ctx) { s ->
+            if (spent) {
+                s.put("todaySpent", s.optDouble("todaySpent", 0.0) + amount)
+                s.put("todayPayments", s.optInt("todayPayments") + 1)
+                s.put("weekSpent", s.optDouble("weekSpent", 0.0) + amount)
+                if (!s.isNull("weekChange") && s.has("weekChange")) s.put("weekChange", s.optDouble("weekChange") + amount)
+                val days = s.getJSONArray("days")
+                for (i in 0 until days.length()) {
+                    val d = days.getJSONObject(i)
+                    if (d.optBoolean("isToday")) d.put("value", d.optDouble("value", 0.0) + amount)
+                }
+            }
+            val time = SimpleDateFormat("H:mm", Locale.UK).format(java.util.Date())
+            val wallet = json.optString("walletName").takeIf { it.isNotBlank() && it != "null" }
+            val entry = JSONObject()
+                .put("name", name(tx.optString("description")))
+                .put("meta", listOfNotNull(wallet, time).joinToString(" · "))
+                .put("amount", amount)
+                .put("incoming", incoming)
+                .put("symbol", "")
+                .put("tone", if (incoming) "success" else if (category == "transfer") "people" else if (category in TONES) category else "muted")
+                .put("time", time)
+            val old = s.optJSONArray("latest") ?: org.json.JSONArray()
+            val latest = org.json.JSONArray().put(entry)
+            for (i in 0 until minOf(2, old.length())) latest.put(old.get(i))
+            s.put("latest", latest)
+        }
+    }
+
+    /** An alert LogIt couldn't read went to Check. */
+    fun addToCheck(ctx: Context) = edit(ctx) { s -> s.put("toCheck", s.optInt("toCheck") + 1) }
 
     // ─── Formatting ──────────────────────────────────────────────────────────
 

@@ -78,8 +78,10 @@ class SmsReceiver : BroadcastReceiver() {
                 // ── Step 3: Handle Final Result ──────────────────────────────
                 if (logResult.statusCode in 200..299) {
                     describeLogged(logResult.responseBody)?.let { showNotification(context, it.first, it.second) }
+                    runCatching { LogItWidgets.addLogged(context, logResult.responseBody) }
                 } else if (logResult.statusCode == 400) {
                     // Couldn't read it: the API saved it to "Needs review" in the app. Stay quiet.
+                    runCatching { LogItWidgets.addToCheck(context) }
                 } else {
                     showNotification(context, "❌ Logging Failed", "Server returned status ${logResult.statusCode}")
                 }
