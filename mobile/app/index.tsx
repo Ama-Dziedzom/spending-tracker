@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Image, View, useColorScheme } from 'react-native';
+import { View, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../lib/supabase';
@@ -9,8 +9,8 @@ import { lastPhone } from '@/lib/session';
 
 /**
  * Start: decides where to go (update needed, Face ID, logged in or not)
- * while the native splash is still showing; _layout hides the splash once
- * we've moved on. No minimum wait and no second loading screen.
+ * while the launch splash plays; the splash fades out once we've moved on.
+ * No minimum wait and no second loading screen.
  */
 export default function SplashScreen() {
     const router = useRouter();
@@ -57,17 +57,8 @@ export default function SplashScreen() {
     return <LaunchView />;
 }
 
-/**
- * Only seen if the start check outlasts _layout's 4s safety net: the same
- * wordmark on the same colours as the native splash (app.json), so it reads
- * as the splash still showing.
- */
+/** Behind LaunchSplash (components/system/launch-splash.tsx): just the splash colour. */
 function LaunchView() {
     const dark = useColorScheme() === 'dark';
-    return (
-        <View style={{ flex: 1, backgroundColor: dark ? '#081750' : '#1642E5', alignItems: 'center', justifyContent: 'center' }} accessible accessibilityLabel="LogIt, loading">
-            <StatusBar style="light" />
-            <Image source={require('../assets/logit-app-icon/splash-icon.png')} style={{ width: 200, height: 200 }} resizeMode="contain" />
-        </View>
-    );
+    return <View style={{ flex: 1, backgroundColor: dark ? '#081750' : '#1642E5' }} />;
 }

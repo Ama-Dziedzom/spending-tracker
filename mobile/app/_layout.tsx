@@ -22,6 +22,7 @@ import { syncSessionToAppGroup } from '@/lib/shareSync';
 import { flushPendingSms } from '@/lib/pending-sms';
 import { lastPhone, wasIntentionalSignOut } from '@/lib/session';
 import { ErrorScreen } from '@/components/system/error-screen';
+import { LaunchSplash } from '@/components/system/launch-splash';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -35,17 +36,15 @@ export default function RootLayout() {
     'Manrope-ExtraBold': Manrope_800ExtraBold,
   });
 
-  // The native splash (W2 wordmark) stays up until people land somewhere
-  // real: app/index.tsx works out where to go behind it, so there's no second
-  // loading screen. Deep links open their screen directly and hide it as
-  // soon as fonts are in.
+  // Launch: the native splash ("logıt", no dot) hands over to LaunchSplash,
+  // drawn in the same place, which drops the dot in while app/index.tsx works
+  // out where to go, then fades into that screen (Figma "Splash · motion").
+  // Deep links open their screen directly; the overlay still plays once.
   const pathname = usePathname();
+  const [splashDone, setSplashDone] = useState(false);
   useEffect(() => {
     if (error) console.warn('[fonts] Manrope failed to load', error);
   }, [error]);
-  useEffect(() => {
-    if ((loaded || error) && pathname !== '/') SplashScreen.hideAsync();
-  }, [loaded, error, pathname]);
 
   // Manrope is built into the app (expo-font plugin in app.json), so this load
   // is near-instant. Safety net: never leave people on the native splash;
@@ -114,6 +113,13 @@ export default function RootLayout() {
           </ToastProvider>
         </LogItThemeProvider>
       </SafeAreaProvider>
+      {!splashDone && (
+        <LaunchSplash
+          ready={pathname !== '/'}
+          onShown={() => SplashScreen.hideAsync().catch(() => {})}
+          onDone={() => setSplashDone(true)}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }
