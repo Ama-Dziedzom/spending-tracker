@@ -2,23 +2,43 @@ import React from 'react';
 import { CategoryTile, ListRow } from '@/components/ui';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
 import { categoryStyle } from '@/lib/category-style';
-import { flowOf } from '@/lib/spending-service';
-import { initials, listAmount, receivedAmount, time24 } from '@/lib/format';
+import { flowOf, startOfWeek } from '@/lib/spending-service';
+import { dayHeading, initials, listAmount, receivedAmount, shortDate, time24 } from '@/lib/format';
 
 /**
- * One transaction in a v1 list (Figma 1004:617): tile, name, "Sent · MTN MoMo · 13:02",
- * amount without currency; received money green with a plus; moved money neutral.
+ * Where a row sits changes its meta line:
+ * - 'day'    (default) under a day header: "Sent · MTN MoMo · 13:02", moved rows "Moved · not spending".
+ * - 'search' no day header, so the date leads: "12 Nov · Card · 11:20" (Figma 1004:853).
+ * - 'moved'  the Moved filter, which explains itself once at the top: "MTN MoMo → Cash · Mon" (Figma 1004:755).
  */
-export function TransactionRow({ tx, onPress }: { tx: TransactionWithWallet; onPress?: () => void }) {
+export type RowContext = 'day' | 'search' | 'moved';
+
+/**
+ * One transaction in a v1 list (Figma 1004:617): tile, name, meta, amount
+ * without currency; received money green with a plus; moved money neutral.
+ */
+export function TransactionRow({ tx, onPress, context = 'day' }: {
+    tx: TransactionWithWallet;
+    onPress?: () => void;
+    context?: RowContext;
+}) {
     const flow = flowOf(tx);
     const style = categoryStyle(tx.category);
     const isPerson = tx.category === 'transfer' || (flow === 'in' && !tx.category);
-    const when = new Date(tx.transaction_date || tx.created_at);
+    const at = new Date(tx.transaction_date || tx.created_at);
+    const time = `${tx.date_source === 'estimated' ? '≈ ' : ''}${time24(at)}`;
 
     const kind = flow === 'moved' ? 'Moved' : flow === 'in' ? 'Received' : isPerson ? 'Sent' : null;
-    const meta = flow === 'moved'
-        ? 'Moved · not spending'
-        : [kind, tx.wallet?.name, `${tx.date_source === 'estimated' ? '≈ ' : ''}${time24(when)}`].filter(Boolean).join(' · ');
+    let meta: string;
+    if (context === 'moved' && flow === 'moved') {
+        meta = [movedRoute(tx), weekdayOrDate(at)].filter(Boolean).join(' · ');
+    } else if (flow === 'moved' && context === 'day') {
+        meta = 'Moved · not spending';
+    } else if (context === 'search') {
+        meta = [dayHeading(at), tx.wallet?.name, time].filter(Boolean).join(' · ');
+    } else {
+        meta = [kind, tx.wallet?.name, time].filter(Boolean).join(' · ');
+    }
 
     const leading = flow === 'moved'
         ? <CategoryTile tone="muted" icon="moved" />
@@ -36,4 +56,21 @@ export function TransactionRow({ tx, onPress }: { tx: TransactionWithWallet; onP
             onPress={onPress}
         />
     );
+}
+
+/** "MTN MoMo → Cash", or "From MTN MoMo" when only one side is known. */
+function movedRoute(tx: TransactionWithWallet): string | null {
+    const from = tx.transfer?.from_wallet?.name;
+    const to = tx.transfer?.to_wallet?.name;
+    if (from && to) return `${from} → ${to}`;
+    const own = tx.wallet?.name;
+    if (!own) return null;
+    return tx.transfer_side === 'to' ? `Into ${own}` : `From ${own}`;
+}
+
+/** "Tue" within this week, otherwise "26 Nov". */
+function weekdayOrDate(d: Date, now = new Date()): string {
+    return d >= startOfWeek(now)
+        ? d.toLocaleDateString('en-GB', { weekday: 'short' })
+        : shortDate(d);
 }

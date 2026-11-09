@@ -1,300 +1,422 @@
-import { View, Text, Pressable, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Platform, Pressable, RefreshControl, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-    ArrowLeft02Icon,
-    BankIcon,
-    Wallet01Icon,
-    Wallet03Icon,
-    Calendar01Icon,
-    FilterIcon,
-} from '@hugeicons/core-free-icons';
-import { TransactionWithWallet, formatCurrency, formatTransactionDate } from '../../lib/transaction-service';
-import { Transaction, supabase } from '../../lib/supabase';
-import { TransactionDetailBottomSheet } from '../../components/transaction-detail-bottom-sheet';
-import { getCategoryById, getCategoryColor, getCategoryIcon, getCategoryByIdOrName } from '../../lib/categories';
+    BandPill, Banner, Button, Card, Icon, InlineLoader, InsetPanel, ListDayHeader, ListGroup,
+    SegmentedControl, Screen, Skeleton, SkeletonRow, TAB_BAR_SPACE, Text, TopBar,
+} from '@/components/ui';
+import { TransactionRow, type RowContext } from '@/components/spending/transaction-row';
+import { TransactionDetailBottomSheet } from '@/components/transaction-detail-bottom-sheet';
+import type { TransactionWithWallet } from '@/lib/transaction-service';
+import {
+    dedupeTransfers, fetchTransactionsPage, groupByDay, groupByWeek, searchTransactions,
+    type TxFilter, type TxGroup,
+} from '@/lib/transactions-list';
+import { flowOf } from '@/lib/spending-service';
+import { listAmount } from '@/lib/format';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
+import { useTheme } from '@/lib/theme';
+import { FONT, HIT_SLOP, RAW } from '@/constants/theme';
 
-const PAGE_SIZE = 20;
+const FILTERS = [
+    { value: 'all', label: 'All' },
+    { value: 'spent', label: 'Spent' },
+    { value: 'in', label: 'Received' },
+    { value: 'moved', label: 'Moved' },
+] as const;
 
-// Group transactions by date
-function groupTransactionsByDate(transactions: TransactionWithWallet[]): { date: string; transactions: TransactionWithWallet[] }[] {
-    const groups: { [key: string]: TransactionWithWallet[] } = {};
+const EMPTY_FILTER: Record<Exclude<TxFilter, 'all'>, string> = {
+    spent: 'Nothing spent yet.',
+    in: 'Nothing received yet.',
+    moved: 'No moves between your wallets yet.',
+};
 
-    transactions.forEach(tx => {
-        const date = new Date(tx.transaction_date || tx.created_at);
-        const dateKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
-
-        if (!groups[dateKey]) {
-            groups[dateKey] = [];
-        }
-        groups[dateKey].push(tx);
-    });
-
-    // Convert to array and sort by date descending
-    return Object.entries(groups)
-        .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-        .map(([date, transactions]) => ({ date, transactions }));
-}
-
-// Format date for section headers
-function formatSectionDate(dateString: string): string {
-    const date = new Date(dateString);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-        return 'Today';
-    } else if (date.toDateString() === yesterday.toDateString()) {
-        return 'Yesterday';
-    } else {
-        return date.toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'short',
-            day: 'numeric'
-        });
-    }
-}
-
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useLiveRefresh } from '../../lib/useLiveRefresh';
-
-export default function TransactionsPage() {
+/**
+ * Transactions (Figma section 993:50): every entry, grouped by day. Filter,
+ * search, and open any one to see exactly what LogIt read. Opens from
+ * Spending; the Spending tab stays highlighted.
+ */
+export default function Transactions() {
     const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const [refreshing, setRefreshing] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [transactions, setTransactions] = useState<TransactionWithWallet[]>([]);
-    const [hasMore, setHasMore] = useState(true);
+
+    const [filter, setFilter] = useState<TxFilter>('all');
+    const [rows, setRows] = useState<TransactionWithWallet[]>([]);
     const [page, setPage] = useState(0);
+    const [hasMore, setHasMore] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState(false);
+    /** Whether the user has any transactions at all, so a filter with none isn't the first-run empty state. */
+    const [hasAny, setHasAny] = useState<boolean | null>(null);
 
-    // Transaction Detail State
-    const [selectedTransaction, setSelectedTransaction] = useState<TransactionWithWallet | null>(null);
-    const [isDetailVisible, setIsDetailVisible] = useState(false);
+    const [searching, setSearching] = useState(false);
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState<TransactionWithWallet[] | null>(null);
+    const [searchBusy, setSearchBusy] = useState(false);
+    const [searchError, setSearchError] = useState(false);
+    /** Bumped to re-run the current search (Try again, or after an edit). */
+    const [searchRun, setSearchRun] = useState(0);
 
-    const fetchTransactions = async (pageNum: number = 0, append: boolean = false) => {
+    const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
+
+    // Ignore responses that arrive after the filter changed.
+    const requestId = useRef(0);
+
+    const load = useCallback(async (f: TxFilter, p: number) => {
+        const id = ++requestId.current;
         try {
-            const from = pageNum * PAGE_SIZE;
-            const to = from + PAGE_SIZE - 1;
-
-            const { data, error, count } = await supabase
-                .from('transactions')
-                .select(`
-                    *,
-                    wallet:wallets(*),
-                    transfer:transfers(
-                        *,
-                        from_wallet:wallets!from_wallet_id(*),
-                        to_wallet:wallets!to_wallet_id(*)
-                    )
-                `, { count: 'exact' })
-                .order('transaction_date', { ascending: false })
-                .range(from, to);
-
-            if (error) {
-                console.error('Error fetching transactions:', error);
-                return;
-            }
-
-            const newTransactions = data || [];
-
-            if (append) {
-                setTransactions(prev => [...prev, ...newTransactions]);
-            } else {
-                setTransactions(newTransactions);
-            }
-
-            // Check if there are more transactions to load
-            const totalFetched = (pageNum + 1) * PAGE_SIZE;
-            setHasMore(count ? totalFetched < count : false);
-
-        } catch (error) {
-            console.error('Error fetching transactions:', error);
+            const { rows: next, hasMore: more } = await fetchTransactionsPage(f, p);
+            if (id !== requestId.current) return;
+            setRows((prev) => (p === 0 ? next : [...prev, ...next]));
+            setPage(p);
+            setHasMore(more);
+            if (f === 'all' && p === 0) setHasAny(next.length > 0);
+            setError(false);
+        } catch (e) {
+            console.error('Error loading transactions:', e);
+            if (id === requestId.current) setError(true);
         } finally {
-            setIsLoading(false);
-            setIsLoadingMore(false);
-            setRefreshing(false);
+            if (id === requestId.current) {
+                setLoading(false);
+                setLoadingMore(false);
+                setRefreshing(false);
+            }
         }
-    };
+    }, []);
 
     useEffect(() => {
-        fetchTransactions(0);
-    }, []);
+        setLoading(true);
+        load(filter, 0);
+    }, [filter, load]);
 
-    const onRefresh = useCallback(() => {
-        setRefreshing(true);
-        setPage(0);
-        setHasMore(true);
-        fetchTransactions(0);
-    }, []);
+    // First-run check when opened on a filter other than All.
+    useEffect(() => {
+        if (hasAny !== null || filter === 'all') return;
+        fetchTransactionsPage('all', 0).then((r) => setHasAny(r.rows.length > 0)).catch(() => {});
+    }, [filter, hasAny]);
 
-    useLiveRefresh(() => fetchTransactions(0, false), 'activity');
+    useLiveRefresh(() => load(filter, 0), 'activity');
 
-    const loadMore = () => {
-        if (!isLoadingMore && hasMore) {
-            setIsLoadingMore(true);
-            const nextPage = page + 1;
-            setPage(nextPage);
-            fetchTransactions(nextPage, true);
+    // Debounced search.
+    useEffect(() => {
+        if (!searching) return;
+        const q = query.trim();
+        if (!q) { setResults(null); setSearchError(false); return; }
+        setSearchBusy(true);
+        let live = true;
+        const t = setTimeout(async () => {
+            try {
+                const found = await searchTransactions(q);
+                if (live) { setResults(found); setSearchError(false); }
+            } catch (e) {
+                console.error('Search failed:', e);
+                if (live) setSearchError(true);
+            } finally {
+                if (live) setSearchBusy(false);
+            }
+        }, 250);
+        return () => { live = false; clearTimeout(t); };
+    }, [query, searching, searchRun]);
+
+    const groups: TxGroup[] = useMemo(() => {
+        const list = dedupeTransfers(rows);
+        return filter === 'moved' ? groupByWeek(list) : groupByDay(list, listAmount);
+    }, [rows, filter]);
+
+    const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+        if (!searching && hasMore && !loadingMore && !loading
+            && layoutMeasurement.height + contentOffset.y >= contentSize.height - 400) {
+            setLoadingMore(true);
+            load(filter, page + 1);
         }
     };
 
-    const handleCloseDetail = useCallback(() => {
-        setIsDetailVisible(false);
-        setSelectedTransaction(null);
-    }, []);
-
-    const handleScroll = (event: any) => {
-        const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
-        const paddingToBottom = 100;
-        if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
-            loadMore();
-        }
+    const closeSearch = () => {
+        setSearching(false);
+        setQuery('');
+        setResults(null);
+        setSearchError(false);
     };
 
-    const groupedTransactions = groupTransactionsByDate(transactions);
+    const refreshAll = () => {
+        load(filter, 0);
+        if (searching) setSearchRun((n) => n + 1);
+    };
 
-    const renderTransactionItem = useCallback((tx: TransactionWithWallet) => {
-        const effectiveCategory = (tx.is_transfer && (!tx.category || tx.category === 'transfer')) ? 'transfer' : (tx.category || 'other');
-        const category = getCategoryByIdOrName(effectiveCategory);
-        const categoryColor = category?.color;
-        const categoryIcon = category?.icon;
-
-        const isIncome = tx.type === 'income' || tx.type === 'credit' || (tx.is_transfer && tx.transfer_side === 'to');
-
-        return (
-            <Pressable
-                key={tx.id}
-                onPress={() => {
-                    setSelectedTransaction(tx);
-                    setIsDetailVisible(true);
-                }}
-                className="flex-row items-center justify-between p-4 bg-white border-[1px] border-slate-100 rounded-[20px]"
-                style={{
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.02,
-                    shadowRadius: 4,
-                    elevation: 1,
-                }}
-            >
-                <View className="flex-row items-center gap-3 flex-1 mr-3">
-                    <View
-                        className="w-10 h-10 rounded-full items-center justify-center"
-                        style={{ backgroundColor: categoryColor ? `${categoryColor}15` : '#F8FAFC' }}
-                    >
-                        <HugeiconsIcon
-                            icon={categoryIcon || (tx.wallet?.type === 'bank' ? BankIcon : tx.wallet?.type === 'momo' ? Wallet03Icon : Wallet01Icon)}
-                            size={20}
-                            color={isIncome ? '#10B981' : (categoryColor || '#64748B')}
-                        />
-                    </View>
-                    <View className="flex-1">
-                        <Text className="text-[14px] font-manrope-bold text-slate-900" numberOfLines={1}>
-                            {tx.description}
-                        </Text>
-                        <Text className="text-[12px] font-manrope text-slate-500">
-                            {tx.wallet?.name || 'Manual'}{category ? ` • ${category.name}` : ''}
-                        </Text>
-                    </View>
-                </View>
-                <Text className={`text-[16px] font-manrope-bold ${isIncome ? 'text-emerald-500' : 'text-slate-900'}`}>
-                    {isIncome ? '+' : '-'}{formatCurrency(tx.amount).replace('GH₵ ', '')}
-                </Text>
-            </Pressable>
-        );
-    }, [setSelectedTransaction, setIsDetailVisible]);
+    const firstRun = !loading && !error && hasAny === false;
 
     return (
-        <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-            <StatusBar style="dark" />
-            {/* Header */}
-            <View className="px-6 pt-4 pb-4">
-                <View className="flex-row items-center gap-4">
-                    <Pressable
-                        onPress={() => router.back()}
-                        className="w-10 h-10 rounded-full bg-slate-100 items-center justify-center"
-                    >
-                        <HugeiconsIcon icon={ArrowLeft02Icon} size={20} color="#1642E5" />
-                    </Pressable>
-                    <Text className="text-[#1642E5] font-manrope-bold text-[28px]">Transactions</Text>
-                </View>
-            </View>
-
-            {isLoading ? (
-                <View className="flex-1 items-center justify-center">
-                    <ActivityIndicator size="large" color="#1642E5" />
-                </View>
-            ) : transactions.length === 0 ? (
-                <View className="flex-1 items-center justify-center px-6">
-                    <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center mb-4">
-                        <HugeiconsIcon icon={Calendar01Icon} size={32} color="#94A3B8" />
-                    </View>
-                    <Text className="text-[20px] font-manrope-bold text-slate-900 mb-2">No transactions yet</Text>
-                    <Text className="text-[16px] font-manrope text-slate-500 text-center">
-                        Your transactions will appear here once you start tracking
-                    </Text>
-                </View>
-            ) : (
-                <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 16 }}
-                    showsVerticalScrollIndicator={false}
-                    onScroll={handleScroll}
-                    scrollEventThrottle={400}
-                    refreshControl={
+        <>
+            <Screen
+                bottomInset={TAB_BAR_SPACE}
+                header={searching
+                    ? <SearchBar value={query} onChange={setQuery} onCancel={closeSearch} />
+                    : (
+                        <TopBar
+                            title="Transactions"
+                            right={firstRun ? undefined : <BandPill icon="search" label="Search" onPress={() => setSearching(true)} />}
+                        />
+                    )}
+                scrollProps={{
+                    onScroll,
+                    scrollEventThrottle: 200,
+                    keyboardShouldPersistTaps: 'handled',
+                    keyboardDismissMode: 'on-drag',
+                    refreshControl: searching ? undefined : (
                         <RefreshControl
                             refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor="#1642E5"
-                            colors={['#1642E5']}
+                            onRefresh={() => { setRefreshing(true); load(filter, 0); }}
+                            tintColor={RAW.onBand}
+                            colors={[RAW.onBand]}
                         />
-                    }
-                >
-                    {groupedTransactions.map((group) => (
-                        <View key={group.date} className="mb-6">
-                            {/* Date Header */}
-                            <View className="flex-row items-center gap-2 mb-4">
-                                <HugeiconsIcon icon={Calendar01Icon} size={16} color="#94A3B8" />
-                                <Text className="text-[14px] font-manrope-semibold text-slate-500">
-                                    {formatSectionDate(group.date)}
+                    ),
+                }}
+            >
+                {searching ? (
+                    <SearchResults
+                        query={query}
+                        results={results}
+                        busy={searchBusy}
+                        error={searchError}
+                        onRetry={() => setSearchRun((n) => n + 1)}
+                        onClear={() => setQuery('')}
+                        onOpen={setDetailTx}
+                    />
+                ) : loading && rows.length === 0 ? (
+                    <ListSkeleton />
+                ) : error && rows.length === 0 ? (
+                    <Banner
+                        tone="danger"
+                        title="Couldn’t load your transactions"
+                        body="Check your connection and try again. Nothing you logged is lost."
+                        action={{ label: 'Try again', onPress: () => { setLoading(true); load(filter, 0); } }}
+                    />
+                ) : firstRun ? (
+                    <FirstRun onAutopilot={() => router.push('/sms-settings')} />
+                ) : (
+                    <Card hero gap={8}>
+                        <SegmentedControl options={FILTERS} value={filter} onChange={setFilter} />
+
+                        {filter === 'moved' && (
+                            <InsetPanel>
+                                <InfoIcon />
+                                <Text variant="meta" weight="semibold" tone="secondary" style={{ flex: 1 }}>
+                                    Money between your own wallets. It isn’t spending, so it’s left out of your totals.
                                 </Text>
+                            </InsetPanel>
+                        )}
+
+                        {loading ? (
+                            <View style={{ gap: 18, paddingVertical: 12 }}>
+                                <SkeletonRow /><SkeletonRow /><SkeletonRow />
                             </View>
-
-                            {/* Transactions for this date */}
-                            <View className="gap-3">
-                                {group.transactions.map(renderTransactionItem)}
-                            </View>
-                        </View>
-                    ))}
-
-                    {/* Load More Indicator */}
-                    {isLoadingMore && (
-                        <View className="py-4 items-center">
-                            <ActivityIndicator size="small" color="#1642E5" />
-                        </View>
-                    )}
-
-                    {!hasMore && transactions.length > 0 && (
-                        <View className="py-4 items-center">
-                            <Text className="text-[14px] font-manrope text-slate-400">
-                                You've reached the end
+                        ) : groups.length === 0 ? (
+                            <Text tone="secondary" align="center" style={{ paddingVertical: 24 }}>
+                                {EMPTY_FILTER[filter as Exclude<TxFilter, 'all'>] ?? 'Nothing here yet.'}
                             </Text>
-                        </View>
-                    )}
-                </ScrollView>
-            )}
+                        ) : (
+                            groups.map((g) => (
+                                <View key={g.key} style={{ gap: 8 }}>
+                                    <ListDayHeader title={g.title} summary={g.summary} />
+                                    <ListGroup bare>
+                                        {g.rows.map((tx) => (
+                                            <TransactionRow
+                                                key={tx.id}
+                                                tx={tx}
+                                                context={(filter === 'moved' ? 'moved' : 'day') as RowContext}
+                                                onPress={() => setDetailTx(tx)}
+                                            />
+                                        ))}
+                                    </ListGroup>
+                                </View>
+                            ))
+                        )}
+
+                        {loadingMore && (
+                            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+                                <InlineLoader label="Loading older transactions…" />
+                            </View>
+                        )}
+                        {error && rows.length > 0 && (
+                            <Banner
+                                tone="danger"
+                                title="Couldn’t load more"
+                                action={{ label: 'Try again', onPress: () => { setLoadingMore(true); load(filter, page + 1); } }}
+                            />
+                        )}
+                    </Card>
+                )}
+            </Screen>
 
             <TransactionDetailBottomSheet
-                isVisible={isDetailVisible}
-                transaction={selectedTransaction}
-                onClose={handleCloseDetail}
-                onCategoryUpdated={() => fetchTransactions(0)}
+                isVisible={!!detailTx}
+                transaction={detailTx}
+                onClose={() => setDetailTx(null)}
+                onCategoryUpdated={refreshAll}
             />
+        </>
+    );
+}
+
+function InfoIcon() {
+    const { colors } = useTheme();
+    return <Icon name="info" size={18} color={colors.text.secondary} />;
+}
+
+/** Search field on the band with Cancel (Figma 1004:853). */
+function SearchBar({ value, onChange, onCancel }: { value: string; onChange: (v: string) => void; onCancel: () => void }) {
+    const { colors } = useTheme();
+    const input = useRef<TextInput>(null);
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, marginTop: 8, marginBottom: 20 }}>
+            <View
+                style={{
+                    flex: 1, height: 46, borderRadius: 999, backgroundColor: colors.bg.surface,
+                    flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 14, paddingRight: 6,
+                }}
+            >
+                <Icon name="search" size={18} color={colors.text.secondary} />
+                <TextInput
+                    ref={input}
+                    value={value}
+                    onChangeText={onChange}
+                    autoFocus
+                    placeholder="Names, places or amounts"
+                    placeholderTextColor={colors.text.tertiary}
+                    returnKeyType="search"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    accessibilityLabel="Search transactions"
+                    style={{
+                        flex: 1, fontFamily: FONT.medium, fontSize: 15, color: colors.text.primary,
+                        paddingVertical: Platform.OS === 'android' ? 0 : undefined,
+                    }}
+                />
+                {value.length > 0 && (
+                    <Pressable
+                        onPress={() => { onChange(''); input.current?.focus(); }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Clear search"
+                        style={{ width: 34, height: 34, alignItems: 'center', justifyContent: 'center' }}
+                        hitSlop={HIT_SLOP}
+                    >
+                        <Icon name="close" size={16} color={colors.text.secondary} />
+                    </Pressable>
+                )}
+            </View>
+            <Pressable onPress={onCancel} accessibilityRole="button" hitSlop={{ top: 12, bottom: 12, left: 6, right: 12 }}>
+                <Text size={14} weight="bold" tone="onBand">Cancel</Text>
+            </Pressable>
         </View>
+    );
+}
+
+/** Results card. The total answers "how much at Shoprite?" (Figma 1004:853, 1004:928). */
+function SearchResults({ query, results, busy, error, onRetry, onClear, onOpen }: {
+    query: string;
+    results: TransactionWithWallet[] | null;
+    busy: boolean;
+    error: boolean;
+    onRetry: () => void;
+    onClear: () => void;
+    onOpen: (tx: TransactionWithWallet) => void;
+}) {
+    const { colors } = useTheme();
+    const q = query.trim();
+
+    if (!q) {
+        return (
+            <Card hero>
+                <Text tone="secondary">Search by name, place or amount, for example “Shoprite”, “Akosua” or “45”.</Text>
+            </Card>
+        );
+    }
+    if (error) {
+        return (
+            <Banner
+                tone="danger"
+                title="Couldn’t search right now"
+                body="Check your connection and try again."
+                action={{ label: 'Try again', onPress: onRetry }}
+            />
+        );
+    }
+    if (!results) {
+        return (
+            <Card hero gap={18}>
+                <SkeletonRow /><SkeletonRow /><SkeletonRow />
+            </Card>
+        );
+    }
+    if (results.length === 0) {
+        return (
+            <Card hero style={{ alignItems: 'center', paddingVertical: 40, gap: 16 }}>
+                <View style={{ width: 64, height: 64, borderRadius: 999, backgroundColor: colors.bg.muted, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="search" size={28} color={colors.text.secondary} />
+                </View>
+                <Text variant="cardTitle" align="center">Nothing for “{q}”</Text>
+                <Text tone="secondary" align="center">Try a shorter word, a person’s name or an amount like 45.</Text>
+                <Button label="Clear search" variant="secondary" size="sm" onPress={onClear} />
+            </Card>
+        );
+    }
+
+    const spent = results.filter((t) => flowOf(t) === 'spent').reduce((s, t) => s + Number(t.amount), 0);
+    return (
+        <Card hero gap={8} style={{ opacity: busy ? 0.6 : 1 }}>
+            <ListDayHeader
+                title={`${results.length} ${results.length === 1 ? 'result' : 'results'}${results.length === 100 ? '+' : ''}`}
+                summary={spent > 0 ? `GHS ${listAmount(spent)} in total` : undefined}
+            />
+            <ListGroup bare>
+                {results.map((tx) => <TransactionRow key={tx.id} tx={tx} context="search" onPress={() => onOpen(tx)} />)}
+            </ListGroup>
+        </Card>
+    );
+}
+
+/** Ghost rows show what's coming; the button goes straight to setup (Figma 1004:968). */
+function FirstRun({ onAutopilot }: { onAutopilot: () => void }) {
+    return (
+        <Card hero gap={16}>
+            <View style={{ gap: 14, opacity: 0.8 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                {[0, 1, 2].map((i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <Skeleton width={28} height={28} radius={9} />
+                        <View style={{ flex: 1, gap: 6 }}>
+                            <Skeleton width="62%" height={8} radius={4} />
+                            <Skeleton width="40%" height={8} radius={4} />
+                        </View>
+                        <Skeleton width={36} height={8} radius={4} />
+                    </View>
+                ))}
+            </View>
+            <View style={{ gap: 6, alignItems: 'center' }}>
+                <Text variant="cardTitle" align="center">No transactions yet</Text>
+                <Text tone="secondary" align="center">They appear here as alerts arrive. Turn on autopilot or paste a message to start.</Text>
+            </View>
+            <Button label="Turn on autopilot" icon="flash" onPress={onAutopilot} />
+        </Card>
+    );
+}
+
+/** Same rhythm as the real list: switch, day header, rows (Figma 1004:1045). */
+function ListSkeleton() {
+    return (
+        <Card hero gap={14}>
+            <Skeleton width="100%" height={40} radius={14} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4 }}>
+                <Skeleton width={60} height={11} radius={5} />
+                <Skeleton width={48} height={9} radius={5} />
+            </View>
+            <SkeletonRow /><SkeletonRow /><SkeletonRow />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4 }}>
+                <Skeleton width={72} height={11} radius={5} />
+                <Skeleton width={48} height={9} radius={5} />
+            </View>
+            <SkeletonRow /><SkeletonRow />
+        </Card>
     );
 }
