@@ -1,157 +1,96 @@
-import { View, Text, ScrollView, Pressable, StyleSheet, Dimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import {
-    ArrowLeft02Icon,
-    Notification01Icon,
-    Wallet01Icon,
-    AiMagicIcon,
-    Tick01Icon,
-    Alert01Icon,
-    Message02Icon,
-    InformationCircleIcon,
-} from '@hugeicons/core-free-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { RefreshControl, View } from 'react-native';
+import { router } from 'expo-router';
+import { Banner, Card, CategoryTile, Icon, ListGroup, ListRow, Screen, SkeletonRow, Text, TopBar } from '@/components/ui';
+import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
+import { useTheme } from '@/lib/theme';
+import { getActivity, lastSeen, markSeen, type ActivityItem, type ActivityTone } from '@/lib/activity';
+import type { TransactionWithWallet } from '@/lib/transaction-service';
+import { RAW } from '@/constants/theme';
 
-const MOCK_NOTIFICATIONS = [
-    {
-        id: '1',
-        title: 'New Transaction Detected',
-        description: 'We found a new transaction from MTN MoMo. Assign it to a wallet to keep your records accurate.',
-        time: '2 mins ago',
-        type: 'alert',
-        icon: Message02Icon,
-        color: '#0F4CFF'
-    },
-    {
-        id: '2',
-        title: 'Wallet Balance Updated',
-        description: 'Your Ecobank Savings balance has been updated to GHS 1,240.00.',
-        time: '1 hour ago',
-        type: 'info',
-        icon: Wallet01Icon,
-        color: '#10B981'
-    },
-    {
-        id: '3',
-        title: 'Weekly Budget Goal',
-        description: 'You have spent 65% of your weekly entertainment budget. You have GHS 45.00 left.',
-        time: '5 hours ago',
-        type: 'warning',
-        icon: Alert01Icon,
-        color: '#F59E0B'
-    },
-    {
-        id: '4',
-        title: 'Smart Spending Tip',
-        description: 'You spend an average of GHS 120 on weekends. Try setting aside GHS 100 on Fridays.',
-        time: 'Yesterday',
-        type: 'ai',
-        icon: AiMagicIcon,
-        color: '#8B5CF6'
-    },
-    {
-        id: '5',
-        title: 'Account Secured',
-        description: 'Your security settings were updated successfully. Your account is protected.',
-        time: '2 days ago',
-        type: 'success',
-        icon: Tick01Icon,
-        color: '#0EA5E9'
-    }
-];
+const TILE: Record<ActivityTone, 'accent' | 'warn' | 'success' | 'transport'> = {
+    accent: 'accent',
+    warn: 'warn',
+    success: 'success',
+    insight: 'transport',
+};
 
-export default function NotificationsPage() {
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
+/**
+ * Notifications (Figma 1003:862) and Notifications · empty (1003:927).
+ * Opens from the bell on Spending. A blue dot marks what's new since you
+ * last looked.
+ */
+export default function Notifications() {
+    const { colors } = useTheme();
+    const [items, setItems] = useState<ActivityItem[] | null>(null);
+    const [seenAt, setSeenAt] = useState<Date | null>(null);
+    const [error, setError] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [detail, setDetail] = useState<TransactionWithWallet | null>(null);
+    const loadedOnce = useRef(false);
+
+    const load = useCallback(async () => {
+        try {
+            if (!loadedOnce.current) setSeenAt(await lastSeen());
+            setItems(await getActivity());
+            setError(false);
+            if (!loadedOnce.current) { loadedOnce.current = true; markSeen(); }
+        } catch (e) {
+            console.error('Notifications failed:', e);
+            setError(true);
+        } finally {
+            setRefreshing(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const open = (item: ActivityItem) => {
+        const o = item.open;
+        if (o.kind === 'transaction') setDetail(o.tx);
+        else if (o.kind === 'check') router.push('/review');
+        else if (o.kind === 'insight') router.push({ pathname: '/insights/insight', params: { category: o.category } });
+        else router.push('/limits');
+    };
 
     return (
-        <View className="flex-1 bg-[#0F172A]">
-            <StatusBar style="light" />
-            <LinearGradient
-                colors={['#0F172A', '#1E1B4B', '#312E81']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-            />
-
-            <View className="flex-1" style={{ paddingTop: insets.top }}>
-                <ScrollView
-                    className="flex-1"
-                    contentContainerStyle={{ flexGrow: 1 }}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <View style={{ paddingHorizontal: 24, paddingBottom: 40, paddingTop: 20 }}>
-                        {/* Header Nav */}
-                        <View className="flex-row items-center justify-between mb-8">
-                            <Pressable
-                                onPress={() => router.back()}
-                                className="w-11 h-11 bg-white/10 rounded-full items-center justify-center border border-white/10"
-                            >
-                                <HugeiconsIcon icon={ArrowLeft02Icon} size={22} color="white" />
-                            </Pressable>
-                            <Text className="text-white font-manrope-bold text-[18px]">Notifications</Text>
-                            <Pressable className="w-11 h-11 bg-white/10 rounded-full items-center justify-center border border-white/10">
-                                <HugeiconsIcon icon={Tick01Icon} size={18} color="white" />
-                            </Pressable>
+        <>
+            <Screen
+                header={<TopBar title="Notifications" />}
+                scrollProps={{ refreshControl: <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={RAW.onBand} colors={[RAW.onBand]} /> }}
+            >
+                {error && !items ? (
+                    <Banner tone="danger" title="Couldn’t load notifications" body="Check your connection and try again." action={{ label: 'Try again', onPress: load }} />
+                ) : !items ? (
+                    <Card hero gap={18}><SkeletonRow /><SkeletonRow /><SkeletonRow /></Card>
+                ) : items.length === 0 ? (
+                    <Card hero style={{ alignItems: 'center', paddingVertical: 32, gap: 12 }}>
+                        <View style={{ width: 60, height: 60, borderRadius: 999, backgroundColor: colors.brand['accent-tint'], alignItems: 'center', justifyContent: 'center' }}>
+                            <Icon name="bell" size={26} color={colors.brand['accent-text']} />
                         </View>
+                        <Text variant="cardTitle" align="center">Nothing new</Text>
+                        <Text size={14} tone="secondary" align="center">When LogIt logs something or needs you, it shows up here.</Text>
+                    </Card>
+                ) : (
+                    <ListGroup style={{ borderRadius: 28, paddingHorizontal: 18, paddingVertical: 7 }}>
+                        {items.map((item) => {
+                            const unread = !seenAt || item.at > seenAt;
+                            return (
+                                <ListRow
+                                    key={item.id}
+                                    leading={<CategoryTile tone={TILE[item.tone]} icon={item.icon} />}
+                                    title={item.title}
+                                    meta={item.meta}
+                                    trailing={unread ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brand.accent }} accessibilityLabel="New" /> : 'none'}
+                                    onPress={() => open(item)}
+                                />
+                            );
+                        })}
+                    </ListGroup>
+                )}
+            </Screen>
 
-                        {/* Subheader */}
-                        <View className="mb-6">
-                            <Text className="text-white/60 font-manrope-medium text-[14px] uppercase tracking-[2px] mb-1">Stay updated</Text>
-                            <Text className="text-white font-manrope-bold text-[36px]">Activity Feed</Text>
-                        </View>
-                    </View>
-
-                    {/* Content Section */}
-                    <View className="flex-1 bg-[#F8FAFC] rounded-t-[48px] px-6 pt-10" style={{
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: -15 },
-                        shadowOpacity: 0.1,
-                        shadowRadius: 20,
-                        elevation: 20,
-                        minHeight: Dimensions.get('window').height - 150
-                    }}>
-                        {MOCK_NOTIFICATIONS.map((notification, index) => (
-                            <Animated.View
-                                key={notification.id}
-                                {...{ entering: FadeInDown.delay(index * 100).duration(600) } as any}
-                                className="bg-white rounded-[32px] p-6 mb-5 border border-slate-100 shadow-sm shadow-slate-200/50"
-                            >
-                                <View className="flex-row items-start gap-5">
-                                    <View
-                                        className="w-14 h-14 rounded-[20px] items-center justify-center"
-                                        style={{ backgroundColor: `${notification.color}10` }}
-                                    >
-                                        <HugeiconsIcon icon={notification.icon} size={28} color={notification.color} />
-                                    </View>
-                                    <View className="flex-1">
-                                        <View className="flex-row justify-between items-start mb-1.5">
-                                            <Text className="text-slate-900 font-manrope-bold text-[17px] flex-1 mr-2" numberOfLines={1}>
-                                                {notification.title}
-                                            </Text>
-                                            <Text className="text-slate-400 font-manrope-medium text-[12px] mt-1">
-                                                {notification.time}
-                                            </Text>
-                                        </View>
-                                        <Text className="text-slate-500 font-manrope text-[14px] leading-[22px]">
-                                            {notification.description}
-                                        </Text>
-                                    </View>
-                                </View>
-                            </Animated.View>
-                        ))}
-
-                        <View style={{ height: insets.bottom + 40 }} />
-                    </View>
-                </ScrollView>
-            </View>
-        </View>
+            <TransactionDetailSheet transaction={detail} onClose={() => setDetail(null)} onChanged={load} />
+        </>
     );
 }
-
-const styles = StyleSheet.create({});
