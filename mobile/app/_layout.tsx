@@ -42,8 +42,9 @@ export default function RootLayout() {
     }
   }, [loaded, error]);
 
-  // Safety net: never leave people on the native splash. If fonts haven't
-  // loaded after 4s, carry on with the system font.
+  // Manrope is built into the app (expo-font plugin in app.json), so this load
+  // is near-instant. Safety net for older builds: never leave people on the
+  // native splash; after 4s carry on with the system font.
   const [fontTimeout, setFontTimeout] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => {
