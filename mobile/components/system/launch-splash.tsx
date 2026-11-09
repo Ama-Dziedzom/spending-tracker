@@ -18,7 +18,7 @@ import { AnimatedView } from '@/components/ui/animated-view';
 /**
  * Launch · dot lands (Figma, App icon page → "Splash · motion").
  *
- * The native splash shows "logıt" without its dot (assets/logit-app-icon/
+ * The native splash shows "logıt" without its dot (assets/app-icon/
  * splash-icon.png). This overlay draws the same wordmark in the same place,
  * so the hand-off can't be seen, then drops the yellow corner onto the i.
  * It holds until LogIt has moved to the right screen (`ready`), then fades

@@ -5,7 +5,7 @@
     "owner": "ama1",
     "version": "1.1.0",
     "orientation": "portrait",
-    "icon": "./assets/logit-app-icon/icon.png",
+    "icon": "./assets/app-icon/icon.png",
     "scheme": "logit",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -94,8 +94,8 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#1642E5",
-        "foregroundImage": "./assets/logit-app-icon/adaptive-icon.png",
-        "backgroundImage": "./assets/logit-app-icon/adaptive-background.png"
+        "foregroundImage": "./assets/app-icon/adaptive-icon.png",
+        "backgroundImage": "./assets/app-icon/adaptive-background.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -113,7 +113,7 @@
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/logit-app-icon/favicon.png"
+      "favicon": "./assets/app-icon/favicon.png"
     },
     "plugins": [
       "./plugins/withShareExtension",
@@ -125,7 +125,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/logit-app-icon/splash-icon.png",
+          "image": "./assets/app-icon/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#1642E5",
