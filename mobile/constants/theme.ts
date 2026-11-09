@@ -45,6 +45,8 @@ export const RAW = {
   onBandFill: 'rgba(255,255,255,0.16)',
   /** Welcome: the incoming-alert bubble on the band (Figma 1000:77), and its label and text. */
   onBandBubble: 'rgba(255,255,255,0.14)',
+  /** Change chip on the band ("+GHS 17", Figma 1022:4657). */
+  onBandChip: 'rgba(255,255,255,0.18)',
   onBandBubbleLabel: 'rgba(255,255,255,0.7)',
   onBandBubbleText: 'rgba(255,255,255,0.92)',
   /** Icon circle inside a toast (white at 14 % on bg/inverse). */

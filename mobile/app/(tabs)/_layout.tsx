@@ -22,8 +22,8 @@ export const useTabContext = () => useContext(TabContext);
 /**
  * v1 navigation shell (handoff §6): three tabs (Spending, Wallets, Insights)
  * plus a floating Add button. Settings is no longer a tab; it opens from the
- * avatar on Spending. Transactions lives here as a hidden route so the tab bar
- * stays visible with Spending highlighted.
+ * avatar on Spending. Each tab has its own stack, so Transactions, a wallet
+ * or an insight keep the tab bar and swipe back within the tab.
  */
 export default function TabLayout() {
     const [addSheetVisible, setAddSheetVisible] = useState(false);
@@ -46,11 +46,10 @@ export default function TabLayout() {
                 screenOptions={{ headerShown: false }}
                 tabBar={(props) => <FloatingTabBar {...props} onAdd={() => setAddSheetVisible(true)} />}
             >
-                <Tabs.Screen name="index" options={{ title: 'Spending' }} />
+                {/* Each tab is its own stack (spending/, wallets/, insights/). */}
+                <Tabs.Screen name="spending" options={{ title: 'Spending' }} />
                 <Tabs.Screen name="wallets" options={{ title: 'Wallets' }} />
                 <Tabs.Screen name="insights" options={{ title: 'Insights' }} />
-                <Tabs.Screen name="transactions" options={{ title: 'Transactions', href: null }} />
-                <Tabs.Screen name="wallet" options={{ title: 'Wallet', href: null }} />
             </Tabs>
 
             <AddSheet visible={addSheetVisible} onClose={() => setAddSheetVisible(false)} onChoose={onChoose} />

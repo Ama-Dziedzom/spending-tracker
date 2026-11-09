@@ -16,6 +16,7 @@ const USER_TABLES = [
   'failed_parses',
   'expected_income',
   'category_rules',
+  'limits',
   'pattern_samples',
   'wallets',
 ];

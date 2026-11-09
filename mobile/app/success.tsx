@@ -35,7 +35,7 @@ export default function YoureIn() {
             footer={
                 <>
                     <Button label="Turn on autopilot" icon="flash" size="xl" onPress={() => router.push('/onboarding/autopilot')} style={shadows.fab} />
-                    <CardLink label="Later" onPress={() => router.replace('/(tabs)')} />
+                    <CardLink label="Later" onPress={() => router.replace('/spending')} />
                 </>
             }
         >

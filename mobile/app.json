@@ -56,6 +56,16 @@
         {
           "faceIDUsageDescription": "Allow LogIt to use FaceID for secure login."
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "LogIt listens only while the mic is on, to hear your question. Audio isn’t kept.",
+          "speechRecognitionPermission": "LogIt turns what you say into a question about your money. Audio isn’t kept.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
       ]
     ],
     "experiments": {

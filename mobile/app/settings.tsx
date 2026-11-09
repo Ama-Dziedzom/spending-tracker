@@ -12,6 +12,7 @@ import { getProfile, lastAlertAt, setHideWidgetAmounts, type Profile } from '@/l
 import { getShareSamples, setShareSamples } from '@/lib/review-service';
 import { getWallets } from '@/lib/wallet-service';
 import { getExpectedIncome } from '@/lib/income-service';
+import { getLimits } from '@/lib/limits';
 import { formatPhone } from '@/lib/phone';
 
 const THEMES = [
@@ -35,25 +36,28 @@ export default function Settings() {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [walletCount, setWalletCount] = useState<number | null>(null);
     const [expected, setExpected] = useState<string | null>(null);
+    const [limitCount, setLimitCount] = useState<number | null>(null);
     const [autopilotOn, setAutopilotOn] = useState<boolean | null>(null);
     const [shareSamples, setShareSamplesState] = useState(false);
 
     useFocusEffect(useCallback(() => {
         let live = true;
         (async () => {
-            const [p, wallets, income, samples, last, androidOn] = await Promise.all([
+            const [p, wallets, income, samples, last, androidOn, limits] = await Promise.all([
                 getProfile(),
                 getWallets().catch(() => []),
                 getExpectedIncome().catch(() => []),
                 getShareSamples().catch(() => false),
                 lastAlertAt().catch(() => null),
                 AsyncStorage.getItem('sms_auto_logging_enabled').catch(() => null),
+                getLimits().catch(() => []),
             ]);
             if (!live) return;
             setProfile(p);
             setWalletCount(wallets.length);
             setExpected(income.length === 0 ? 'None' : income.length === 1 ? income[0].label : `${income.length} set`);
             setShareSamplesState(samples);
+            setLimitCount(limits.length);
             // iPhone: on if an alert has come in through autopilot in the last two weeks.
             setAutopilotOn(Platform.OS === 'android' ? androidOn === 'true' : !!last && Date.now() - last.getTime() < 14 * 86_400_000);
         })();
@@ -112,8 +116,9 @@ export default function Settings() {
             </Pressable>
 
             <ListGroup label="Money" labelOnBand>
-                <ListRow dense leading={tile('wallet')} title="Wallets" value={walletCount === null ? '' : String(walletCount)} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/(tabs)/wallets')} />
+                <ListRow dense leading={tile('wallet')} title="Wallets" value={walletCount === null ? '' : String(walletCount)} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/wallets')} />
                 <ListRow dense leading={tile('receive')} title="Expected income" value={expected ?? ''} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/expected-income')} />
+                <ListRow dense leading={tile('shield')} title="Limits" value={limitCount === null ? '' : limitCount === 0 ? 'None' : `${limitCount} set`} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/limits')} />
             </ListGroup>
 
             <ListGroup label="Autopilot" labelOnBand>

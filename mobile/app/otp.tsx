@@ -54,7 +54,7 @@ export default function Code() {
                     if (fullName) await supabase.auth.updateUser({ data: { full_name: fullName } });
                     router.replace('/onboarding/avatar');
                 } else {
-                    router.replace('/(tabs)');
+                    router.replace('/spending');
                 }
                 return;
             }

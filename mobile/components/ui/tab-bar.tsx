@@ -9,20 +9,11 @@ import { Icon, type IconName } from './icon';
 import { Tap } from './tap';
 import { Text } from './text';
 
-/** Route name → icon. Spending is the `index` route. */
+/** Tab route → icon. Each tab is a stack, so Transactions keeps Spending highlighted (handoff §6). */
 const TAB_ICONS: Record<string, IconName> = {
-    index: 'pieChart',
+    spending: 'pieChart',
     wallets: 'wallet',
     insights: 'insights',
-};
-
-/**
- * Hidden routes that live under a tab, so the bar stays visible and that tab
- * stays highlighted (handoff §6: Transactions keeps Spending highlighted).
- */
-const TAB_PARENT: Record<string, string> = {
-    transactions: 'index',
-    wallet: 'wallets',
 };
 
 /** Space to leave below scroll content so it clears the floating bar. */
@@ -42,7 +33,7 @@ export function FloatingTabBar({ state, descriptors, navigation, onAdd }: Props)
     const { colors, shadows } = useTheme();
     const insets = useSafeAreaInsets();
     const currentName = state.routes[state.index]?.name;
-    const activeTab = TAB_PARENT[currentName] ?? currentName;
+    const activeTab = currentName;
 
     // "Bottom fade" (Figma 1004:749): 150 tall on an 844 frame, canvas from
     // transparent to solid at 60 %, so lists fade out behind the bar.
@@ -84,7 +75,7 @@ export function FloatingTabBar({ state, descriptors, navigation, onAdd }: Props)
                             accessibilityLabel={label}
                             onPress={() => {
                                 const e = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-                                // From Transactions, tapping Spending goes back to Spending.
+                                // Tapping the tab you're on pops its stack back to the top (handled by the stack).
                                 if (!onTabRoot && !e.defaultPrevented) {
                                     Haptics.selectionAsync().catch(() => {});
                                     navigation.navigate(route.name, route.params);

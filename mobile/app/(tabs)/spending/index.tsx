@@ -11,7 +11,7 @@ import { FirstRunCard, SalaryPromptCard } from '@/components/spending/prompt-car
 import { DayDetailSheet } from '@/components/spending/day-detail-sheet';
 import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
 import { AddEntrySheet } from '@/components/transactions/add-entry-sheet';
-import { useTabContext } from './_layout';
+import { useTabContext } from '../_layout';
 import { supabase, type Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
@@ -24,7 +24,7 @@ import { longDate, sameDay, time24 } from '@/lib/format';
 import { loadSpendingCache, saveSpendingCache } from '@/lib/spending-cache';
 import { isNetworkError } from '@/lib/network';
 import { pendingSmsCount } from '@/lib/pending-sms';
-import { NOTIFICATIONS_ASKED } from '../allow-notifications';
+import { NOTIFICATIONS_ASKED } from '../../allow-notifications';
 import { RAW } from '@/constants/theme';
 
 /**
@@ -212,7 +212,7 @@ export default function Spending() {
                         period={period}
                         onPeriod={setPeriod}
                         compact={!!incomePrompt}
-                        onMore={() => router.push('/transactions')}
+                        onMore={() => router.push('/spending/transactions')}
                         onDay={setDayOpen}
                         onTransaction={setDetailTx}
                         freshIds={freshIds}
@@ -253,7 +253,7 @@ export default function Spending() {
                 isBiggest={!!dayOpen && !!bigDay && sameDay(dayOpen, bigDay)}
                 onClose={() => setDayOpen(null)}
                 onTransaction={setDetailTx}
-                onSeeAll={() => router.push('/transactions')}
+                onSeeAll={() => router.push('/spending/transactions')}
             />
 
             <TransactionDetailSheet

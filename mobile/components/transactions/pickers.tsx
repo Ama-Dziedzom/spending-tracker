@@ -258,11 +258,11 @@ export function WhenForm({ initial, onSave, onBack, saveLabel = 'Save' }: {
  * Big amount entry: "GHS 45|" (Figma 1005:1120). Digits and one decimal
  * point, up to two decimals.
  */
-export function AmountInput({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
+export function AmountInput({ value, onChange, autoFocus, size = 52 }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; /** 52 (Add manually) or 48 (Set a limit). */ size?: 52 | 48 }) {
     const { colors } = useTheme();
     return (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 8, paddingVertical: 10 }}>
-            <Text size={18} weight="bold" tone="tertiary">GHS</Text>
+            <Text size={18} weight={size === 48 ? 'semibold' : 'bold'} tone={size === 48 ? 'secondary' : 'tertiary'}>GHS</Text>
             <BottomSheetTextInput
                 value={value}
                 onChangeText={(t) => onChange(cleanAmount(t))}
@@ -275,7 +275,7 @@ export function AmountInput({ value, onChange, autoFocus }: { value: string; onC
                 accessibilityLabel="Amount in cedis"
                 maxLength={12}
                 style={{
-                    fontFamily: FONT.extrabold, fontSize: 52, letterSpacing: -2.08,
+                    fontFamily: FONT.extrabold, fontSize: size, letterSpacing: size === 48 ? -1.44 : -2.08,
                     color: colors.text.primary, minWidth: 40, padding: 0, textAlign: 'center',
                 }}
             />

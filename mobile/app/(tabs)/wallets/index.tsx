@@ -44,7 +44,7 @@ export default function Wallets() {
     useLiveRefresh(() => load(), 'wallets');
 
     const empty = !!data && data.lines.length === 0;
-    const openWallet = (w: Wallet) => router.push({ pathname: '/wallet', params: { walletId: w.id } });
+    const openWallet = (w: Wallet) => router.push({ pathname: '/wallets/wallet', params: { walletId: w.id } });
 
     return (
         <>

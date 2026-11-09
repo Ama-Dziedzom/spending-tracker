@@ -445,7 +445,7 @@ function AllCaughtUp() {
             <TickCircle />
             <Text variant="screenTitle" size={20} align="center">All caught up</Text>
             <Text size={13} tone="secondary" align="center">Anything LogIt can’t read on its own will wait here. Nothing gets lost.</Text>
-            <Button label="Back to spending" variant="secondary" size="sm" onPress={() => router.dismissTo('/')} style={{ marginTop: 6 }} />
+            <Button label="Back to spending" variant="secondary" size="sm" onPress={() => router.dismissTo('/spending')} style={{ marginTop: 6 }} />
         </Card>
     );
 }

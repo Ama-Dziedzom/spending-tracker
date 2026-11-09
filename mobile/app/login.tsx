@@ -27,7 +27,7 @@ export default function Login() {
 
     const biometricLogin = useCallback(async () => {
         const result = await biometrics.attemptBiometricLogin();
-        if (result.success) router.replace('/(tabs)');
+        if (result.success) router.replace('/spending');
         else if (result.requiresRelogin) setError('Your saved login has expired. Log in with your email and password once more.');
     }, [router]);
 
@@ -53,7 +53,7 @@ export default function Login() {
         if (!/^\S+@\S+\.\S+$/.test(email.trim())) { setError('Use the full email address you signed up with.'); return; }
         if (password.length < 6) { setError('Passwords are at least 6 characters. Check yours and try again.'); return; }
         const result = await signIn(email.trim(), password);
-        if (result.success) router.replace('/(tabs)');
+        if (result.success) router.replace('/spending');
         else setError('That email and password don’t match. Check both and try again.');
     };
 

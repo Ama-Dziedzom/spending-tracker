@@ -19,7 +19,7 @@ export default function SplashScreen() {
     useEffect(() => {
         let cancelled = false;
 
-        const resolveDestination = async (): Promise<'/(tabs)' | '/login' | '/welcome' | '/session-expired'> => {
+        const resolveDestination = async (): Promise<'/spending' | '/login' | '/welcome' | '/session-expired'> => {
             // Biometric users get routed through /login, which auto-triggers the
             // Face ID/fingerprint prompt on mount and can restore a session even
             // after the Supabase token has fully expired (see utils/biometrics.ts).
@@ -31,7 +31,7 @@ export default function SplashScreen() {
             // Supabase session directly so we don't force a manual re-login
             // just because the app reloaded.
             const { data: { session } } = await supabase.auth.getSession();
-            if (session) return '/(tabs)';
+            if (session) return '/spending';
             // Signed out without choosing to (login lapsed): "Log in again".
             return (await lastPhone()) ? '/session-expired' : '/welcome';
         };

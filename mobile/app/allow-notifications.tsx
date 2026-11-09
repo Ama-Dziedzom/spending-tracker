@@ -19,7 +19,7 @@ export default function AllowNotifications() {
     const done = async () => {
         await AsyncStorage.setItem(NOTIFICATIONS_ASKED, 'true').catch(() => {});
         if (router.canGoBack()) router.back();
-        else router.replace('/(tabs)');
+        else router.replace('/spending');
     };
 
     const allow = async () => {

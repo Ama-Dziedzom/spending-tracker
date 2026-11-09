@@ -141,7 +141,7 @@ function AppStack() {
             <Stack.Screen name="onboarding/avatar" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="onboarding/autopilot" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding/test" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="profile" options={{ headerShown: false }} />
             <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
@@ -149,6 +149,8 @@ function AppStack() {
             <Stack.Screen name="delete-account" options={{ headerShown: false }} />
             <Stack.Screen name="sms-settings" options={{ headerShown: false }} />
             <Stack.Screen name="paste" options={{ headerShown: false }} />
+            <Stack.Screen name="ask" options={{ headerShown: false }} />
+            <Stack.Screen name="limits" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="review" options={{ headerShown: false }} />
             <Stack.Screen name="expected-income" options={{ headerShown: false }} />

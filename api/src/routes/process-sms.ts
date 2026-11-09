@@ -337,6 +337,52 @@ async function ruleCategory(userId: string, description: string): Promise<string
   return data?.category ?? null;
 }
 
+/**
+ * Near limit (Figma 1044:5289): one warning when this week's spending in a
+ * category first crosses its warn level, never repeated in that week
+ * (limits.last_warned_week). Returns the two notification lines, or null.
+ * Amber, not red, and no shame: says what's left and per day.
+ */
+async function limitWarning(userId: string, category: string | null | undefined, now = new Date()): Promise<string | null> {
+  if (!category) return null;
+  const { data: limit, error } = await supabaseAdmin
+    .from('limits')
+    .select('id, amount, reset_day, warn_at, last_warned_week')
+    .eq('user_id', userId)
+    .eq('category', category)
+    .maybeSingle();
+  if (error || !limit || limit.warn_at === null) return null;
+
+  // Start of this limit week (reset_day: 1 = Monday … 7 = Sunday).
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const iso = ((today.getUTCDay() + 6) % 7) + 1;
+  const start = new Date(today.getTime() - ((iso - limit.reset_day + 7) % 7) * 86_400_000);
+  const weekKey = start.toISOString().slice(0, 10);
+  if (limit.last_warned_week === weekKey) return null;
+
+  const { data: rows } = await supabaseAdmin
+    .from('transactions')
+    .select('amount, is_transfer')
+    .eq('user_id', userId)
+    .eq('category', category)
+    .in('type', ['debit', 'expense'])
+    .gte('transaction_date', start.toISOString());
+  const spent = (rows ?? []).filter((r) => !r.is_transfer).reduce((s, r) => s + Number(r.amount), 0);
+  const amount = Number(limit.amount);
+  if (spent < amount * Number(limit.warn_at)) return null;
+
+  await supabaseAdmin.from('limits').update({ last_warned_week: weekKey }).eq('id', limit.id);
+
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const resets = days[limit.reset_day - 1];
+  const name = category === 'airtime' ? 'Airtime & data' : category.charAt(0).toUpperCase() + category.slice(1);
+  const whole = (n: number) => Math.round(n).toLocaleString('en-US');
+  const daysLeft = Math.max(1, 7 - Math.round((today.getTime() - start.getTime()) / 86_400_000));
+  if (spent > amount) return `${name}: GHS ${whole(spent)} of ${whole(amount)}\nGHS ${whole(spent - amount)} over. It happens; it resets ${resets}.`;
+  const left = amount - spent;
+  return `${name}: GHS ${whole(spent)} of ${whole(amount)}\nGHS ${whole(left)} left until ${resets}. That’s about GHS ${whole(left / daysLeft)} a day.`;
+}
+
 async function applyBalance(walletId: string, tx: ParsedTx, smsDate: Date | null, txId: string): Promise<boolean> {
   if (smsDate && (await hasNewerSnapshot(walletId, smsDate, txId))) {
     console.log(`⏪ Older SMS for wallet ${walletId}: balance already reflects it, not changed`);
@@ -645,11 +691,21 @@ processSmsRouter.post(
         }
       }
 
+      // ── Near a weekly limit? (one warning a week) ───────────────────────
+      let warning: string | null = null;
+      if (transaction.type === 'debit' && !transaction.is_transfer) {
+        warning = await limitWarning(userId, transaction.category).catch((e) => {
+          console.error('limit check failed:', e instanceof Error ? e.message : e);
+          return null;
+        });
+      }
+
       // ── Response ────────────────────────────────────────────────────────
       if (wantsPlainText(req)) {
         const typeEmoji = transaction.type === 'debit' ? '💸' : '💰';
         const typeStr = transaction.type === 'debit' ? 'Debit' : 'Credit';
-        let textResponse = `✅ Transaction Logged!\n`;
+        // The Shortcut shows this text as LogIt's notification; a limit warning leads.
+        let textResponse = warning ? `${warning}\n\n✅ Transaction Logged!\n` : `✅ Transaction Logged!\n`;
         textResponse += `${typeEmoji} Amount: GHS ${transaction.amount.toFixed(2)} (${typeStr})\n`;
         textResponse += `👛 Wallet: ${wallet ? wallet.name + (wallet.created ? ' (new)' : '') : 'Not linked'}\n`;
         textResponse += `🏷️ Category: ${transaction.category}\n`;
@@ -684,6 +740,7 @@ processSmsRouter.post(
         fee: transaction.fee,
         transactionDate: txDate.toISOString(),
         dateSource,
+        limitWarning: warning,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

@@ -73,7 +73,7 @@ export default function AutopilotTest() {
                 back={false}
                 cardTop={400}
                 hero={<BandHero icon="flash" title="Autopilot is on" subtitle={`Your test was logged in ${landedIn} ${landedIn === 1 ? 'second' : 'seconds'}`} />}
-                footer={<Button label="Go to my money" size="xl" onPress={() => router.replace('/(tabs)')} style={shadows.fab} />}
+                footer={<Button label="Go to my money" size="xl" onPress={() => router.replace('/spending')} style={shadows.fab} />}
             >
                 <Text size={11} weight="bold" tone="secondary">Just logged</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.bg.muted, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 }}>
@@ -96,7 +96,7 @@ export default function AutopilotTest() {
             footer={
                 <>
                     <Button label="Open Messages" size="xl" onPress={openMessages} style={shadows.fab} />
-                    <CardLink label="Skip test" onPress={() => router.replace('/(tabs)')} />
+                    <CardLink label="Skip test" onPress={() => router.replace('/spending')} />
                 </>
             }
         >

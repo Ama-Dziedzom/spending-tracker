@@ -37,7 +37,7 @@ export default function OnboardingAutopilot() {
             const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS).catch(() => PermissionsAndroid.RESULTS.DENIED);
             if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
                 toast.show({ message: 'No problem. You can turn it on later in Settings › Autopilot.', icon: 'info' });
-                router.replace('/(tabs)');
+                router.replace('/spending');
                 return;
             }
             await AsyncStorage.setItem('sms_auto_logging_enabled', 'true');
@@ -52,7 +52,7 @@ export default function OnboardingAutopilot() {
                 footer={
                     <>
                         <Button label="Allow" size="xl" onPress={allow} style={shadows.fab} />
-                        <CardLink label="Not now" onPress={() => router.replace('/(tabs)')} />
+                        <CardLink label="Not now" onPress={() => router.replace('/spending')} />
                     </>
                 }
             >
