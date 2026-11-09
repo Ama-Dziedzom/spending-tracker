@@ -132,6 +132,9 @@ function AppStack() {
             <Stack.Screen name="otp" options={{ headerShown: false, animation: 'slide_from_right' }} />
             <Stack.Screen name="password" options={{ headerShown: false, animation: 'slide_from_right' }} />
             <Stack.Screen name="success" options={{ headerShown: false, animation: 'fade' }} />
+            <Stack.Screen name="onboarding/avatar" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="onboarding/autopilot" options={{ headerShown: false }} />
+            <Stack.Screen name="onboarding/test" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="profile" options={{ headerShown: false }} />

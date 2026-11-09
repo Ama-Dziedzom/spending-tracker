@@ -377,6 +377,27 @@ processSmsRouter.post(
         return;
       }
 
+      // ── Step 0a: Autopilot test (onboarding, Figma 1001:281) ────────────
+      // "LogIt test: GHS 1.00" proves autopilot works. It never counts toward
+      // spending and never shows in Check: it's recorded as an already
+      // dismissed failed_parses row the app watches for.
+      if (/^\s*logit test\b/i.test(rawSms)) {
+        const { error: testError } = await supabaseAdmin.from('failed_parses').insert({
+          user_id: userId,
+          raw_sms: rawSms,
+          reason: 'autopilot_test',
+          status: 'dismissed',
+        });
+        if (testError) console.error('autopilot test not recorded:', testError.message);
+        console.log(`🧪 Autopilot test received user=${userId}`);
+        if (wantsPlainText(req)) {
+          res.type('text/plain').send('✅ Autopilot works\nTests never count toward your spending.');
+          return;
+        }
+        res.json({ success: true, test: true });
+        return;
+      }
+
       // ── Step 0: Ignore things that aren't money movements ───────────────
       // One-time codes and messages with no amount never belong in LogIt —
       // not as transactions, not in "Needs review". Applies to every route
