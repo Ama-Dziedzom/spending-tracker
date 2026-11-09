@@ -13,8 +13,7 @@ interface Props {
 
 /**
  * "Add to LogIt" (Figma 1003:674): the + button. Paste a message comes first
- * in the design because it's what alerts are made of; it's added here once the
- * in-app paste screen exists (Transactions phase).
+ * because it's what alerts are made of.
  */
 export function AddSheet({ visible, onClose, onChoose }: Props) {
     const pick = (fn: () => void) => () => {
@@ -25,6 +24,13 @@ export function AddSheet({ visible, onClose, onChoose }: Props) {
     return (
         <Sheet visible={visible} onClose={onClose} title="Add to LogIt">
             <ListGroup bare>
+                <ListRow
+                    leading={<CategoryTile tone="accent" icon="paste" size={44} />}
+                    title="Paste a message"
+                    meta="A MoMo or bank alert"
+                    trailing="chevron"
+                    onPress={pick(() => router.push('/paste'))}
+                />
                 <ListRow
                     leading={<CategoryTile tone="cash" icon="cash" size={44} />}
                     title="Log cash"

@@ -78,6 +78,8 @@ export interface SpendingSummary {
         days: DayTotal[];
         /** The biggest day so far, if it's clearly bigger than the rest. */
         bigDay: { date: Date; names: string[]; style: CategoryStyle } | null;
+        /** The three biggest payments this week, largest first. */
+        top: TransactionWithWallet[];
         cameIn: number;
         moved: number;
     };
@@ -158,6 +160,7 @@ export function summarise(txs: TransactionWithWallet[], now = new Date()): Spend
             lastWeekSameSpan: sum(spent.filter((t) => inRange(t, lastWeekStart, lastWeekSpanEnd))),
             days,
             bigDay,
+            top: [...weekSpent].sort((a, b) => Number(b.amount) - Number(a.amount)).slice(0, 3),
             cameIn: sum(received.filter((t) => inRange(t, weekStart, now))),
             moved: sum(moved.filter((t) => inRange(t, weekStart, now))),
         },

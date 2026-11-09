@@ -140,6 +140,8 @@ export interface Transaction {
     date_source?: 'sms' | 'estimated' | 'received' | 'manual' | null;
     /** The alert as received, when the entry came from an SMS. */
     raw_sms?: string | null;
+    /** Whether this entry changed its wallet's balance (v1 adds). Null on older rows. */
+    balance_applied?: boolean | null;
 }
 
 /**

@@ -6,7 +6,7 @@ import { Icon, type IconName } from './icon';
 import { Spinner } from './loaders';
 import { Text } from './text';
 
-type Variant = 'primary' | 'secondary' | 'ink' | 'danger' | 'dangerSoft';
+type Variant = 'primary' | 'secondary' | 'ink' | 'danger' | 'dangerSoft' | 'ghost';
 
 interface ButtonProps {
     label: string;
@@ -17,6 +17,7 @@ interface ButtonProps {
      * ink       – brand/ink-button (navy; inverts in dark), e.g. "Check", "Discard".
      * danger    – status/danger, only for destructive confirmation.
      * dangerSoft – status/danger-tint fill, status/danger label ("Delete" on Transaction detail).
+     * ghost     – no fill, brand/accent-text label ("Edit first" on Paste · read).
      */
     variant?: Variant;
     /** 'lg' = 15pt / 15 vertical (full-width CTAs); 'md' = 13pt / 10 (dialogs); 'sm' = 13pt / 9 (inline). */
@@ -40,6 +41,7 @@ export function Button({
         ink: { bg: colors.brand['ink-button'], fg: colors.brand['on-ink-button'] },
         danger: { bg: colors.status.danger, fg: colors.brand['on-accent'] },
         dangerSoft: { bg: colors.status['danger-tint'], fg: colors.status.danger },
+        ghost: { bg: 'transparent', fg: colors.brand['accent-text'] },
     }[variant];
     const pad = { lg: { v: 15, h: 20, font: 15 }, md: { v: 10, h: 16, font: 13 }, sm: { v: 9, h: 16, font: 13 } }[size];
     const inactive = disabled || busy;

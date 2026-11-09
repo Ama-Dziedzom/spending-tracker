@@ -1,15 +1,15 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { AddTransactionBottomSheet } from '@/components/add-transaction-bottom-sheet';
+import { AddEntrySheet } from '@/components/transactions/add-entry-sheet';
+import { LogCashSheet } from '@/components/transactions/log-cash-sheet';
 import { AddSheet, type AddChoice } from '@/components/add-sheet';
 import { FloatingTabBar } from '@/components/ui';
-import { getWallets } from '@/lib/wallet-service';
 
 // Context to share the add trigger and dashboard refresh between tabs.
 interface TabContextType {
     /** Opens the "Add to LogIt" chooser. */
     openAddTransaction: () => void;
-    /** Skips the chooser and opens the add form directly (e.g. the Log cash shortcut). */
+    /** Skips the chooser: 'cash' opens Log cash, 'manual' opens Add manually. */
     openAdd: (choice: AddChoice) => void;
     refreshDashboard: () => void;
     setRefreshDashboard: (fn: () => void) => void;
@@ -27,20 +27,10 @@ export const useTabContext = () => useContext(TabContext);
  */
 export default function TabLayout() {
     const [addSheetVisible, setAddSheetVisible] = useState(false);
-    const [formVisible, setFormVisible] = useState(false);
-    const [prefill, setPrefill] = useState<{ type?: 'expense'; walletId?: string } | undefined>();
+    const [open, setOpen] = useState<AddChoice | null>(null);
     const refreshFnRef = useRef<() => void>(() => {});
 
-    const onChoose = useCallback(async (choice: AddChoice) => {
-        if (choice === 'cash') {
-            // Preselect the first cash wallet, if there is one.
-            const cash = (await getWallets()).find((w) => w.type === 'cash');
-            setPrefill({ type: 'expense', walletId: cash?.id });
-        } else {
-            setPrefill(undefined);
-        }
-        setFormVisible(true);
-    }, []);
+    const onChoose = useCallback((choice: AddChoice) => setOpen(choice), []);
 
     const contextValue: TabContextType = useMemo(() => ({
         openAddTransaction: () => setAddSheetVisible(true),
@@ -63,12 +53,8 @@ export default function TabLayout() {
             </Tabs>
 
             <AddSheet visible={addSheetVisible} onClose={() => setAddSheetVisible(false)} onChoose={onChoose} />
-            <AddTransactionBottomSheet
-                isVisible={formVisible}
-                prefill={prefill}
-                onClose={() => setFormVisible(false)}
-                onSuccess={() => refreshFnRef.current()}
-            />
+            <AddEntrySheet visible={open === 'manual'} onClose={() => setOpen(null)} onSuccess={() => refreshFnRef.current()} />
+            <LogCashSheet visible={open === 'cash'} onClose={() => setOpen(null)} onSuccess={() => refreshFnRef.current()} />
         </TabContext.Provider>
     );
 }

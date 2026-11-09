@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HugeiconsIcon } from '@hugeicons/react-native';
 import { ArrowLeft01Icon, InboxIcon, Message01Icon } from '@hugeicons/core-free-icons';
-import { AddTransactionBottomSheet } from '../components/add-transaction-bottom-sheet';
+import { AddEntrySheet } from '../components/transactions/add-entry-sheet';
 import { COLORS } from '../constants/theme';
 import {
     ReviewItem,
@@ -140,8 +140,8 @@ export default function ReviewScreen() {
                 )}
             </ScrollView>
 
-            <AddTransactionBottomSheet
-                isVisible={!!active}
+            <AddEntrySheet
+                visible={!!active}
                 onClose={() => setActive(null)}
                 onSuccess={handleSaved}
                 prefill={active ? { ...active.prefill, rawSms: active.item.raw_sms } : undefined}

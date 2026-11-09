@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, RefreshControl, View } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
     ActionBanner, Avatar, Banner, Chip, RoundButton, Screen, TAB_BAR_SPACE, Text, TopBar,
@@ -10,7 +10,7 @@ import { FirstRunCard, SalaryPromptCard } from '@/components/spending/prompt-car
 import { DayDetailSheet } from '@/components/spending/day-detail-sheet';
 import { LinkWalletsFlow } from '@/components/spending/link-wallets-flow';
 import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
-import { AddTransactionBottomSheet } from '@/components/add-transaction-bottom-sheet';
+import { AddEntrySheet } from '@/components/transactions/add-entry-sheet';
 import { useTabContext } from './_layout';
 import { supabase, type Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
@@ -92,14 +92,6 @@ export default function Spending() {
     useLiveRefresh(() => fetchData(), 'home');
     useEffect(() => { tabs?.setRefreshDashboard(fetchData); }, [tabs, fetchData]);
 
-    const openMessages = async () => {
-        try {
-            const url = Platform.OS === 'ios' && (await Linking.canOpenURL('messages://')) ? 'messages://' : 'sms:';
-            await Linking.openURL(url);
-        } catch {
-            Alert.alert('Couldn’t open Messages', 'Open your Messages app, then share a MoMo or bank alert to LogIt.');
-        }
-    };
 
     const firstRun = !loading && !error && summary?.empty && wallets.length === 0;
     const bigDay = summary?.week.bigDay?.date;
@@ -153,7 +145,7 @@ export default function Spending() {
                         action={{ label: 'Try again', onPress: () => { setLoading(true); fetchData(); } }}
                     />
                 ) : firstRun ? (
-                    <FirstRunCard onAutopilot={() => router.push('/sms-settings')} onPaste={openMessages} />
+                    <FirstRunCard onAutopilot={() => router.push('/sms-settings')} onPaste={() => router.push('/paste')} />
                 ) : summary && (
                     <SpendingCard
                         summary={summary}
@@ -189,7 +181,7 @@ export default function Spending() {
                 {!loading && !firstRun && (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                         <Chip icon="cash" label="Log cash" onPress={() => tabs?.openAdd('cash')} />
-                        <Chip icon="paste" label="Paste a message" onPress={openMessages} />
+                        <Chip icon="paste" label="Paste a message" onPress={() => router.push('/paste')} />
                         <Chip icon="receive" label="Set salary" onPress={() => router.push('/expected-income')} />
                     </View>
                 )}
@@ -210,8 +202,8 @@ export default function Spending() {
                 onChanged={fetchData}
             />
 
-            <AddTransactionBottomSheet
-                isVisible={!!incomeSheetFor}
+            <AddEntrySheet
+                visible={!!incomeSheetFor}
                 onClose={() => setIncomeSheetFor(null)}
                 onSuccess={async () => {
                     if (incomeSheetFor) await markIncomeReceived(incomeSheetFor.item.id);

@@ -1,24 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, Pressable, Switch, TextInput, View, useWindowDimensions } from 'react-native';
-import {
-    Button, CategoryTile, FieldError, Icon, ListGroup, ListRow, SectionLabel, Sheet, Text, useToast,
-} from '@/components/ui';
-import { FONT, HIT_SLOP } from '@/constants/theme';
+import { Platform, Switch, View } from 'react-native';
+import { Button, CategoryTile, SectionLabel, Sheet, Text, useToast } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import type { Wallet } from '@/lib/supabase';
 import { updateTransactionCategory, type TransactionWithWallet } from '@/lib/transaction-service';
-import { getWallets } from '@/lib/wallet-service';
 import { categoryStyle } from '@/lib/category-style';
 import { flowOf } from '@/lib/spending-service';
 import { getRule, merchantLabel, removeRule, saveRule } from '@/lib/category-rules';
 import { changeWallet, changeWhen, scheduleRemoval } from '@/lib/transaction-edits';
-import { dayHeading, initials, listAmount, receivedAmount, sameDay, shortDate, time24 } from '@/lib/format';
+import { dayHeading, initials, listAmount, receivedAmount, time24 } from '@/lib/format';
+import {
+    CategoryGrid, CategoryValue, FactRow, IN_CATEGORIES, SPENT_CATEGORIES, WalletList, WhenForm, pickStyle,
+} from './pickers';
 
 type Mode = 'detail' | 'category' | 'wallet' | 'when';
-
-/** Category choices, in the design's order (Figma 1005:911). */
-const SPENT_CATEGORIES = ['food', 'shopping', 'airtime', 'bills', 'transport', 'transfer', 'cash', 'subscription', 'fees', 'loans', 'other'];
-const IN_CATEGORIES = ['income', 'transfer', 'gifts', 'loans', 'other'];
 
 /**
  * Transaction detail (Figma 1005:804): three facts you can change, then the
@@ -166,12 +161,7 @@ function Detail({ tx, onCategory, onWallet, onWhen, onRemove }: {
                     onPress={flow === 'moved' ? undefined : onCategory}
                     value={flow === 'moved'
                         ? <Text variant="row">Not spending</Text>
-                        : (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <CategoryTile tone={isPerson ? 'people' : style.tone} icon={isPerson ? 'people' : style.icon} size={24} />
-                                <Text variant="row">{isPerson ? 'People' : style.label}</Text>
-                            </View>
-                        )}
+                        : <CategoryValue id={isPerson ? 'transfer' : (tx.category ?? 'other')} />}
                 />
                 <FactRow
                     divider
@@ -207,36 +197,6 @@ function Detail({ tx, onCategory, onWallet, onWhen, onRemove }: {
                 <Button label="Delete" icon="trash" variant="dangerSoft" size="sm" fill onPress={() => onRemove('delete')} />
             </View>
         </>
-    );
-}
-
-/** "Category · Shopping ›". 44+ tall, label left, value and chevron right. */
-function FactRow({ label, value, onPress, divider }: {
-    label: string;
-    value: React.ReactNode;
-    onPress?: () => void;
-    divider?: boolean;
-}) {
-    const { colors } = useTheme();
-    const body = (
-        <View
-            style={[
-                { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, minHeight: 44 },
-                divider && { borderTopWidth: 1, borderTopColor: colors.line.default },
-            ]}
-        >
-            <Text variant="row" tone="secondary" style={{ flex: 1 }}>{label}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
-                {value}
-                {onPress && <Icon name="next" size={16} color={colors.text.tertiary} />}
-            </View>
-        </View>
-    );
-    if (!onPress) return body;
-    return (
-        <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`Change ${label.toLowerCase()}`} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
-            {body}
-        </Pressable>
     );
 }
 
@@ -305,11 +265,7 @@ export function highlight(sms: string, description: string): { text: string; mar
 function CategoryPicker({ tx, onPicked }: { tx: TransactionWithWallet; onPicked: (category: string) => void }) {
     const { colors } = useTheme();
     const toast = useToast();
-    const { width } = useWindowDimensions();
     const flow = flowOf(tx);
-    const options = flow === 'in' ? IN_CATEGORIES : SPENT_CATEGORIES;
-    const tileWidth = Math.floor((Math.min(width, 520) - 40 - 20) / 3);
-
     const [selected, setSelected] = useState(tx.category ?? 'other');
     const [always, setAlways] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -334,7 +290,7 @@ function CategoryPicker({ tx, onPicked }: { tx: TransactionWithWallet; onPicked:
             toast.show({ message: 'Couldn’t change the category. Try again.', icon: 'alert' });
             return;
         }
-        toast.show({ message: `Changed to ${categoryStyle(id).label}` });
+        toast.show({ message: `Changed to ${pickStyle(id).label}` });
         onPicked(id);
     };
 
@@ -346,44 +302,12 @@ function CategoryPicker({ tx, onPicked }: { tx: TransactionWithWallet; onPicked:
             toast.show({ message: 'Couldn’t save that. Try again.', icon: 'alert' });
             return;
         }
-        if (on) toast.show({ message: `${merchant} will always be ${categoryStyle(selected).label}` });
+        if (on) toast.show({ message: `${merchant} will always be ${pickStyle(selected).label}` });
     };
 
     return (
         <>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }} accessibilityRole="radiogroup">
-                {options.map((id) => {
-                    const s = id === 'transfer' ? { tone: 'people' as const, icon: 'people' as const, label: 'People' } : categoryStyle(id);
-                    const active = id === selected;
-                    return (
-                        <Pressable
-                            key={id}
-                            onPress={() => pick(id)}
-                            accessibilityRole="radio"
-                            accessibilityState={{ selected: active, disabled: busy }}
-                            accessibilityLabel={s.label}
-                            style={({ pressed }) => ({
-                                width: tileWidth,
-                                alignItems: 'center',
-                                gap: 8,
-                                paddingVertical: 12,
-                                paddingHorizontal: 6,
-                                borderRadius: 20,
-                                backgroundColor: active ? colors.brand['accent-tint'] : colors.bg.muted,
-                                borderWidth: 2,
-                                borderColor: active ? colors.brand.accent : 'transparent',
-                                opacity: pressed ? 0.8 : 1,
-                            })}
-                        >
-                            <CategoryTile tone={s.tone} icon={s.icon} size={40} />
-                            <Text size={12} weight={active ? 'bold' : 'semibold'} tone={active ? 'accent' : 'primary'} align="center">
-                                {s.label}
-                            </Text>
-                        </Pressable>
-                    );
-                })}
-            </View>
-
+            <CategoryGrid options={flow === 'in' ? IN_CATEGORIES : SPENT_CATEGORIES} selected={selected} onPick={pick} disabled={busy} />
             {merchant.length > 0 && (
                 <View style={{ backgroundColor: colors.bg.muted, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <Text variant="row" style={{ flex: 1 }}>Always use this for {merchant}</Text>
@@ -401,19 +325,12 @@ function CategoryPicker({ tx, onPicked }: { tx: TransactionWithWallet; onPicked:
     );
 }
 
-// ---------------------------------------------------------------------------
-
 function WalletPicker({ tx, onPicked, onBack }: { tx: TransactionWithWallet; onPicked: (w: Wallet) => void; onBack: () => void }) {
-    const { colors } = useTheme();
     const toast = useToast();
-    const [wallets, setWallets] = useState<Wallet[] | null>(null);
-    const [busy, setBusy] = useState<string | null>(null);
-
-    useEffect(() => { getWallets().then(setWallets).catch(() => setWallets([])); }, []);
-
+    const [busy, setBusy] = useState(false);
     const pick = async (w: Wallet) => {
         if (busy) return;
-        setBusy(w.id);
+        setBusy(true);
         try {
             await changeWallet(tx, w.id);
             toast.show({ message: `Moved to ${w.name}` });
@@ -422,127 +339,33 @@ function WalletPicker({ tx, onPicked, onBack }: { tx: TransactionWithWallet; onP
             console.error('Change wallet failed:', e);
             toast.show({ message: 'Couldn’t change the wallet. Try again.', icon: 'alert' });
         } finally {
-            setBusy(null);
+            setBusy(false);
         }
     };
-
     return (
         <>
-            {wallets === null ? (
-                <Text tone="secondary">Loading your wallets…</Text>
-            ) : wallets.length === 0 ? (
-                <Text tone="secondary">You have no wallets yet. Add one from the Wallets tab.</Text>
-            ) : (
-                <ListGroup bare>
-                    {wallets.map((w) => (
-                        <ListRow
-                            key={w.id}
-                            leading={<CategoryTile tone={w.type === 'cash' ? 'cash' : 'muted'} icon={w.type === 'cash' ? 'cash' : w.type === 'bank' ? 'bank' : 'wallet'} />}
-                            title={w.name}
-                            trailing={w.id === tx.wallet_id ? <Icon name="tick" size={18} color={colors.brand['accent-text']} /> : 'none'}
-                            onPress={() => pick(w)}
-                            accessibilityLabel={`${w.name}${w.id === tx.wallet_id ? ', current' : ''}`}
-                        />
-                    ))}
-                </ListGroup>
-            )}
+            <WalletList selected={tx.wallet_id} onPick={pick} />
             <Button label="Back" variant="secondary" size="md" onPress={onBack} />
         </>
     );
 }
 
-// ---------------------------------------------------------------------------
-
-/** Last seven days as chips, then a 24-hour time. */
 function WhenPicker({ tx, onSaved, onBack }: { tx: TransactionWithWallet; onSaved: (d: Date) => void; onBack: () => void }) {
-    const { colors } = useTheme();
     const toast = useToast();
-    const current = new Date(tx.transaction_date || tx.created_at);
-    const today = new Date();
-    const days = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-        return d;
-    });
-    const inRange = days.some((d) => sameDay(d, current));
-    const [day, setDay] = useState<Date>(inRange ? new Date(current.getFullYear(), current.getMonth(), current.getDate()) : days[0]);
-    const [time, setTime] = useState(time24(current));
-    const [error, setError] = useState<string | null>(null);
-    const [busy, setBusy] = useState(false);
-
-    const save = async () => {
-        const m = /^(\d{1,2})[:.](\d{2})$/.exec(time.trim());
-        const h = m ? Number(m[1]) : NaN;
-        const min = m ? Number(m[2]) : NaN;
-        if (!m || h > 23 || min > 59) {
-            setError('Use 24-hour time, like 13:02.');
-            return;
-        }
-        const when = new Date(day.getFullYear(), day.getMonth(), day.getDate(), h, min);
-        if (when.getTime() > Date.now() + 60_000) {
-            setError('That’s later than now. Pick an earlier time.');
-            return;
-        }
-        setBusy(true);
-        try {
-            await changeWhen(tx, when);
-            toast.show({ message: `Moved to ${dayHeading(when)}, ${time24(when)}` });
-            onSaved(when);
-        } catch (e) {
-            console.error('Change date failed:', e);
-            toast.show({ message: 'Couldn’t change the time. Try again.', icon: 'alert' });
-        } finally {
-            setBusy(false);
-        }
-    };
-
     return (
-        <>
-            {!inRange && (
-                <Text size={13} tone="secondary">Currently {shortDate(current)}, {time24(current)}. You can move it to one of the last seven days.</Text>
-            )}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
-                {days.map((d) => {
-                    const active = sameDay(d, day);
-                    const label = sameDay(d, today) ? 'Today' : d.getTime() === days[1].getTime() ? 'Yesterday' : `${d.toLocaleDateString('en-GB', { weekday: 'short' })} ${shortDate(d)}`;
-                    return (
-                        <Pressable
-                            key={d.toDateString()}
-                            onPress={() => setDay(d)}
-                            hitSlop={HIT_SLOP}
-                            accessibilityRole="radio"
-                            accessibilityState={{ selected: active }}
-                            style={{
-                                paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
-                                backgroundColor: active ? colors.brand.accent : colors.bg.muted,
-                            }}
-                        >
-                            <Text size={13} weight="bold" style={{ color: active ? colors.brand['on-accent'] : colors.text.primary }}>{label}</Text>
-                        </Pressable>
-                    );
-                })}
-            </View>
-            <View style={{ gap: 6 }}>
-                <Text variant="row" tone="secondary">Time</Text>
-                <TextInput
-                    value={time}
-                    onChangeText={(t) => { setTime(t); setError(null); }}
-                    keyboardType="numbers-and-punctuation"
-                    placeholder="13:02"
-                    placeholderTextColor={colors.text.tertiary}
-                    accessibilityLabel="Time, 24-hour"
-                    maxLength={5}
-                    style={{
-                        fontFamily: FONT.semibold, fontSize: 17, color: colors.text.primary,
-                        backgroundColor: colors.bg.muted, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12,
-                        borderWidth: 1.5, borderColor: error ? colors.status.danger : 'transparent',
-                    }}
-                />
-                {error && <FieldError message={error} />}
-            </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Button label="Back" variant="secondary" size="md" fill onPress={onBack} />
-                <Button label="Save" size="md" fill busy={busy} onPress={save} />
-            </View>
-        </>
+        <WhenForm
+            initial={new Date(tx.transaction_date || tx.created_at)}
+            onBack={onBack}
+            onSave={async (when) => {
+                try {
+                    await changeWhen(tx, when);
+                    toast.show({ message: `Moved to ${dayHeading(when)}, ${time24(when)}` });
+                    onSaved(when);
+                } catch (e) {
+                    console.error('Change date failed:', e);
+                    toast.show({ message: 'Couldn’t change the time. Try again.', icon: 'alert' });
+                }
+            }}
+        />
     );
 }

@@ -9,6 +9,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { supabaseAnon } from '../lib/supabase.js';
+import { extractSmsDate } from '../lib/sms-helpers.js';
 import { categorizeTransaction } from '../lib/categorize.js';
 import { extractFee, extractProviderTxnId } from '../lib/sms-helpers.js';
 
@@ -206,7 +207,10 @@ parseSmsRouter.post('/parse-sms', async (req: Request, res: Response) => {
     }
 
     const result = await parseSms(rawSms);
-    res.json(result);
+    // The date written in the message, so the app can preview "Today, 07:40"
+    // before anything is saved (Paste · read, Figma 1005:1319).
+    const smsDate = result.parsed ? extractSmsDate(rawSms) : null;
+    res.json({ ...result, smsDate: smsDate ? smsDate.toISOString() : null });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('parse-sms error:', message);

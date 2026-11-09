@@ -87,16 +87,24 @@ export function FloatingTabBar({ state, descriptors, navigation, onAdd }: Props)
                     );
                 })}
             </View>
+            {/* The fill lives on a plain View: a style function on Pressable can be
+                dropped by NativeWind's interop, which left the white + on nothing. */}
             <Pressable
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onAdd(); }}
                 accessibilityRole="button"
                 accessibilityLabel="Add"
-                style={({ pressed }) => ({
-                    width: 56, height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: colors.brand.accent, opacity: pressed ? 0.9 : 1, ...shadows.fab,
-                })}
+                style={{ width: 56, height: 56, borderRadius: 999 }}
             >
-                <Icon name="plus" size={24} color={colors.brand['on-accent']} />
+                {({ pressed }) => (
+                    <View
+                        style={{
+                            width: 56, height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: colors.brand.accent, opacity: pressed ? 0.9 : 1, ...shadows.fab,
+                        }}
+                    >
+                        <Icon name="plus" size={24} color={colors.brand['on-accent']} />
+                    </View>
+                )}
             </Pressable>
         </View>
     );

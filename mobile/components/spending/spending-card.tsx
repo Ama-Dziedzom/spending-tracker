@@ -37,7 +37,7 @@ export function SpendingCard({ summary, period, onPeriod, onMore, onDay, onTrans
                 <CardHeader title="Spending" right={<RoundButton icon="more" label="More" tone="card" onPress={onMore} />} />
             )}
             <SegmentedControl options={PERIODS} value={period} onChange={onPeriod} />
-            {period === 'week' && <WeekView summary={summary} onDay={onDay} />}
+            {period === 'week' && <WeekView summary={summary} onDay={onDay} onTransaction={onTransaction} />}
             {period === 'today' && <TodayView summary={summary} onTransaction={onTransaction} />}
             {period === 'month' && <MonthView summary={summary} />}
         </Card>
@@ -59,7 +59,11 @@ function Total({ label, amount, tag }: { label: string; amount: number; tag?: Re
     );
 }
 
-function WeekView({ summary, onDay }: { summary: SpendingSummary; onDay: (d: Date) => void }) {
+function WeekView({ summary, onDay, onTransaction }: {
+    summary: SpendingSummary;
+    onDay: (d: Date) => void;
+    onTransaction: (tx: TransactionWithWallet) => void;
+}) {
     const { colors } = useTheme();
     const w = summary.week;
     const quiet = w.spent === 0;
@@ -96,6 +100,13 @@ function WeekView({ summary, onDay }: { summary: SpendingSummary; onDay: (d: Dat
                         {w.bigDay.date.toLocaleDateString('en-GB', { weekday: 'long' })} was your big day: {listNames(w.bigDay.names)}
                     </Text>
                 </InsetPanel>
+            )}
+            {w.top.length > 0 && (
+                <ListGroup bare>
+                    {w.top.map((tx) => (
+                        <TransactionRow key={tx.id} tx={tx} onPress={() => onTransaction(tx)} />
+                    ))}
+                </ListGroup>
             )}
             {(w.cameIn > 0 || w.moved > 0) && (
                 <InsetPanel style={{ paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16, flexWrap: 'wrap' }}>
@@ -146,7 +157,7 @@ function MonthView({ summary }: { summary: SpendingSummary }) {
                 tag={m.cameIn > 0 ? <Chip variant="tag" tone="success" label={`${ghs(m.cameIn)} came in`} /> : undefined}
             />
             <View style={{ gap: 14 }}>
-                {m.categories.slice(0, 6).map((c) => {
+                {m.categories.slice(0, 4).map((c) => {
                     const barColor = c.style.tone === 'muted' ? colors.text.tertiary : colors.cat[c.style.tone];
                     const meta = c.id === 'transfer' ? `${c.count} ${c.count === 1 ? 'transfer' : 'transfers'}` : c.names.join(', ') || `${c.count} spends`;
                     return (

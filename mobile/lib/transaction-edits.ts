@@ -3,12 +3,13 @@ import { supabase } from './supabase';
 import type { TransactionWithWallet } from './transaction-service';
 
 /**
- * Edits from Transaction detail (Figma 1005:804): wallet, when, and removal.
+ * Adds and edits (Figma 1005:804, 1005:1055, 1005:1161): wallet, when,
+ * removal, and new manual entries.
  *
  * Wallet balances: when an alert carried the bank's own balance
- * (balance_snapshot), that figure is the truth and is left alone. Entries
- * without one changed the balance by their amount, so moving or removing
- * them undoes that change.
+ * (balance_snapshot), that figure is the truth and is left alone. Other
+ * entries that changed the balance by their amount have that change undone
+ * when they're moved or removed (see countsTowardBalance).
  */
 
 function signedEffect(tx: Pick<TransactionWithWallet, 'type' | 'amount'>): number {
@@ -16,7 +17,7 @@ function signedEffect(tx: Pick<TransactionWithWallet, 'type' | 'amount'>): numbe
     return out ? -Number(tx.amount) : Number(tx.amount);
 }
 
-async function adjustBalance(walletId: string, delta: number): Promise<void> {
+export async function adjustBalance(walletId: string, delta: number): Promise<void> {
     if (!delta) return;
     const { data, error } = await supabase.from('wallets').select('current_balance').eq('id', walletId).single();
     if (error || !data) throw error ?? new Error('Wallet not found');
@@ -27,7 +28,16 @@ async function adjustBalance(walletId: string, delta: number): Promise<void> {
     if (updateError) throw updateError;
 }
 
-const countsTowardBalance = (tx: TransactionWithWallet) => tx.balance_snapshot === null || tx.balance_snapshot === undefined;
+/**
+ * Did this entry change its wallet's balance? v1 adds record it in
+ * balance_applied. Older rows: SMS entries without the bank's balance did;
+ * manual entries didn't (the old add form never touched balances).
+ */
+function countsTowardBalance(tx: TransactionWithWallet): boolean {
+    if (tx.balance_applied !== null && tx.balance_applied !== undefined) return tx.balance_applied;
+    if (tx.source === 'manual') return false;
+    return tx.balance_snapshot === null || tx.balance_snapshot === undefined;
+}
 
 export async function changeWallet(tx: TransactionWithWallet, walletId: string): Promise<void> {
     if (tx.wallet_id === walletId) return;
