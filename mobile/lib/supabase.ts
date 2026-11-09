@@ -138,6 +138,8 @@ export interface Transaction {
     source?: TransactionSource;
     /** sms = read from the message, estimated = worked out by LogIt, received = when LogIt got it */
     date_source?: 'sms' | 'estimated' | 'received' | 'manual' | null;
+    /** Set when LogIt added this side of a move because the bank didn't text (points at the alert it came from). */
+    inferred_from?: string | null;
     /** The alert as received, when the entry came from an SMS. */
     raw_sms?: string | null;
     /** Whether this entry changed its wallet's balance (v1 adds). Null on older rows. */

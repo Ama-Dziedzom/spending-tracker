@@ -189,6 +189,13 @@ function Detail({ tx, onCategory, onWallet, onWhen }: {
                     <SectionLabel>What LogIt read</SectionLabel>
                     <ReadMessage sms={rawSms} description={tx.description} />
                 </View>
+            ) : tx.inferred_from ? (
+                <View style={{ backgroundColor: colors.bg.muted, borderRadius: 18, padding: 14, gap: 4 }}>
+                    <SectionLabel>Added by LogIt</SectionLabel>
+                    <Text variant="meta" tone="secondary">
+                        {tx.wallet?.name ?? 'This bank'} didn’t send a message for this move, so LogIt added it from the other side’s alert. If it wasn’t you, delete it.
+                    </Text>
+                </View>
             ) : (
                 <Text variant="meta" tone="tertiary">You added this yourself.</Text>
             )}

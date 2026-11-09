@@ -422,6 +422,104 @@ async function applyBalance(walletId: string, tx: ParsedTx, smsDate: Date | null
   return !error;
 }
 
+const STAND_IN_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Adds the silent side of a move between the user's own accounts, marked
+ * inferred_from = the alert it came from, so the app can label it "Added by
+ * LogIt" and offer Undo. Skipped when that bank already sent its own alert.
+ */
+async function addStandIn(
+  userId: string,
+  originalId: string,
+  other: { id: string; name: string },
+  otherSource: string | null,
+  thisWalletName: string,
+  thisType: 'debit' | 'credit',
+  amount: number,
+  at: Date,
+  dateSource: string,
+  knownDate: Date | null,
+): Promise<{ walletName: string } | null> {
+  const type: 'debit' | 'credit' = thisType === 'credit' ? 'debit' : 'credit';
+  const from = new Date(at.getTime() - STAND_IN_WINDOW_MS).toISOString();
+  const to = new Date(at.getTime() + STAND_IN_WINDOW_MS).toISOString();
+
+  const { data: real } = await supabaseAdmin
+    .from('transactions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('wallet_id', other.id)
+    .eq('type', type)
+    .eq('amount', amount)
+    .eq('is_transfer', true)
+    .gte('transaction_date', from)
+    .lte('transaction_date', to)
+    .limit(1);
+  if (real && real.length > 0) return null; // the bank did text: nothing to add
+
+  const { data: row, error } = await supabaseAdmin
+    .from('transactions')
+    .insert({
+      user_id: userId,
+      wallet_id: other.id,
+      amount,
+      type,
+      category: 'transfer',
+      is_transfer: true,
+      transfer_type: type === 'debit' ? 'transfer_out' : 'transfer_in',
+      description: `${type === 'debit' ? 'To' : 'From'} ${thisWalletName}`,
+      source: otherSource ?? 'manual',
+      transaction_date: at.toISOString(),
+      raw_sms: null,
+      balance_snapshot: null,
+    })
+    .select('id')
+    .single();
+  if (error || !row) {
+    console.error('Stand-in not added:', error?.message);
+    return null;
+  }
+
+  const { error: markError } = await supabaseAdmin
+    .from('transactions')
+    .update({ inferred_from: originalId, date_source: dateSource })
+    .eq('id', row.id);
+  if (markError) console.error('inferred_from not saved (run the inferred_transfers migration):', markError.message);
+
+  const applied = await applyBalance(other.id, { type, amount, balance: null, fee: 0 } as unknown as ParsedTx, knownDate, row.id);
+  await supabaseAdmin.from('transactions').update({ balance_applied: applied }).eq('id', row.id);
+  console.log(`🔁 Added the silent side: ${type} ${amount} on ${other.name}`);
+  return { walletName: other.name };
+}
+
+/** Removes a stand-in LogIt added for this move, undoing its balance change. */
+async function replaceStandIn(userId: string, walletId: string, type: 'debit' | 'credit', amount: number, at: Date): Promise<void> {
+  const { data: rows, error } = await supabaseAdmin
+    .from('transactions')
+    .select('id, balance_applied')
+    .eq('user_id', userId)
+    .eq('wallet_id', walletId)
+    .eq('type', type)
+    .eq('amount', amount)
+    .not('inferred_from', 'is', null)
+    .gte('transaction_date', new Date(at.getTime() - STAND_IN_WINDOW_MS).toISOString())
+    .lte('transaction_date', new Date(at.getTime() + STAND_IN_WINDOW_MS).toISOString())
+    .limit(1);
+  if (error || !rows || rows.length === 0) return;
+  const standIn = rows[0];
+  if (standIn.balance_applied) {
+    const { data: w } = await supabaseAdmin.from('wallets').select('current_balance').eq('id', walletId).single();
+    if (w) {
+      const current = Number(w.current_balance) || 0;
+      const undone = type === 'debit' ? current + amount : current - amount;
+      await supabaseAdmin.from('wallets').update({ current_balance: undone, updated_at: new Date().toISOString() }).eq('id', walletId);
+    }
+  }
+  await supabaseAdmin.from('transactions').delete().eq('id', standIn.id);
+  console.log(`🔁 Replaced LogIt's stand-in with the bank's own alert on wallet ${walletId}`);
+}
+
 processSmsRouter.post(
   '/process-sms',
   extractUser,
@@ -609,6 +707,8 @@ processSmsRouter.post(
       // For own-account moves, name the other side when the message says it
       // ("…Mine from SCB Standard Chartered Bank" -> "From Standard Chartered"),
       // using the user's own name for that wallet when they have one.
+      let counterpartWallet: { id: string; name: string } | null = null;
+      let counterpartSource: string | null = null;
       if (transaction.is_transfer) {
         const other = counterpartProvider(rawSms, transaction.source);
         if (other) {
@@ -623,6 +723,8 @@ processSmsRouter.post(
             (w.source_identifier ?? '').toLowerCase() === info.identifier ||
             info.nameHints.some((h) => (w.name ?? '').toLowerCase().includes(h)));
           transaction.description = `${transaction.type === 'credit' ? 'From' : 'To'} ${match?.name ?? info.name}`;
+          counterpartWallet = match ? { id: match.id, name: match.name } : null;
+          counterpartSource = other;
         }
       }
 
@@ -658,6 +760,14 @@ processSmsRouter.post(
         }
       }
       const knownDate = dateSource === 'received' && !receivedAt ? null : txDate;
+
+      // ── Step 3b: The bank's own alert for a move LogIt already filled in ─
+      // If LogIt added this side earlier (the other bank was silent at the
+      // time), replace that stand-in with the real alert so it's not counted
+      // twice. The stand-in's balance change is undone first.
+      if (transaction.is_transfer && wallet) {
+        await replaceStandIn(userId, wallet.id, transaction.type, transaction.amount, txDate);
+      }
 
       // ── Step 4: Insert transaction (+ a separate row for any fee) ───────
       const { fee, provider_txn_id: providerTxnId, affects_balance: affectsBalance, ...txFields } = transaction;
@@ -712,6 +822,14 @@ processSmsRouter.post(
       // ── Step 5: Update wallet balance ───────────────────────────────────
       const balanceApplied = wallet && affectsBalance ? await applyBalance(wallet.id, transaction, knownDate, data.id) : false;
 
+      // ── Step 5b: The other side of an own-account move ──────────────────
+      // e.g. MoMo says "received … from SCB" but Standard Chartered never
+      // texts. Add the matching entry to that wallet so its balance drops too.
+      let standIn: { walletName: string } | null = null;
+      if (transaction.is_transfer && counterpartWallet && wallet && counterpartWallet.id !== wallet.id) {
+        standIn = await addStandIn(userId, data.id, counterpartWallet, counterpartSource, wallet.name, transaction.type, transaction.amount, txDate, dateSource, knownDate);
+      }
+
       // ── Step 6: Transfer matching (this user's pending transfers only) ──
       let transferSuggestions: unknown[] = [];
       if (transaction.is_transfer) {
@@ -751,6 +869,9 @@ processSmsRouter.post(
         textResponse += `🏷️ Category: ${transaction.category}\n`;
         textResponse += `💬 Desc: ${transaction.description}`;
         if (transaction.fee > 0) textResponse += `\n🧾 Fee: GHS ${transaction.fee.toFixed(2)}`;
+        if (standIn) {
+          textResponse += `\n🔁 ${standIn.walletName} didn't text, so LogIt moved GHS ${transaction.amount.toFixed(2)} there too.`;
+        }
         if (dateSource === 'estimated') {
           textResponse += `\n🕒 Date: about ${txDate.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} (estimated)`;
         }
@@ -779,6 +900,7 @@ processSmsRouter.post(
         balanceAfter: transaction.balance,
         fee: transaction.fee,
         transactionDate: txDate.toISOString(),
+        standInWallet: standIn?.walletName ?? null,
         dateSource,
         limitWarning: warning,
       });
