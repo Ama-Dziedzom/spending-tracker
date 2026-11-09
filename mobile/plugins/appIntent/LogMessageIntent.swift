@@ -102,10 +102,24 @@ struct LogItAppShortcuts: AppShortcutsProvider {
 // "pending_sms" in the App Group: a JSON array of message texts. The Android
 // receiver uses the same key and format, and the app sends them when it opens
 // (lib/pending-sms.ts). Retrying is safe: the API ignores duplicates.
+// "pending_sms_received_at" maps each text to when it arrived (epoch ms), so
+// a message sent late still gets its real time.
 
 enum PendingQueue {
     static let key = "pending_sms"
+    static let timesKey = "pending_sms_received_at"
     static let max = 100
+
+    static func times(defaults: UserDefaults?) -> [String: Double] {
+        guard let raw = defaults?.string(forKey: timesKey), let data = raw.data(using: .utf8),
+              let map = try? JSONSerialization.jsonObject(with: data) as? [String: Double] else { return [:] }
+        return map
+    }
+
+    static func receivedAt(_ sms: String, defaults: UserDefaults?) -> Date? {
+        guard let ms = times(defaults: defaults)[sms] else { return nil }
+        return Date(timeIntervalSince1970: ms / 1000)
+    }
 
     static func all(defaults: UserDefaults?) -> [String] {
         guard let raw = defaults?.string(forKey: key), let data = raw.data(using: .utf8),
@@ -114,6 +128,12 @@ enum PendingQueue {
     }
 
     static func save(_ list: [String], defaults: UserDefaults?) {
+        // Keep arrival times only for messages still waiting.
+        let kept = times(defaults: defaults).filter { list.contains($0.key) }
+        if kept.isEmpty { defaults?.removeObject(forKey: timesKey) }
+        else if let d = try? JSONSerialization.data(withJSONObject: kept), let r = String(data: d, encoding: .utf8) {
+            defaults?.set(r, forKey: timesKey)
+        }
         if list.isEmpty { defaults?.removeObject(forKey: key); return }
         if let data = try? JSONSerialization.data(withJSONObject: Array(list.suffix(max))),
            let raw = String(data: data, encoding: .utf8) {
@@ -121,7 +141,12 @@ enum PendingQueue {
         }
     }
 
-    static func add(_ sms: String, defaults: UserDefaults?) {
+    static func add(_ sms: String, receivedAt: Date, defaults: UserDefaults?) {
+        var map = times(defaults: defaults)
+        if map[sms] == nil { map[sms] = (receivedAt.timeIntervalSince1970 * 1000).rounded() }
+        if let d = try? JSONSerialization.data(withJSONObject: map), let r = String(data: d, encoding: .utf8) {
+            defaults?.set(r, forKey: timesKey)
+        }
         var list = all(defaults: defaults)
         if !list.contains(sms) { list.append(sms) }
         save(list, defaults: defaults)
@@ -238,18 +263,20 @@ struct LogItClient {
     /// Sends one message to /process-sms with the user's session.
     /// No accountId: the API routes each message to the wallet of the
     /// provider that sent it (MTN → MTN MoMo, StanChart → Standard Chartered…).
-    func log(_ sms: String) async -> LogOutcome {
+    /// `receivedAt`: when the message arrived. The automation runs the moment
+    /// it does, so "now" is exact; the API then never has to estimate it.
+    func log(_ sms: String, receivedAt: Date = Date()) async -> LogOutcome {
         var client = self
         do {
-            var (data, status) = try await client.post(sms)
+            var (data, status) = try await client.post(sms, receivedAt: receivedAt)
             if status == 401 {
                 guard await client.refreshSession() else { return .notSignedIn }
-                (data, status) = try await client.post(sms)
+                (data, status) = try await client.post(sms, receivedAt: receivedAt)
                 if status == 401 { return .notSignedIn }
             }
             return LogItClient.outcome(data: data, status: status)
         } catch let error as URLError where LogItClient.isOffline(error) {
-            PendingQueue.add(sms, defaults: defaults)
+            PendingQueue.add(sms, receivedAt: receivedAt, defaults: defaults)
             return .queued
         } catch {
             return .failed(error.localizedDescription)
@@ -265,11 +292,12 @@ struct LogItClient {
         var sent = 0
         var remaining = pending
         for sms in pending {
+            let at = PendingQueue.receivedAt(sms, defaults: defaults)
             do {
-                var (_, status) = try await client.post(sms)
+                var (_, status) = try await client.post(sms, receivedAt: at)
                 if status == 401 {
                     guard await client.refreshSession() else { break }
-                    (_, status) = try await client.post(sms)
+                    (_, status) = try await client.post(sms, receivedAt: at)
                 }
                 if (200..<300).contains(status) || status == 400 {
                     remaining.removeAll { $0 == sms }
@@ -291,14 +319,16 @@ struct LogItClient {
             .contains(error.code)
     }
 
-    private func post(_ sms: String) async throws -> (Data, Int) {
+    private func post(_ sms: String, receivedAt: Date?) async throws -> (Data, Int) {
         guard let url = URL(string: "\(apiUrl)/process-sms") else { throw URLError(.badURL) }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.timeoutInterval = 25
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
-        req.httpBody = try JSONSerialization.data(withJSONObject: ["rawSms": sms])
+        var body: [String: Any] = ["rawSms": sms]
+        if let receivedAt { body["receivedAt"] = Int64((receivedAt.timeIntervalSince1970 * 1000).rounded()) }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: req)
         return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }

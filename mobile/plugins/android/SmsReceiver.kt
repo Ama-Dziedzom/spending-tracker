@@ -33,6 +33,8 @@ class SmsReceiver : BroadcastReceiver() {
         val msgs = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         val rawSms = msgs.map { it.messageBody }.joinToString("")
         val sender = msgs.firstOrNull()?.originatingAddress ?: ""
+        // When the network delivered it (exact), so the API never has to estimate.
+        val receivedAt = msgs.firstOrNull()?.timestampMillis?.takeIf { it > 0 } ?: System.currentTimeMillis()
 
         // Only look at messages that are very likely money movements
         if (!isLikelyTransaction(sender, rawSms)) return
@@ -61,7 +63,7 @@ class SmsReceiver : BroadcastReceiver() {
                 flushPending(context, apiUrl, authToken, defaultAccountId)
 
                 // ── Step 1: POST to backend ──────────────────────────────────
-                var logResult = postTransaction(apiUrl, authToken, rawSms, defaultAccountId)
+                var logResult = postTransaction(apiUrl, authToken, rawSms, defaultAccountId, receivedAt)
 
                 // ── Step 2: Auto-refresh token if 401 Unauthorized ────────────
                 if (logResult.statusCode == 401 && refreshToken.isNotEmpty() && supabaseAnonKey.isNotEmpty()) {
@@ -69,7 +71,7 @@ class SmsReceiver : BroadcastReceiver() {
                     if (refreshSuccess) {
                         // Reload refreshed token and retry POST
                         authToken = sharedPref.getString("auth_token", "") ?: ""
-                        logResult = postTransaction(apiUrl, authToken, rawSms, defaultAccountId)
+                        logResult = postTransaction(apiUrl, authToken, rawSms, defaultAccountId, receivedAt)
                     }
                 }
 
@@ -84,7 +86,7 @@ class SmsReceiver : BroadcastReceiver() {
             } catch (e: java.io.IOException) {
                 // No connection (or it dropped mid-request): keep the message and
                 // send it next time. The API ignores duplicates, so retrying is safe.
-                enqueuePending(context, rawSms)
+                enqueuePending(context, rawSms, receivedAt)
                 showNotification(context, "Saved offline", "LogIt will log this when you're back online.")
             } catch (e: Exception) {
                 showNotification(context, "❌ Error Auto-Logging Transaction", e.localizedMessage ?: "Unknown error")
@@ -153,7 +155,7 @@ class SmsReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun postTransaction(apiUrl: String, token: String, rawSms: String, accountId: String): RequestResult {
+    private fun postTransaction(apiUrl: String, token: String, rawSms: String, accountId: String, receivedAt: Long? = null): RequestResult {
         val targetUrl = URL("$apiUrl/process-sms")
         val conn = targetUrl.openConnection() as HttpURLConnection
         conn.requestMethod = "POST"
@@ -165,6 +167,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val jsonBody = JSONObject().apply {
             put("rawSms", rawSms)
+            if (receivedAt != null) put("receivedAt", receivedAt)
             if (accountId.isNotEmpty()) {
                 put("accountId", accountId)
             }
@@ -190,6 +193,19 @@ class SmsReceiver : BroadcastReceiver() {
     // the next message here, and by the app when it opens (lib/pending-sms.ts).
 
     private val PENDING_KEY = "pending_sms"
+    // Same as iOS: { message text: epoch ms it arrived } for queued messages.
+    private val PENDING_TIMES_KEY = "pending_sms_received_at"
+
+    private fun readTimes(context: Context): JSONObject {
+        val raw = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(PENDING_TIMES_KEY, null)
+        return try { if (raw == null) JSONObject() else JSONObject(raw) } catch (e: Exception) { JSONObject() }
+    }
+
+    private fun writeTimes(context: Context, times: JSONObject) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+        if (times.length() == 0) prefs.remove(PENDING_TIMES_KEY) else prefs.putString(PENDING_TIMES_KEY, times.toString())
+        prefs.apply()
+    }
     private val PENDING_MAX = 100
 
     @Synchronized
@@ -205,12 +221,18 @@ class SmsReceiver : BroadcastReceiver() {
 
     @Synchronized
     private fun writePending(context: Context, list: List<String>) {
+        val times = readTimes(context)
+        val kept = JSONObject()
+        for (sms in list) if (times.has(sms)) kept.put(sms, times.getLong(sms))
+        writeTimes(context, kept)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
         if (list.isEmpty()) prefs.remove(PENDING_KEY) else prefs.putString(PENDING_KEY, JSONArray(list).toString())
         prefs.apply()
     }
 
-    private fun enqueuePending(context: Context, sms: String) {
+    private fun enqueuePending(context: Context, sms: String, receivedAt: Long) {
+        val times = readTimes(context)
+        if (!times.has(sms)) { times.put(sms, receivedAt); writeTimes(context, times) }
         val list = readPending(context)
         if (!list.contains(sms)) list.add(sms)
         writePending(context, list.takeLast(PENDING_MAX))
@@ -220,9 +242,11 @@ class SmsReceiver : BroadcastReceiver() {
         val list = readPending(context)
         if (list.isEmpty()) return
         val remaining = list.toMutableList()
+        val times = readTimes(context)
         for (sms in list) {
             try {
-                val result = postTransaction(apiUrl, token, sms, accountId)
+                val at = if (times.has(sms)) times.getLong(sms) else null
+                val result = postTransaction(apiUrl, token, sms, accountId, at)
                 if (result.statusCode == 401) break          // signed out: keep the rest
                 if (result.statusCode in 200..299 || result.statusCode == 400) remaining.remove(sms)
             } catch (e: java.io.IOException) {

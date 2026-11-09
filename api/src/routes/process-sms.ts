@@ -37,6 +37,19 @@ interface ParsedTx {
   affects_balance: boolean;
 }
 
+/**
+ * The phone's "message arrived at" time (ISO string or epoch ms). Ignored if
+ * it is in the future (clock skew beyond 5 min) or older than 60 days.
+ */
+function parseReceivedAt(value: unknown, now: Date): Date | null {
+  if (value === undefined || value === null || value === '') return null;
+  const d = typeof value === 'number' ? new Date(value) : typeof value === 'string' ? new Date(value) : null;
+  if (!d || Number.isNaN(d.getTime())) return null;
+  if (d.getTime() > now.getTime() + 5 * 60 * 1000) return null;
+  if (now.getTime() - d.getTime() > 60 * 24 * 60 * 60 * 1000) return null;
+  return d.getTime() > now.getTime() ? now : d;
+}
+
 /** An undated message is treated as late when its estimated time is this far before now. */
 const LATE_SHARE_MS = 2 * 60 * 60 * 1000;
 
@@ -414,7 +427,7 @@ processSmsRouter.post(
   extractUser,
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { rawSms: rawInput, accountId } = req.body as { rawSms?: unknown; accountId?: string };
+      const { rawSms: rawInput, accountId, receivedAt: receivedAtInput } = req.body as { rawSms?: unknown; accountId?: string; receivedAt?: unknown };
       const rawSms = typeof rawInput === 'string' ? toPlainSms(rawInput) : rawInput;
       const userId = req.userId!;
 
@@ -606,10 +619,17 @@ processSmsRouter.post(
       // being logged late), else now.
       const now = new Date();
       const smsDate = extractSmsDate(rawSms, now);
-      let txDate: Date = smsDate ?? now;
+      // When the phone got the message, sent by the iOS automation and the
+      // Android receiver (also kept for alerts queued offline). It's exact,
+      // so a live alert is never re-dated by the ID estimate below.
+      const receivedAt = parseReceivedAt(receivedAtInput, now);
+      let txDate: Date = smsDate ?? receivedAt ?? now;
       let dateSource: 'sms' | 'estimated' | 'received' = smsDate ? 'sms' : 'received';
       if (smsDate) {
         await recordAnchor(transaction.source, transaction.provider_txn_id, smsDate);
+      } else if (receivedAt) {
+        // Exact arrival time from the phone: nothing to estimate. (Not saved
+        // as an anchor: undated alerts may use a different ID series.)
       } else {
         const estimate = await estimateDateFromId(transaction.source, transaction.provider_txn_id, now);
         if (estimate && now.getTime() - estimate.getTime() > LATE_SHARE_MS) {
@@ -617,7 +637,7 @@ processSmsRouter.post(
           dateSource = 'estimated';
         }
       }
-      const knownDate = dateSource === 'received' ? null : txDate;
+      const knownDate = dateSource === 'received' && !receivedAt ? null : txDate;
 
       // ── Step 4: Insert transaction (+ a separate row for any fee) ───────
       const { fee, provider_txn_id: providerTxnId, affects_balance: affectsBalance, ...txFields } = transaction;
