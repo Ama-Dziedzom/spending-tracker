@@ -4,7 +4,8 @@
  * Full SMS processing pipeline:
  *   1. Authenticate (JWT, or shortcut secret)
  *   2. Parse SMS via parseSms() (direct call, no HTTP)
- *   3. Skip exact duplicates (same SMS already logged by this user)
+ *   3. Skip exact duplicates (same SMS already logged by this user), and
+ *      file a payment's notice under the payment (one payment, two messages)
  *   4. Route to the user's wallet for that provider (create it if missing)
  *   5. Insert transaction (wallet_id, balance_snapshot, transaction_date from the SMS)
  *   6. Update the wallet balance — only if this SMS is not older than the
@@ -520,6 +521,79 @@ async function replaceStandIn(userId: string, walletId: string, type: 'debit' | 
   console.log(`🔁 Replaced LogIt's stand-in with the bank's own alert on wallet ${walletId}`);
 }
 
+/** How far apart a payment's notice and the payment's own SMS can arrive. */
+const NOTICE_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * A notice says money moved but has no transaction ID and no balance, e.g.
+ * Hubtel's "Your Mobile Money wallet has been debited directly…" that comes
+ * with MTN's own "Payment for GHS… Transaction Id…" SMS. One payment, two
+ * messages: LogIt keeps the payment and files the notice under it.
+ */
+function isNotice(tx: ParsedTx): boolean {
+  return !tx.provider_txn_id && (tx.balance === null || tx.balance === undefined);
+}
+
+/** A cut-off merchant name ("Direct.Inv"): the notice's name reads better. */
+function looksCutOff(description: string): boolean {
+  const d = description.trim();
+  return d.length < 4 || /[a-z]\.[a-z]/i.test(d);
+}
+
+interface NoticePair {
+  id: string;
+  raw_sms: string | null;
+  description: string;
+  category: string | null;
+  balance_applied: boolean | null;
+  balance_snapshot: number | null;
+  provider_txn_id: string | null;
+  notice_sms: string | null;
+  created_at: string;
+}
+
+/**
+ * The other half of a notice/payment pair: same wallet, direction and exact
+ * amount within NOTICE_WINDOW_MS, where exactly one of the two is a notice.
+ * Two notices, or two real payments, are never paired: those can be two
+ * real purchases of the same amount.
+ */
+async function findNoticePair(userId: string, walletId: string, tx: ParsedTx, at: Date, incomingIsNotice: boolean): Promise<NoticePair | null> {
+  const { data, error } = await supabaseAdmin
+    .from('transactions')
+    .select('id, raw_sms, description, category, balance_applied, balance_snapshot, provider_txn_id, notice_sms, created_at')
+    .eq('user_id', userId)
+    .eq('wallet_id', walletId)
+    .eq('type', tx.type)
+    .eq('amount', tx.amount)
+    .eq('is_transfer', false)
+    .not('raw_sms', 'is', null)
+    .is('inferred_from', null)
+    .gte('transaction_date', new Date(at.getTime() - NOTICE_WINDOW_MS).toISOString())
+    .lte('transaction_date', new Date(at.getTime() + NOTICE_WINDOW_MS).toISOString())
+    .order('transaction_date', { ascending: true })
+    .limit(5);
+  if (error) {
+    // e.g. the notice_pairs migration hasn't run: log as before
+    console.error('notice pairing skipped:', error.message);
+    return null;
+  }
+  const rows = (data ?? []) as NoticePair[];
+  return rows.find((r) => {
+    const rowIsNotice = !r.provider_txn_id && (r.balance_snapshot === null || r.balance_snapshot === undefined);
+    return incomingIsNotice ? !rowIsNotice && !r.notice_sms : rowIsNotice;
+  }) ?? null;
+}
+
+/** Puts back a balance change an entry made. */
+async function undoBalance(walletId: string, type: 'debit' | 'credit', amount: number): Promise<void> {
+  const { data: w } = await supabaseAdmin.from('wallets').select('current_balance').eq('id', walletId).single();
+  if (!w) return;
+  const current = Number(w.current_balance) || 0;
+  const undone = type === 'debit' ? current + amount : current - amount;
+  await supabaseAdmin.from('wallets').update({ current_balance: undone, updated_at: new Date().toISOString() }).eq('id', walletId);
+}
+
 processSmsRouter.post(
   '/process-sms',
   extractUser,
@@ -695,6 +769,22 @@ processSmsRouter.post(
         return;
       }
 
+      // A notice already filed under its payment, shared again
+      const { data: filedNotice } = await supabaseAdmin
+        .from('transactions')
+        .select('id, created_at')
+        .eq('user_id', userId)
+        .eq('notice_sms', rawSms)
+        .limit(1);
+      if (filedNotice && filedNotice.length > 0) {
+        if (wantsPlainText(req)) {
+          res.type('text/plain').send(`ℹ️ Already logged\nThis is the notice for a payment LogIt already has.`);
+          return;
+        }
+        res.json({ success: true, duplicate: true, noticeOf: filedNotice[0].id, data: filedNotice[0], loggedOn: filedNotice[0].created_at });
+        return;
+      }
+
       // ── Step 3: Own accounts, wallet and date ───────────────────────────
       // Money moved between the user's own accounts is a transfer, not income
       // or spending.
@@ -761,6 +851,42 @@ processSmsRouter.post(
       }
       const knownDate = dateSource === 'received' && !receivedAt ? null : txDate;
 
+      // ── Step 3c: A payment's notice and the payment itself ─────────────
+      // Some services text their own notice ("debited directly", no ID, no
+      // balance) next to the provider's payment SMS. Keep the payment; file
+      // the notice under it so the money is counted once.
+      let noticeSms: string | null = null;
+      if (wallet && !transaction.is_transfer) {
+        const incomingIsNotice = isNotice(transaction);
+        const pair = await findNoticePair(userId, wallet.id, transaction, txDate, incomingIsNotice);
+        if (pair && incomingIsNotice) {
+          const betterName = looksCutOff(pair.description) && !looksCutOff(transaction.description) ? transaction.description : null;
+          await supabaseAdmin
+            .from('transactions')
+            .update({ notice_sms: rawSms, ...(betterName ? { description: betterName } : {}) })
+            .eq('id', pair.id);
+          console.log(`🧾 Notice filed under payment ${pair.id} (GHS ${transaction.amount})`);
+          if (wantsPlainText(req)) {
+            res.type('text/plain').send(`ℹ️ Same payment\nThis is the notice for the GHS ${transaction.amount.toFixed(2)} payment LogIt already has. Counted once.`);
+            return;
+          }
+          res.json({ success: true, duplicate: true, noticeOf: pair.id, data: { ...pair, notice_sms: rawSms }, walletId: wallet.id, walletName: wallet.name, loggedOn: pair.created_at });
+          return;
+        }
+        if (pair && !incomingIsNotice) {
+          // The notice came first: undo its balance change and replace it,
+          // keeping its name if ours is cut off and the category it had
+          // (the user may have changed it).
+          const applied = pair.balance_applied ?? true;
+          if (applied) await undoBalance(wallet.id, transaction.type, transaction.amount);
+          await supabaseAdmin.from('transactions').delete().eq('id', pair.id);
+          if (looksCutOff(transaction.description) && !looksCutOff(pair.description)) transaction.description = pair.description;
+          if (pair.category) transaction.category = pair.category;
+          noticeSms = pair.raw_sms;
+          console.log(`🧾 Payment replaced its earlier notice ${pair.id} (GHS ${transaction.amount})`);
+        }
+      }
+
       // ── Step 3b: The bank's own alert for a move LogIt already filled in ─
       // If LogIt added this side earlier (the other bank was silent at the
       // time), replace that stand-in with the real alert so it's not counted
@@ -795,6 +921,10 @@ processSmsRouter.post(
         .update({ date_source: dateSource, provider_txn_id: providerTxnId })
         .eq('id', data.id);
       if (extraError) console.error('date_source/provider_txn_id not saved (run the capture migration):', extraError.message);
+      if (noticeSms) {
+        const { error: noticeError } = await supabaseAdmin.from('transactions').update({ notice_sms: noticeSms }).eq('id', data.id);
+        if (noticeError) console.error('notice_sms not saved (run the notice_pairs migration):', noticeError.message);
+      }
 
       if (fee > 0) {
         const { error: feeError } = await supabaseAdmin.from('transactions').insert({
@@ -821,6 +951,9 @@ processSmsRouter.post(
 
       // ── Step 5: Update wallet balance ───────────────────────────────────
       const balanceApplied = wallet && affectsBalance ? await applyBalance(wallet.id, transaction, knownDate, data.id) : false;
+      // Recorded so an undo (move, delete, or a payment replacing its notice)
+      // only puts back a change that happened.
+      await supabaseAdmin.from('transactions').update({ balance_applied: balanceApplied }).eq('id', data.id);
 
       // ── Step 5b: The other side of an own-account move ──────────────────
       // e.g. MoMo says "received … from SCB" but Standard Chartered never
