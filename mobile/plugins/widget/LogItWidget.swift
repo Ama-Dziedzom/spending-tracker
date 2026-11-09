@@ -530,14 +530,32 @@ extension View {
     }
 }
 
-struct TodayWidget: Widget {
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "LogItToday", provider: Provider()) { e in
-            TodayView(s: e.snap).redactedIf(e.placeholder).background(blue: true)
+/// One widget, three sizes, so it can be resized on the home screen:
+/// small = Today, medium = This week, large = Overview (Figma 1037:4555).
+struct SpendingView: View {
+    let e: WEntry
+    @Environment(\.widgetFamily) var family
+    var body: some View {
+        switch family {
+        case .systemSmall:
+            TodayView(s: e.snap).padding(16).redactedIf(e.placeholder).background(blue: true)
+        case .systemMedium:
+            WeekView(s: e.snap).padding(16).redactedIf(e.placeholder).background(blue: false)
+        default:
+            OverviewView(s: e.snap).redactedIf(e.placeholder).background(blue: false)
         }
-        .configurationDisplayName("Today")
-        .description("Today’s spend and the week so far.")
-        .supportedFamilies([.systemSmall])
+    }
+}
+
+struct SpendingWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "LogItSpending", provider: Provider()) { e in
+            SpendingView(e: e)
+        }
+        .configurationDisplayName("Spending")
+        .description("Today, the week, or the week with your latest entries. Resize it to switch.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .contentMarginsDisabled()
     }
 }
 
@@ -552,17 +570,6 @@ struct ToCheckWidget: Widget {
     }
 }
 
-struct WeekWidget: Widget {
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "LogItWeek", provider: Provider()) { e in
-            WeekView(s: e.snap).redactedIf(e.placeholder).background(blue: false)
-        }
-        .configurationDisplayName("This week")
-        .description("The week’s spend, day by day, and your latest entry.")
-        .supportedFamilies([.systemMedium])
-    }
-}
-
 struct WalletsWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "LogItWallets", provider: Provider()) { e in
@@ -571,18 +578,6 @@ struct WalletsWidget: Widget {
         .configurationDisplayName("Wallets")
         .description("Balances from each wallet’s latest alert, with their age.")
         .supportedFamilies([.systemMedium])
-    }
-}
-
-struct OverviewWidget: Widget {
-    var body: some WidgetConfiguration {
-        StaticConfiguration(kind: "LogItOverview", provider: Provider()) { e in
-            OverviewView(s: e.snap).redactedIf(e.placeholder).containerBackground(for: .widget) { Tok.bgSurface }
-        }
-        .configurationDisplayName("Overview")
-        .description("The week, your last three entries, and Ask LogIt.")
-        .supportedFamilies([.systemLarge])
-        .contentMarginsDisabled()
     }
 }
 
@@ -611,11 +606,9 @@ struct CheckLockWidget: Widget {
 @main
 struct LogItWidgets: WidgetBundle {
     var body: some Widget {
-        TodayWidget()
+        SpendingWidget()
         ToCheckWidget()
-        WeekWidget()
         WalletsWidget()
-        OverviewWidget()
         LockWidget()
         CheckLockWidget()
     }
