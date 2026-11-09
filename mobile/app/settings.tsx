@@ -3,7 +3,7 @@ import { Platform, Pressable, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    Avatar, CategoryTile, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast,
+    Avatar, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast,
     type IconName,
 } from '@/components/ui';
 import { useAppLock } from '@/components/app-lock';
@@ -14,6 +14,7 @@ import { getWallets } from '@/lib/wallet-service';
 import { getExpectedIncome } from '@/lib/income-service';
 import { getLimits } from '@/lib/limits';
 import { formatPhone } from '@/lib/phone';
+import { forgetPhone, signOutOnPurpose } from '@/lib/session';
 
 const THEMES = [
     { value: 'light', label: 'Light' },
@@ -39,6 +40,18 @@ export default function Settings() {
     const [limitCount, setLimitCount] = useState<number | null>(null);
     const [autopilotOn, setAutopilotOn] = useState<boolean | null>(null);
     const [shareSamples, setShareSamplesState] = useState(false);
+    const [logoutOpen, setLogoutOpen] = useState(false);
+
+    const logOut = async () => {
+        setLogoutOpen(false);
+        const { error } = await signOutOnPurpose();
+        await forgetPhone();
+        if (error) {
+            toast.show({ message: 'Couldn’t log out. Try again.', icon: 'alert' });
+            return;
+        }
+        router.replace('/welcome');
+    };
 
     useFocusEffect(useCallback(() => {
         let live = true;
@@ -97,6 +110,7 @@ export default function Settings() {
     const notificationsOn = profile ? Object.values(profile.notifications).some(Boolean) : null;
 
     return (
+        <>
         <Screen band={{ height: 500 }} header={<TopBar title="Settings" />} contentStyle={{ gap: 10 }}>
             <Pressable
                 onPress={() => router.push('/profile')}
@@ -156,6 +170,24 @@ export default function Settings() {
             <ListGroup>
                 <ListRow dense leading={tile('help')} title="Help & privacy" trailing="chevron" onPress={() => router.push('/help')} />
             </ListGroup>
+
+            {/* Easy to find, not alarming: its own group, last. Red stays for Delete account (Profile). */}
+            <ListGroup>
+                <ListRow dense leading={tile('logout')} title="Log out" onPress={() => setLogoutOpen(true)} />
+            </ListGroup>
         </Screen>
+        <Dialog
+            visible={logoutOpen}
+            tone="neutral"
+            icon="logout"
+            title="Log out of LogIt?"
+            body="Your transactions stay saved. Autopilot pauses until you log back in."
+            confirmLabel="Log out"
+            cancelLabel="Stay"
+            stacked
+            onCancel={() => setLogoutOpen(false)}
+            onConfirm={logOut}
+        />
+        </>
     );
 }

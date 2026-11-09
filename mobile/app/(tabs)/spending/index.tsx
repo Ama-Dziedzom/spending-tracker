@@ -241,10 +241,10 @@ export default function Spending() {
                 )}
 
                 {!loading && !firstRun && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                        <Chip icon="cash" label="Log cash" onPress={() => tabs?.openAdd('cash')} />
-                        <Chip icon="paste" label="Paste a message" onPress={() => router.push('/paste')} />
-                        <Chip icon="receive" label="Set salary" onPress={() => router.push('/expected-income')} />
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Chip fill icon="cash" label="Log cash" onPress={() => tabs?.openAdd('cash')} />
+                        <Chip fill icon="paste" label="Paste" onPress={() => router.push('/paste')} />
+                        <Chip fill icon="receive" label="Set salary" onPress={() => router.push('/expected-income')} />
                     </View>
                 )}
             </Screen>

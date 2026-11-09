@@ -86,7 +86,6 @@ export default function ProfileScreen() {
                 </ListGroup>
 
                 <ListGroup>
-                    <ListRow dense title="Log out" onPress={() => setLogoutOpen(true)} />
                     <Tap onPress={() => router.push('/delete-account')} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center', paddingVertical: 9 }}>
                         <Text variant="row" tone="danger">Delete account and data</Text>
                     </Tap>

@@ -90,12 +90,14 @@ interface ChipProps {
      * tag      – tinted status/category tag (e.g. "42 less than last week").
      */
     variant?: 'shortcut' | 'muted' | 'tag';
+    /** Share a row's width equally with its siblings (Spending shortcuts). */
+    fill?: boolean;
     /** For 'tag': the tone. */
     tone?: 'success' | 'warn' | 'danger' | 'accent' | 'neutral';
     trailingChevron?: boolean;
 }
 
-export function Chip({ label, icon, onPress, variant = 'shortcut', tone = 'neutral', trailingChevron }: ChipProps) {
+export function Chip({ label, icon, onPress, variant = 'shortcut', tone = 'neutral', trailingChevron, fill }: ChipProps) {
     const { colors, shadows } = useTheme();
 
     let bg = colors.bg.surface;
@@ -123,6 +125,7 @@ export function Chip({ label, icon, onPress, variant = 'shortcut', tone = 'neutr
                 variant === 'tag' && { paddingHorizontal: 10, paddingVertical: 6 },
                 // Anything you can tap is at least 44 tall for a good thumb fit.
                 !!onPress && { minHeight: 44, paddingVertical: 0 },
+                fill && { justifyContent: 'center', paddingLeft: 8, paddingRight: 8 },
             ]}
         >
             {icon && <Icon name={icon} size={variant === 'shortcut' ? 16 : 14} color={iconColor} />}
@@ -139,7 +142,7 @@ export function Chip({ label, icon, onPress, variant = 'shortcut', tone = 'neutr
 
     if (!onPress) return body;
     return (
-        <Tap onPress={onPress} hitSlop={HIT_SLOP} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+        <Tap onPress={onPress} hitSlop={HIT_SLOP} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, ...(fill ? { flex: 1 } : {}) })}>
             {body}
         </Tap>
     );
