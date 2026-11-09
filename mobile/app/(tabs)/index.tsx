@@ -1,8 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-    ActionBanner, Avatar, Banner, Chip, RoundButton, Screen, TAB_BAR_SPACE, Text, TopBar,
+    ActionBanner, Avatar, Banner, Chip, OfflinePill, RoundButton, Screen, Spinner, TAB_BAR_SPACE, Text, TopBar,
     type AvatarChoice,
 } from '@/components/ui';
 import { SpendingCard, SpendingCardSkeleton, type Period } from '@/components/spending/spending-card';
@@ -19,7 +20,11 @@ import { getIncomePrompts, logExpectedIncome, markIncomeReceived, snoozeIncome, 
 import { fetchSpendingWindow, summarise, type SpendingSummary } from '@/lib/spending-service';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { usePendingRemovals } from '@/lib/transaction-edits';
-import { longDate, sameDay } from '@/lib/format';
+import { longDate, sameDay, time24 } from '@/lib/format';
+import { loadSpendingCache, saveSpendingCache } from '@/lib/spending-cache';
+import { isNetworkError } from '@/lib/network';
+import { pendingSmsCount } from '@/lib/pending-sms';
+import { NOTIFICATIONS_ASKED } from '../allow-notifications';
 import { RAW } from '@/constants/theme';
 
 /**
@@ -46,6 +51,15 @@ export default function Spending() {
     const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
     const [incomeSheetFor, setIncomeSheetFor] = useState<IncomePrompt | null>(null);
 
+    // System states (Figma section 993:54)
+    /** Set while showing saved numbers because the connection is down: when they were saved. */
+    const [offlineAt, setOfflineAt] = useState<Date | null>(null);
+    /** Rows that just arrived on refresh, tinted for a moment. */
+    const [freshIds, setFreshIds] = useState<ReadonlySet<string>>(new Set());
+    const [waitingToSync, setWaitingToSync] = useState(0);
+    const knownIds = useRef<Set<string> | null>(null);
+    const askedNotifications = useRef(false);
+
     // Entries inside their Undo window are left out, so totals change at once.
     const removing = usePendingRemovals();
     const visibleTxs = useMemo(() => {
@@ -69,22 +83,57 @@ export default function Spending() {
                 getCheckCount(),
                 getIncomePrompts(),
             ]);
+            // New since the last load: tint them for a moment so you can see what changed.
+            if (knownIds.current) {
+                const added = window.filter((t) => !knownIds.current!.has(t.id)).map((t) => t.id);
+                if (added.length) {
+                    setFreshIds(new Set(added));
+                    setTimeout(() => setFreshIds(new Set()), 2500);
+                }
+            }
+            knownIds.current = new Set(window.map((t) => t.id));
             setTxs(window);
             setLoaded(true);
             setWallets(walletList);
             setReviewCount(pending);
             setIncomePrompt(prompts[0] ?? null);
             setError(false);
+            setOfflineAt(null);
+            saveSpendingCache({ txs: window, wallets: walletList, name: (meta.full_name as string | undefined) ?? null, avatar: (meta.avatar as string | undefined) ?? null });
+
+            // Ask about notifications after the first alert is logged, not at sign-up (Figma 1016:2297).
+            if (!askedNotifications.current && window.some((t) => t.raw_sms)) {
+                askedNotifications.current = true;
+                if ((await AsyncStorage.getItem(NOTIFICATIONS_ASKED).catch(() => 'true')) !== 'true') router.push('/allow-notifications');
+            }
         } catch (e) {
             console.error('Error loading Spending:', e);
-            setError(true);
+            // Offline with numbers on screen: keep them and say when they're from.
+            const cache = isNetworkError(e) ? await loadSpendingCache() : null;
+            if (cache) setOfflineAt(new Date(cache.savedAt));
+            else setError(true);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [router]);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    // Saved numbers first, instantly; then the real load (Figma 1014:1948).
+    useEffect(() => {
+        loadSpendingCache().then((cache) => {
+            if (cache && !knownIds.current) {
+                setTxs(cache.txs);
+                setWallets(cache.wallets);
+                setName(cache.name?.split(' ')[0] ?? null);
+                setAvatar((cache.avatar as AvatarChoice | null) ?? null);
+                setLoaded(true);
+                setLoading(false);
+                knownIds.current = new Set(cache.txs.map((t) => t.id));
+            }
+        });
+        fetchData();
+        pendingSmsCount().then(setWaitingToSync);
+    }, [fetchData]);
     useLiveRefresh(() => fetchData(), 'home');
     useEffect(() => { tabs?.setRefreshDashboard(fetchData); }, [tabs, fetchData]);
 
@@ -117,10 +166,25 @@ export default function Spending() {
                 }
                 scrollProps={{
                     refreshControl: (
-                        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchData(); }} tintColor={RAW.onBand} colors={[RAW.onBand]} />
+                        // The band shows "Checking for new alerts…" instead of the system spinner.
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={() => { setRefreshing(true); fetchData(); pendingSmsCount().then(setWaitingToSync); }}
+                            tintColor="transparent"
+                            colors={[RAW.onBand]}
+                        />
                     ),
                 }}
             >
+                {refreshing && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: -6 }} accessibilityLiveRegion="polite">
+                        <Spinner size={16} color={RAW.onBand} />
+                        <Text variant="meta" weight="semibold" style={{ color: RAW.onBandSecondary }}>Checking for new alerts…</Text>
+                    </View>
+                )}
+
+                {offlineAt && <OfflinePill label={`Offline · showing what you have at ${time24(offlineAt)}`} />}
+
                 {incomePrompt && !loading && (
                     <SalaryPromptCard
                         prompt={incomePrompt}
@@ -151,6 +215,16 @@ export default function Spending() {
                         onMore={() => router.push('/transactions')}
                         onDay={setDayOpen}
                         onTransaction={setDetailTx}
+                        freshIds={freshIds}
+                    />
+                )}
+
+                {waitingToSync > 0 && (
+                    <Banner
+                        tone="info"
+                        icon="refresh"
+                        title={`${waitingToSync} ${waitingToSync === 1 ? 'alert' : 'alerts'} waiting to sync`}
+                        body="Logs as soon as you’re back online. Nothing is lost."
                     />
                 )}
 

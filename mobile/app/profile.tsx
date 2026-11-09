@@ -7,7 +7,7 @@ import {
 import { AvatarPickerSheet } from '@/components/settings/avatar-picker-sheet';
 import { TextEditSheet } from '@/components/settings/text-edit-sheet';
 import { useTheme } from '@/lib/theme';
-import { supabase } from '@/lib/supabase';
+import { forgetPhone, signOutOnPurpose } from '@/lib/session';
 import { getProfile, setName, setRecoveryEmail, type Profile } from '@/lib/settings-service';
 import { formatPhone } from '@/lib/phone';
 import { RAW } from '@/constants/theme';
@@ -29,7 +29,8 @@ export default function ProfileScreen() {
 
     const logOut = async () => {
         setLogoutOpen(false);
-        const { error } = await supabase.auth.signOut();
+        const { error } = await signOutOnPurpose();
+        await forgetPhone();
         if (error) {
             toast.show({ message: 'Couldn’t log out. Try again.', icon: 'alert' });
             return;

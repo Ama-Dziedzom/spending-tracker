@@ -7,6 +7,8 @@ import { RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { supabase } from '../lib/supabase';
 import { biometrics } from '../utils/biometrics';
+import { checkUpdateRequired } from '@/lib/app-config';
+import { lastPhone } from '@/lib/session';
 
 const MIN_SPLASH_MS = 2000;
 
@@ -17,7 +19,7 @@ export default function SplashScreen() {
     useEffect(() => {
         let cancelled = false;
 
-        const resolveDestination = async (): Promise<'/(tabs)' | '/login' | '/welcome'> => {
+        const resolveDestination = async (): Promise<'/(tabs)' | '/login' | '/welcome' | '/session-expired'> => {
             // Biometric users get routed through /login, which auto-triggers the
             // Face ID/fingerprint prompt on mount and can restore a session even
             // after the Supabase token has fully expired (see utils/biometrics.ts).
@@ -29,13 +31,22 @@ export default function SplashScreen() {
             // Supabase session directly so we don't force a manual re-login
             // just because the app reloaded.
             const { data: { session } } = await supabase.auth.getSession();
-            return session ? '/(tabs)' : '/welcome';
+            if (session) return '/(tabs)';
+            // Signed out without choosing to (login lapsed): "Log in again".
+            return (await lastPhone()) ? '/session-expired' : '/welcome';
         };
 
         Promise.all([
-            resolveDestination(),
+            checkUpdateRequired(),
             new Promise((resolve) => setTimeout(resolve, MIN_SPLASH_MS)),
-        ]).then(([destination]) => {
+        ]).then(async ([update]) => {
+            if (cancelled) return;
+            // Update required wins over everything (Figma 1014:2283).
+            if (update.required) {
+                router.replace({ pathname: '/update-required', params: { reason: update.reason ?? '' } });
+                return;
+            }
+            const destination = await resolveDestination();
             if (!cancelled) router.replace(destination);
         }).catch((err) => {
             // Never strand people on the splash: if the session or biometrics

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { PanResponder, Pressable, View } from 'react-native';
 import { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { AnimatedView } from './animated-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -63,6 +63,11 @@ export function useToast() {
 function ToastView({ message, icon = 'tick', action, onDismiss }: ToastOptions & { onDismiss: () => void }) {
     const { colors, shadows } = useTheme();
     const insets = useSafeAreaInsets();
+    // Swipe down to dismiss (Figma 1016:2336).
+    const pan = React.useRef(PanResponder.create({
+        onMoveShouldSetPanResponder: (_e, g) => g.dy > 6 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderRelease: (_e, g) => { if (g.dy > 18) onDismiss(); },
+    })).current;
     return (
         <AnimatedView
             entering={FadeInDown.duration(200)}
@@ -71,6 +76,7 @@ function ToastView({ message, icon = 'tick', action, onDismiss }: ToastOptions &
             style={{ position: 'absolute', left: 16, right: 16, bottom: insets.bottom + ABOVE_NAV }}
         >
             <View
+                {...pan.panHandlers}
                 accessibilityRole="alert"
                 accessibilityLiveRegion="polite"
                 style={{

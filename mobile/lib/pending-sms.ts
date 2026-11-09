@@ -75,3 +75,15 @@ export async function requestLogNotifications(): Promise<boolean> {
         return false;
     }
 }
+
+/** How many alerts are saved on the phone waiting to be sent ("1 alert waiting to sync"). */
+export async function pendingSmsCount(): Promise<number> {
+    if (!reader?.getItem) return 0;
+    try {
+        const raw = await reader.getItem(KEY);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list.length : 0;
+    } catch {
+        return 0;
+    }
+}

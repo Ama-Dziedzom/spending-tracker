@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import { AppState, Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold, useFonts } from '@expo-google-fonts/manrope';
@@ -18,7 +18,9 @@ import { AppLockProvider } from '@/components/app-lock';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { syncSessionToAppGroup } from '@/lib/shareSync';
-import { flushPendingSms, requestLogNotifications } from '@/lib/pending-sms';
+import { flushPendingSms } from '@/lib/pending-sms';
+import { lastPhone, wasIntentionalSignOut } from '@/lib/session';
+import { ErrorScreen } from '@/components/system/error-screen';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -59,20 +61,24 @@ export default function RootLayout() {
       syncSessionToAppGroup(session);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       syncSessionToAppGroup(session);
+      // Login lapsed on its own (not Log out): "Log in again" (Figma 1014:2313).
+      if (event === 'SIGNED_OUT' && !wasIntentionalSignOut()) {
+        lastPhone().then((p) => { if (p) router.replace('/session-expired'); });
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   // Send messages saved while offline, at launch and whenever LogIt comes back
-  // to the foreground. Also ask (once) to show LogIt's own notifications.
+  // to the foreground. Notifications are asked for after the first alert is
+  // logged (app/allow-notifications.tsx), not here.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return;
       flushPendingSms();
-      requestLogNotifications();
     });
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') flushPendingSms();
@@ -147,8 +153,26 @@ function AppStack() {
             <Stack.Screen name="review" options={{ headerShown: false }} />
             <Stack.Screen name="expected-income" options={{ headerShown: false }} />
             <Stack.Screen name="add-phone" options={{ headerShown: false }} />
+            <Stack.Screen name="session-expired" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
+            <Stack.Screen name="update-required" options={{ headerShown: false, gestureEnabled: false, animation: 'fade' }} />
+            <Stack.Screen name="allow-notifications" options={{ headerShown: false, animation: 'fade' }} />
           </Stack>
           <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
         </ThemeProvider>
+  );
+}
+
+/**
+ * Something went wrong (Figma 1014:2246): full screen only when nothing can
+ * be shown. expo-router renders this in place of the layout, so it brings its
+ * own providers.
+ */
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  return (
+    <SafeAreaProvider>
+      <LogItThemeProvider>
+        <ErrorScreen error={error} retry={retry} />
+      </LogItThemeProvider>
+    </SafeAreaProvider>
   );
 }

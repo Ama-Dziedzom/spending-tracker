@@ -8,6 +8,7 @@ import { useTheme } from '@/lib/theme';
 import { useAuth } from '../lib/useAuth';
 import { supabase } from '../lib/supabase';
 import { formatPhone, phoneAuthMessage } from '../lib/phone';
+import { rememberPhone } from '@/lib/session';
 
 const RESEND_SECONDS = 60;
 
@@ -47,6 +48,7 @@ export default function Code() {
             if (mode === 'phone' && phone) {
                 const r = await verifyPhoneCode(phone, value);
                 if (!r.success) { setError('That code didn’t work. Try again or get a new one.'); return; }
+                await rememberPhone(phone);
                 if (intent === 'signup') {
                     // Name was sent with the code request; save it again in case this number already had an account.
                     if (fullName) await supabase.auth.updateUser({ data: { full_name: fullName } });

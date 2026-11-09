@@ -2,6 +2,7 @@ import { Share } from 'react-native';
 import { supabase } from './supabase';
 import type { AvatarChoice } from '@/components/ui';
 import { API_URL } from './sms-api';
+import { forgetPhone, signOutOnPurpose } from './session';
 
 /**
  * Settings (Figma section 993:53). Everything here is stored on the account
@@ -151,5 +152,6 @@ export async function deleteAccount(): Promise<void> {
         throw new Error('Couldn’t reach LogIt. Check your connection and try again.');
     }
     if (!res.ok) throw new Error('Couldn’t delete your account. Nothing was removed; try again.');
-    await supabase.auth.signOut();
+    await signOutOnPurpose();
+    await forgetPhone();
 }

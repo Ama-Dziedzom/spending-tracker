@@ -27,18 +27,20 @@ interface Props {
     onTransaction: (tx: TransactionWithWallet) => void;
     /** Hide the title row (salary prompt / first run put the switch first). */
     compact?: boolean;
+    /** Ids that just arrived on refresh, tinted for a moment. */
+    freshIds?: ReadonlySet<string>;
 }
 
 /** The Spending card (Figma 1002:203 / 351 / 475). */
-export function SpendingCard({ summary, period, onPeriod, onMore, onDay, onTransaction, compact }: Props) {
+export function SpendingCard({ summary, period, onPeriod, onMore, onDay, onTransaction, compact, freshIds }: Props) {
     return (
         <Card hero gap={16}>
             {!compact && (
                 <CardHeader title="Spending" right={<RoundButton icon="more" label="More" tone="card" onPress={onMore} />} />
             )}
             <SegmentedControl options={PERIODS} value={period} onChange={onPeriod} />
-            {period === 'week' && <WeekView summary={summary} onDay={onDay} onTransaction={onTransaction} />}
-            {period === 'today' && <TodayView summary={summary} onTransaction={onTransaction} />}
+            {period === 'week' && <WeekView summary={summary} onDay={onDay} onTransaction={onTransaction} freshIds={freshIds} />}
+            {period === 'today' && <TodayView summary={summary} onTransaction={onTransaction} freshIds={freshIds} />}
             {period === 'month' && <MonthView summary={summary} />}
         </Card>
     );
@@ -59,10 +61,11 @@ function Total({ label, amount, tag }: { label: string; amount: number; tag?: Re
     );
 }
 
-function WeekView({ summary, onDay, onTransaction }: {
+function WeekView({ summary, onDay, onTransaction, freshIds }: {
     summary: SpendingSummary;
     onDay: (d: Date) => void;
     onTransaction: (tx: TransactionWithWallet) => void;
+    freshIds?: ReadonlySet<string>;
 }) {
     const { colors } = useTheme();
     const w = summary.week;
@@ -104,7 +107,7 @@ function WeekView({ summary, onDay, onTransaction }: {
             {w.top.length > 0 && (
                 <ListGroup bare>
                     {w.top.map((tx) => (
-                        <TransactionRow key={tx.id} tx={tx} onPress={() => onTransaction(tx)} />
+                        <TransactionRow key={tx.id} tx={tx} fresh={freshIds?.has(tx.id)} onPress={() => onTransaction(tx)} />
                     ))}
                 </ListGroup>
             )}
@@ -119,7 +122,7 @@ function WeekView({ summary, onDay, onTransaction }: {
     );
 }
 
-function TodayView({ summary, onTransaction }: { summary: SpendingSummary; onTransaction: (tx: TransactionWithWallet) => void }) {
+function TodayView({ summary, onTransaction, freshIds }: { summary: SpendingSummary; onTransaction: (tx: TransactionWithWallet) => void; freshIds?: ReadonlySet<string> }) {
     const t = summary.today;
     return (
         <>
@@ -135,7 +138,7 @@ function TodayView({ summary, onTransaction }: { summary: SpendingSummary; onTra
             ) : (
                 <ListGroup bare>
                     {t.entries.slice(0, 6).map((tx) => (
-                        <TransactionRow key={tx.id} tx={tx} onPress={() => onTransaction(tx)} />
+                        <TransactionRow key={tx.id} tx={tx} fresh={freshIds?.has(tx.id)} onPress={() => onTransaction(tx)} />
                     ))}
                 </ListGroup>
             )}

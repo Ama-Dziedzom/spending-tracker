@@ -1,4 +1,6 @@
 import React from 'react';
+import { View } from 'react-native';
+import { useTheme } from '@/lib/theme';
 import { CategoryTile, ListRow } from '@/components/ui';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
 import { categoryStyle } from '@/lib/category-style';
@@ -18,11 +20,14 @@ export type RowContext = 'day' | 'search' | 'moved' | 'wallet';
  * One transaction in a v1 list (Figma 1004:617): tile, name, meta, amount
  * without currency; received money green with a plus; moved money neutral.
  */
-export function TransactionRow({ tx, onPress, context = 'day' }: {
+export function TransactionRow({ tx, onPress, context = 'day', fresh }: {
     tx: TransactionWithWallet;
     onPress?: () => void;
     context?: RowContext;
+    /** Just arrived on refresh: tinted for a moment so you can see what changed (Figma 1014:2143). */
+    fresh?: boolean;
 }) {
+    const { colors } = useTheme();
     const flow = flowOf(tx);
     const style = categoryStyle(tx.category);
     const isPerson = tx.category === 'transfer' || (flow === 'in' && !tx.category);
@@ -49,7 +54,7 @@ export function TransactionRow({ tx, onPress, context = 'day' }: {
             ? <CategoryTile tone="people" initials={initials(tx.description)} />
             : <CategoryTile tone={style.tone} icon={style.icon} />;
 
-    return (
+    const row = (
         <ListRow
             leading={leading}
             title={tx.description || style.label}
@@ -59,6 +64,8 @@ export function TransactionRow({ tx, onPress, context = 'day' }: {
             onPress={onPress}
         />
     );
+    if (!fresh) return row;
+    return <View style={{ backgroundColor: colors.brand['accent-tint'], borderRadius: 14, marginHorizontal: -8, paddingHorizontal: 8 }}>{row}</View>;
 }
 
 /** "MTN MoMo → Cash", or "From MTN MoMo" when only one side is known. */
