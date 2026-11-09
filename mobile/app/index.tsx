@@ -1,18 +1,17 @@
 import React, { useEffect } from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { Image, View, useColorScheme } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BrandBand, Icon, Spinner, Text } from '@/components/ui';
-import { RAW } from '@/constants/theme';
-import { useTheme } from '@/lib/theme';
 import { supabase } from '../lib/supabase';
 import { biometrics } from '../utils/biometrics';
 import { checkUpdateRequired } from '@/lib/app-config';
 import { lastPhone } from '@/lib/session';
 
-const MIN_SPLASH_MS = 2000;
-
-/** Launch · loading (Figma 1000:29): full band, mark and name, a spinner near the bottom. */
+/**
+ * Start: decides where to go (update needed, Face ID, logged in or not)
+ * while the native splash is still showing; _layout hides the splash once
+ * we've moved on. No minimum wait and no second loading screen.
+ */
 export default function SplashScreen() {
     const router = useRouter();
 
@@ -36,10 +35,7 @@ export default function SplashScreen() {
             return (await lastPhone()) ? '/session-expired' : '/welcome';
         };
 
-        Promise.all([
-            checkUpdateRequired(),
-            new Promise((resolve) => setTimeout(resolve, MIN_SPLASH_MS)),
-        ]).then(async ([update]) => {
+        checkUpdateRequired().then(async (update) => {
             if (cancelled) return;
             // Update required wins over everything (Figma 1014:2283).
             if (update.required) {
@@ -61,24 +57,17 @@ export default function SplashScreen() {
     return <LaunchView />;
 }
 
+/**
+ * Only seen if the start check outlasts _layout's 4s safety net: the same
+ * wordmark on the same colours as the native splash (app.json), so it reads
+ * as the splash still showing.
+ */
 function LaunchView() {
-    const { colors } = useTheme();
-    const { height } = useWindowDimensions();
-    // Figma positions on an 844 frame: mark at 330, spinner at 720.
-    const y = (v: number) => (v / 844) * height;
+    const dark = useColorScheme() === 'dark';
     return (
-        <View style={{ flex: 1, backgroundColor: colors.brand.band }}>
+        <View style={{ flex: 1, backgroundColor: dark ? '#081750' : '#1642E5', alignItems: 'center', justifyContent: 'center' }} accessible accessibilityLabel="LogIt, loading">
             <StatusBar style="light" />
-            <BrandBand full />
-            <View style={{ position: 'absolute', top: y(330), left: 0, right: 0, alignItems: 'center', gap: 14 }} accessible accessibilityLabel="LogIt, loading">
-                <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: RAW.onBand, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name="flash" size={36} color={colors.brand.accent} />
-                </View>
-                <Text weight="extrabold" size={34} tone="onBand" style={{ letterSpacing: -1.02 }}>LogIt</Text>
-            </View>
-            <View style={{ position: 'absolute', top: y(720), left: 0, right: 0, alignItems: 'center' }}>
-                <Spinner size={28} color={RAW.onBand} />
-            </View>
+            <Image source={require('../assets/logit-app-icon/splash-icon.png')} style={{ width: 200, height: 200 }} resizeMode="contain" />
         </View>
     );
 }

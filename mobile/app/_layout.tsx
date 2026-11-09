@@ -2,7 +2,7 @@ import { clearWidgetSnapshot } from '@/lib/widget-snapshot';
 import 'react-native-gesture-handler';
 import { AppState, Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { router, Stack } from 'expo-router';
+import { router, Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold, useFonts } from '@expo-google-fonts/manrope';
@@ -35,16 +35,22 @@ export default function RootLayout() {
     'Manrope-ExtraBold': Manrope_800ExtraBold,
   });
 
+  // The native splash (W2 wordmark) stays up until people land somewhere
+  // real: app/index.tsx works out where to go behind it, so there's no second
+  // loading screen. Deep links open their screen directly and hide it as
+  // soon as fonts are in.
+  const pathname = usePathname();
   useEffect(() => {
-    if (loaded || error) {
-      if (error) console.warn('[fonts] Manrope failed to load', error);
-      SplashScreen.hideAsync();
-    }
-  }, [loaded, error]);
+    if (error) console.warn('[fonts] Manrope failed to load', error);
+  }, [error]);
+  useEffect(() => {
+    if ((loaded || error) && pathname !== '/') SplashScreen.hideAsync();
+  }, [loaded, error, pathname]);
 
   // Manrope is built into the app (expo-font plugin in app.json), so this load
-  // is near-instant. Safety net for older builds: never leave people on the
-  // native splash; after 4s carry on with the system font.
+  // is near-instant. Safety net: never leave people on the native splash;
+  // after 4s carry on (system font if needed, and app/index.tsx shows the
+  // same wordmark as the splash while it finishes).
   const [fontTimeout, setFontTimeout] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => {
