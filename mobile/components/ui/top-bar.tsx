@@ -1,10 +1,11 @@
 import React from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { router } from 'expo-router';
 import { HIT_SLOP, RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { Icon, type IconName } from './icon';
 import { Text } from './text';
+import { Tap } from './tap';
 
 interface RoundButtonProps {
     icon: IconName;
@@ -21,7 +22,7 @@ export function RoundButton({ icon, onPress, label, tone = 'band', size }: Round
     const { colors } = useTheme();
     const d = size ?? (tone === 'band' ? 38 : 34);
     return (
-        <Pressable
+        <Tap
             onPress={onPress}
             hitSlop={HIT_SLOP}
             accessibilityRole="button"
@@ -37,7 +38,7 @@ export function RoundButton({ icon, onPress, label, tone = 'band', size }: Round
             })}
         >
             <Icon name={icon} size={tone === 'band' ? 20 : 18} color={tone === 'band' ? RAW.onBand : colors.text.primary} />
-        </Pressable>
+        </Tap>
     );
 }
 
@@ -81,18 +82,18 @@ export function TopBar({ title, subtitle, leading = 'back', onLeading, left, rig
 /** Translucent pill action on the band, e.g. "Search" on Transactions. */
 export function BandPill({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
     return (
-        <Pressable
+        <Tap
             onPress={onPress}
             accessibilityRole="button"
             style={({ pressed }) => ({
                 flexDirection: 'row', alignItems: 'center', gap: 6,
-                paddingHorizontal: 14, paddingVertical: 8, minHeight: 38,
+                paddingHorizontal: 14, minHeight: 44,
                 borderRadius: 999, backgroundColor: RAW.onBandFill, opacity: pressed ? 0.7 : 1,
             })}
             hitSlop={HIT_SLOP}
         >
             <Icon name={icon} size={16} color={RAW.onBand} />
             <Text variant="row" size={13} weight="bold" tone="onBand">{label}</Text>
-        </Pressable>
+        </Tap>
     );
 }

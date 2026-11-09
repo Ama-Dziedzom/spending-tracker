@@ -3,8 +3,10 @@ import { Pressable, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/lib/theme';
 import { Icon, type IconName } from './icon';
+import { Tap } from './tap';
 import { Text } from './text';
 
 /** Route name → icon. Spending is the `index` route. */
@@ -20,6 +22,7 @@ const TAB_ICONS: Record<string, IconName> = {
  */
 const TAB_PARENT: Record<string, string> = {
     transactions: 'index',
+    wallet: 'wallets',
 };
 
 /** Space to leave below scroll content so it clears the floating bar. */
@@ -41,7 +44,18 @@ export function FloatingTabBar({ state, descriptors, navigation, onAdd }: Props)
     const currentName = state.routes[state.index]?.name;
     const activeTab = TAB_PARENT[currentName] ?? currentName;
 
+    // "Bottom fade" (Figma 1004:749): 150 tall on an 844 frame, canvas from
+    // transparent to solid at 60 %, so lists fade out behind the bar.
+    const fadeHeight = 150 + Math.max(0, insets.bottom - 34);
+
     return (
+        <>
+        <LinearGradient
+            pointerEvents="none"
+            colors={[`${colors.bg.canvas}00`, colors.bg.canvas, colors.bg.canvas]}
+            locations={[0, 0.6, 1]}
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: fadeHeight }}
+        />
         <View
             pointerEvents="box-none"
             style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, 12) + 4, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 }}
@@ -87,25 +101,19 @@ export function FloatingTabBar({ state, descriptors, navigation, onAdd }: Props)
                     );
                 })}
             </View>
-            {/* The fill lives on a plain View: a style function on Pressable can be
-                dropped by NativeWind's interop, which left the white + on nothing. */}
-            <Pressable
+            {/* Tap, not Pressable: NativeWind drops Pressable style functions, which left the white + on nothing. */}
+            <Tap
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onAdd(); }}
                 accessibilityRole="button"
                 accessibilityLabel="Add"
-                style={{ width: 56, height: 56, borderRadius: 999 }}
+                style={({ pressed }) => ({
+                    width: 56, height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: colors.brand.accent, opacity: pressed ? 0.9 : 1, ...shadows.fab,
+                })}
             >
-                {({ pressed }) => (
-                    <View
-                        style={{
-                            width: 56, height: 56, borderRadius: 999, alignItems: 'center', justifyContent: 'center',
-                            backgroundColor: colors.brand.accent, opacity: pressed ? 0.9 : 1, ...shadows.fab,
-                        }}
-                    >
-                        <Icon name="plus" size={24} color={colors.brand['on-accent']} />
-                    </View>
-                )}
-            </Pressable>
+                <Icon name="plus" size={24} color={colors.brand['on-accent']} />
+            </Tap>
         </View>
+        </>
     );
 }

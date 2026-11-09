@@ -10,8 +10,9 @@ import { dayHeading, initials, listAmount, receivedAmount, shortDate, time24 } f
  * - 'day'    (default) under a day header: "Sent · MTN MoMo · 13:02", moved rows "Moved · not spending".
  * - 'search' no day header, so the date leads: "12 Nov · Card · 11:20" (Figma 1004:853).
  * - 'moved'  the Moved filter, which explains itself once at the top: "MTN MoMo → Cash · Mon" (Figma 1004:755).
+ * - 'wallet' inside one wallet, so no wallet name: "Sent · Today 13:02" (Figma 1006:1096).
  */
-export type RowContext = 'day' | 'search' | 'moved';
+export type RowContext = 'day' | 'search' | 'moved' | 'wallet';
 
 /**
  * One transaction in a v1 list (Figma 1004:617): tile, name, meta, amount
@@ -34,6 +35,8 @@ export function TransactionRow({ tx, onPress, context = 'day' }: {
         meta = [movedRoute(tx), weekdayOrDate(at)].filter(Boolean).join(' · ');
     } else if (flow === 'moved' && context === 'day') {
         meta = 'Moved · not spending';
+    } else if (context === 'wallet') {
+        meta = [kind, `${dayHeading(at)} ${time}`].filter(Boolean).join(' · ');
     } else if (context === 'search') {
         meta = [dayHeading(at), tx.wallet?.name, time].filter(Boolean).join(' · ');
     } else {

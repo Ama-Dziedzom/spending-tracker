@@ -1,10 +1,11 @@
 import React from 'react';
-import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { HIT_SLOP } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { Icon, type IconName } from './icon';
 import { Spinner } from './loaders';
 import { Text } from './text';
+import { Tap } from './tap';
 
 type Variant = 'primary' | 'secondary' | 'ink' | 'danger' | 'dangerSoft' | 'ghost';
 
@@ -20,8 +21,11 @@ interface ButtonProps {
      * ghost     – no fill, brand/accent-text label ("Edit first" on Paste · read).
      */
     variant?: Variant;
-    /** 'lg' = 15pt / 15 vertical (full-width CTAs); 'md' = 13pt / 10 (dialogs); 'sm' = 13pt / 9 (inline). */
-    size?: 'lg' | 'md' | 'sm';
+    /**
+     * 'xl' = 16pt, 52 tall (Welcome, sign-in); 'lg' = 15pt, 50 tall (full-width CTAs);
+     * 'md' / 'sm' = 13pt, 44 tall (dialogs, inline). Nothing is shorter than 44 for a good thumb fit.
+     */
+    size?: 'xl' | 'lg' | 'md' | 'sm';
     icon?: IconName;
     busy?: boolean;
     /** Label shown while busy, e.g. "Sending code". */
@@ -43,14 +47,14 @@ export function Button({
         dangerSoft: { bg: colors.status['danger-tint'], fg: colors.status.danger },
         ghost: { bg: 'transparent', fg: colors.brand['accent-text'] },
     }[variant];
-    const pad = { lg: { v: 15, h: 20, font: 15 }, md: { v: 10, h: 16, font: 13 }, sm: { v: 9, h: 16, font: 13 } }[size];
+    const pad = { xl: { v: 16, h: 20, font: 16 }, lg: { v: 15, h: 20, font: 15 }, md: { v: 10, h: 16, font: 13 }, sm: { v: 9, h: 16, font: 13 } }[size];
     const inactive = disabled || busy;
 
     return (
-        <Pressable
+        <Tap
             onPress={onPress}
             disabled={inactive}
-            hitSlop={size === 'lg' ? undefined : HIT_SLOP}
+            hitSlop={size === 'lg' || size === 'xl' ? undefined : HIT_SLOP}
             accessibilityRole="button"
             accessibilityState={{ disabled: !!disabled, busy: !!busy }}
             accessibilityLabel={busy && busyLabel ? busyLabel : label}
@@ -60,7 +64,7 @@ export function Button({
                     backgroundColor: palette.bg,
                     paddingVertical: pad.v, paddingHorizontal: pad.h,
                     borderRadius: 999,
-                    minHeight: size === 'lg' ? 50 : undefined,
+                    minHeight: size === 'xl' ? 52 : size === 'lg' ? 50 : 44,
                     opacity: busy ? 0.85 : disabled ? 0.5 : pressed ? 0.85 : 1,
                 },
                 fill && { flex: 1 },
@@ -68,11 +72,11 @@ export function Button({
             ]}
         >
             {busy && variant === 'primary' && <Spinner size={18} color={palette.fg} />}
-            {!busy && icon && <Icon name={icon} size={size === 'lg' ? 18 : 16} color={palette.fg} />}
+            {!busy && icon && <Icon name={icon} size={size === 'lg' || size === 'xl' ? 18 : 16} color={palette.fg} />}
             <Text weight="bold" size={pad.font} style={{ color: palette.fg }}>
                 {busy && busyLabel ? busyLabel : label}
             </Text>
-        </Pressable>
+        </Tap>
     );
 }
 
@@ -117,6 +121,8 @@ export function Chip({ label, icon, onPress, variant = 'shortcut', tone = 'neutr
                 variant === 'shortcut' && { paddingLeft: 11, paddingRight: 12, paddingVertical: 10, ...shadows.small },
                 variant === 'muted' && { paddingLeft: 10, paddingRight: 12, paddingVertical: 7, gap: 6 },
                 variant === 'tag' && { paddingHorizontal: 10, paddingVertical: 6 },
+                // Anything you can tap is at least 44 tall for a good thumb fit.
+                !!onPress && { minHeight: 44, paddingVertical: 0 },
             ]}
         >
             {icon && <Icon name={icon} size={variant === 'shortcut' ? 16 : 14} color={iconColor} />}
@@ -133,8 +139,8 @@ export function Chip({ label, icon, onPress, variant = 'shortcut', tone = 'neutr
 
     if (!onPress) return body;
     return (
-        <Pressable onPress={onPress} hitSlop={HIT_SLOP} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+        <Tap onPress={onPress} hitSlop={HIT_SLOP} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
             {body}
-        </Pressable>
+        </Tap>
     );
 }

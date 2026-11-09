@@ -1,13 +1,16 @@
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
+import React, { useEffect } from 'react';
+import { View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { BrandBand, Icon, Spinner, Text } from '@/components/ui';
+import { RAW } from '@/constants/theme';
+import { useTheme } from '@/lib/theme';
 import { supabase } from '../lib/supabase';
 import { biometrics } from '../utils/biometrics';
 
-const { width, height } = Dimensions.get('window');
 const MIN_SPLASH_MS = 2000;
 
+/** Launch · loading (Figma 1000:29): full band, mark and name, a spinner near the bottom. */
 export default function SplashScreen() {
     const router = useRouter();
 
@@ -44,63 +47,27 @@ export default function SplashScreen() {
         return () => { cancelled = true; };
     }, []);
 
-    return (
-        <View style={styles.container}>
-            <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
-                <Defs>
-                    <RadialGradient
-                        id="upperBlue"
-                        cx={width * 0.55}
-                        cy={0}
-                        r={height * 0.65}
-                        gradientUnits="userSpaceOnUse"
-                    >
-                        <Stop offset="0%" stopColor="#1642E5" stopOpacity="1" />
-                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0" />
-                    </RadialGradient>
-                    <RadialGradient
-                        id="topLeftBlob"
-                        cx={0}
-                        cy={0}
-                        r={height * 0.45}
-                        gradientUnits="userSpaceOnUse"
-                    >
-                        <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.75" />
-                        <Stop offset="40%" stopColor="#B7C4F7" stopOpacity="0.45" />
-                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0" />
-                    </RadialGradient>
-                    <RadialGradient
-                        id="topRightBlob"
-                        cx={width * 0.8}
-                        cy={-height * 0.05}
-                        r={height * 0.55}
-                        gradientUnits="userSpaceOnUse"
-                    >
-                        <Stop offset="0%" stopColor="#3558FF" stopOpacity="0.7" />
-                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0" />
-                    </RadialGradient>
-                </Defs>
-                <Rect width={width} height={height} fill="#081750" />
-                <Rect width={width} height={height} fill="url(#upperBlue)" />
-                <Rect width={width} height={height} fill="url(#topLeftBlob)" />
-                <Rect width={width} height={height} fill="url(#topRightBlob)" />
-            </Svg>
+    return <LaunchView />;
+}
 
-            <Text style={styles.logo}>LogIt</Text>
+function LaunchView() {
+    const { colors } = useTheme();
+    const { height } = useWindowDimensions();
+    // Figma positions on an 844 frame: mark at 330, spinner at 720.
+    const y = (v: number) => (v / 844) * height;
+    return (
+        <View style={{ flex: 1, backgroundColor: colors.brand.band }}>
+            <StatusBar style="light" />
+            <BrandBand full />
+            <View style={{ position: 'absolute', top: y(330), left: 0, right: 0, alignItems: 'center', gap: 14 }} accessible accessibilityLabel="LogIt, loading">
+                <View style={{ width: 72, height: 72, borderRadius: 22, backgroundColor: RAW.onBand, alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon name="flash" size={36} color={colors.brand.accent} />
+                </View>
+                <Text weight="extrabold" size={34} tone="onBand" style={{ letterSpacing: -1.02 }}>LogIt</Text>
+            </View>
+            <View style={{ position: 'absolute', top: y(720), left: 0, right: 0, alignItems: 'center' }}>
+                <Spinner size={28} color={RAW.onBand} />
+            </View>
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#081750',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    logo: {
-        color: '#FFFFFF',
-        fontSize: 48,
-        fontFamily: 'Manrope-SemiBold',
-    },
-});

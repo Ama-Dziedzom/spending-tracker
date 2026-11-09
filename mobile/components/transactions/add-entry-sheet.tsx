@@ -136,7 +136,11 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
     };
 
     return (
-        <Sheet visible={visible} onClose={onClose} title={mode === 'category' ? 'What was it?' : mode === 'wallet' ? (kind === 'moved' ? 'From which wallet?' : 'Which wallet?') : mode === 'to' ? 'To which wallet?' : mode === 'when' ? 'When was it?' : undefined}>
+        <Sheet
+            visible={visible}
+            onClose={onClose}
+            footer={mode === 'form' ? <Button label="Save" busy={busy} busyLabel="Saving" disabled={!canSave} onPress={save} /> : undefined}
+            title={mode === 'category' ? 'What was it?' : mode === 'wallet' ? (kind === 'moved' ? 'From which wallet?' : 'Which wallet?') : mode === 'to' ? 'To which wallet?' : mode === 'when' ? 'When was it?' : undefined}>
             {mode === 'form' && (
                 <>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -193,7 +197,6 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
                         <Text variant="meta" tone="secondary">Moves between your own wallets aren’t spending, so they’re left out of your totals.</Text>
                     )}
 
-                    <Button label="Save" busy={busy} busyLabel="Saving" disabled={!canSave} onPress={save} style={{ marginTop: 8 }} />
                 </>
             )}
 

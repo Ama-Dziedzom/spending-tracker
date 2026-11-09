@@ -56,14 +56,18 @@ export function TransactionDetailSheet({ transaction, onClose, onChanged }: {
     };
 
     return (
-        <Sheet visible={!!transaction} onClose={close} title={titleFor(mode)}>
+        <Sheet
+            visible={!!transaction}
+            onClose={close}
+            title={titleFor(mode)}
+            footer={tx && mode === 'detail' ? <DetailActions tx={tx} onRemove={remove} /> : undefined}
+        >
             {tx && mode === 'detail' && (
                 <Detail
                     tx={tx}
                     onCategory={() => setMode('category')}
                     onWallet={() => setMode('wallet')}
                     onWhen={() => setMode('when')}
-                    onRemove={remove}
                 />
             )}
             {tx && mode === 'category' && (
@@ -108,12 +112,11 @@ function titleFor(mode: Mode): string | undefined {
 
 // ---------------------------------------------------------------------------
 
-function Detail({ tx, onCategory, onWallet, onWhen, onRemove }: {
+function Detail({ tx, onCategory, onWallet, onWhen }: {
     tx: TransactionWithWallet;
     onCategory: () => void;
     onWallet: () => void;
     onWhen: () => void;
-    onRemove: (kind: 'delete' | 'notMoney') => void;
 }) {
     const { colors } = useTheme();
     const flow = flowOf(tx);
@@ -190,13 +193,19 @@ function Detail({ tx, onCategory, onWallet, onWhen, onRemove }: {
                 <Text variant="meta" tone="tertiary">You added this yourself.</Text>
             )}
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                {rawSms && flow !== 'moved' && (
-                    <Button label="Not money" variant="secondary" size="sm" fill onPress={() => onRemove('notMoney')} />
-                )}
-                <Button label="Delete" icon="trash" variant="dangerSoft" size="sm" fill onPress={() => onRemove('delete')} />
-            </View>
         </>
+    );
+}
+
+/** Not money / Delete, pinned to the bottom of the sheet (Figma 1005:899). */
+function DetailActions({ tx, onRemove }: { tx: TransactionWithWallet; onRemove: (kind: 'delete' | 'notMoney') => void }) {
+    return (
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+            {tx.raw_sms && flowOf(tx) !== 'moved' && (
+                <Button label="Not money" variant="secondary" size="sm" fill onPress={() => onRemove('notMoney')} />
+            )}
+            <Button label="Delete" icon="trash" variant="dangerSoft" size="sm" fill onPress={() => onRemove('delete')} />
+        </View>
     );
 }
 

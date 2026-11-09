@@ -8,6 +8,7 @@ import type { Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
 import { categoryStyle } from '@/lib/category-style';
 import { sameDay, shortDate, time24 } from '@/lib/format';
+import { Tap } from '@/components/ui/tap';
 
 /**
  * Pieces shared by Transaction detail, Add manually and Log cash
@@ -40,7 +41,7 @@ export function CategoryGrid({ options, selected, onPick, disabled }: {
                 const s = pickStyle(id);
                 const active = id === selected;
                 return (
-                    <Pressable
+                    <Tap
                         key={id}
                         onPress={() => onPick(id)}
                         disabled={disabled}
@@ -64,7 +65,7 @@ export function CategoryGrid({ options, selected, onPick, disabled }: {
                         <Text size={12} weight={active ? 'bold' : 'semibold'} tone={active ? 'accent' : 'primary'} align="center">
                             {s.label}
                         </Text>
-                    </Pressable>
+                    </Tap>
                 );
             })}
         </View>
@@ -96,14 +97,14 @@ export function FactRow({ label, value, onPress, divider, accessibilityLabel }: 
     );
     if (!onPress) return body;
     return (
-        <Pressable
+        <Tap
             onPress={onPress}
             accessibilityRole="button"
             accessibilityLabel={accessibilityLabel ?? `Change ${label.toLowerCase()}`}
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >
             {body}
-        </Pressable>
+        </Tap>
     );
 }
 
@@ -216,7 +217,7 @@ export function WhenForm({ initial, onSave, onBack, saveLabel = 'Save' }: {
                             accessibilityRole="radio"
                             accessibilityState={{ selected: active }}
                             style={{
-                                paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999,
+                                paddingHorizontal: 14, minHeight: 44, justifyContent: 'center', borderRadius: 999,
                                 backgroundColor: active ? colors.brand.accent : colors.bg.muted,
                             }}
                         >

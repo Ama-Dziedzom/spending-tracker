@@ -1,306 +1,198 @@
-import { View, Text, ScrollView, Pressable, ActivityIndicator, RefreshControl, Image, Dimensions } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { HugeiconsIcon } from '@hugeicons/react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
-    BankIcon,
-    Wallet01Icon,
-    ArrowRight01Icon,
-    AddCircleHalfDotIcon,
-    Wallet03Icon,
-    ArrowUpRight03Icon,
-} from '@hugeicons/core-free-icons';
-import { getWallets, createWallets, CreateWalletInput } from '../../lib/wallet-service';
-import { assignTransactionToWallet, getWalletAnalytics } from '../../lib/transaction-service';
-import { Wallet } from '../../lib/supabase';
-import { ConfigureWalletBottomSheet } from '../../components/configure-wallet-bottom-sheet';
-import { SelectWalletTypeBottomSheet } from '../../components/select-wallet-type-bottom-sheet';
-import { EditWalletBottomSheet } from '../../components/edit-wallet-bottom-sheet';
-import { Alert } from 'react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
-import { useCallback } from 'react';
-import { useLiveRefresh } from '../../lib/useLiveRefresh';
+    BandPill, Banner, Button, Card, CardHeader, CategoryTile, Icon, ListGroup, ListRow, Screen, Skeleton, SkeletonRow,
+    TAB_BAR_SPACE, Text, TopBar,
+} from '@/components/ui';
+import { AddWalletSheet } from '@/components/wallets/add-wallet-sheet';
+import { CountCashSheet } from '@/components/wallets/count-cash-sheet';
+import { fetchWalletsOverview, type ComingUp, type WalletLine, type WalletsOverview } from '@/lib/wallets-overview';
+import type { Wallet } from '@/lib/supabase';
+import { useLiveRefresh } from '@/lib/useLiveRefresh';
+import { useTheme } from '@/lib/theme';
+import { ago, heroAmount, listAmount, shortDate } from '@/lib/format';
+import { RAW } from '@/constants/theme';
 
-const formatMoney = (val: number | string | undefined | null) => {
-    if (val === undefined || val === null) return '0.00';
-    const num = typeof val === 'number' ? val : parseFloat(val);
-    if (isNaN(num)) return '0.00';
-    const parts = num.toFixed(2).split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return parts.join('.');
-};
-
+/**
+ * Wallets (Figma section 993:51): what you have, wallet by wallet, and
+ * what's about to land. Cash invites a count.
+ */
 export default function Wallets() {
-    const insets = useSafeAreaInsets();
     const router = useRouter();
-    const params = useLocalSearchParams<{
-        fromTransactionId?: string;
-        initialAmount?: string;
-        transactionType?: string;
-    }>();
+    const [data, setData] = useState<WalletsOverview | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
+    const [countFor, setCountFor] = useState<Wallet | null | undefined>(undefined); // undefined = closed, null = new cash wallet
 
-    const [wallets, setWallets] = React.useState<Wallet[]>([]);
-    const [spentThisMonthByWallet, setSpentThisMonthByWallet] = React.useState<Record<string, number>>({});
-    const [isLoading, setIsLoading] = React.useState(true);
-    const [refreshing, setRefreshing] = React.useState(false);
-    const [isSelectTypeSheetVisible, setIsSelectTypeSheetVisible] = React.useState(false);
-    const [isConfigureSheetVisible, setIsConfigureSheetVisible] = React.useState(false);
-    const [isEditSheetVisible, setIsEditSheetVisible] = React.useState(false);
-    const [selectedWalletForEdit, setSelectedWalletForEdit] = React.useState<Wallet | null>(null);
-    const [selectedWalletTypes, setSelectedWalletTypes] = React.useState<string[]>([]);
-    const [isSaving, setIsSaving] = React.useState(false);
-
-    const fetchWallets = React.useCallback(async () => {
+    const load = useCallback(async () => {
         try {
-            const walletsData = await getWallets();
-            setWallets(walletsData);
-
-            const analyticsEntries = await Promise.all(
-                walletsData.map(async (w) => [w.id, (await getWalletAnalytics(w.id, 'month')).totalSpent] as const)
-            );
-            setSpentThisMonthByWallet(Object.fromEntries(analyticsEntries));
-        } catch (error) {
-            console.error('Error fetching wallets:', error);
+            setData(await fetchWalletsOverview());
+            setError(false);
+        } catch (e) {
+            console.error('Error loading wallets:', e);
+            setError(true);
         } finally {
-            setIsLoading(false);
+            setLoading(false);
             setRefreshing(false);
         }
     }, []);
 
-    useLiveRefresh(() => fetchWallets(), 'wallets');
-    React.useEffect(() => {
-        fetchWallets();
-    }, [fetchWallets]);
+    useEffect(() => { load(); }, [load]);
+    useLiveRefresh(() => load(), 'wallets');
 
-    // If we have a transaction ID in the params, open the creation flow automatically
-    React.useEffect(() => {
-        if (params.fromTransactionId && !isConfigureSheetVisible && !isSelectTypeSheetVisible) {
-            setIsSelectTypeSheetVisible(true);
-        }
-    }, [params.fromTransactionId]);
-
-    const onRefresh = () => {
-        setRefreshing(true);
-        fetchWallets();
-    };
-
-    const handleSelectType = (types: string[]) => {
-        setSelectedWalletTypes(types);
-        setIsSelectTypeSheetVisible(false);
-        setTimeout(() => {
-            setIsConfigureSheetVisible(true);
-        }, 800);
-    };
-
-    const handleWalletPress = (wallet: Wallet) => {
-        router.push({
-            pathname: '/wallet-details',
-            params: { walletId: wallet.id }
-        });
-    };
-
-    const handleEditWallet = (wallet: Wallet) => {
-        setSelectedWalletForEdit(wallet);
-        setIsEditSheetVisible(true);
-    };
-
-    const handleConfigure = async (data: any) => {
-        setIsSaving(true);
-        try {
-            const walletsToCreate: CreateWalletInput[] = [];
-
-            if (data.momo) {
-                walletsToCreate.push({
-                    name: 'Mobile Money',
-                    type: 'momo',
-                    icon: 'wallet-03',
-                    color: '#1642E5',
-                    initial_balance: 0,
-                    source_identifier: data.momo.provider,
-                });
-            }
-
-            if (data.bank) {
-                walletsToCreate.push({
-                    name: data.bank.name || 'Bank Wallet',
-                    type: 'bank',
-                    icon: 'bank',
-                    color: '#1642E5',
-                    initial_balance: 0,
-                });
-            }
-
-            if (data.cash) {
-                walletsToCreate.push({
-                    name: data.cash.name || 'Cash Wallet',
-                    type: 'cash',
-                    icon: 'money-01',
-                    color: '#1642E5',
-                    initial_balance: 0,
-                });
-            }
-
-            let createdWallets: Wallet[] = [];
-            if (walletsToCreate.length > 0) {
-                createdWallets = await createWallets(walletsToCreate);
-            }
-
-            if (params.fromTransactionId && createdWallets.length > 0) {
-                let targetWallet = createdWallets[0];
-                if (createdWallets.length > 1) {
-                    const momoWallet = createdWallets.find(w => w.type === 'momo');
-                    if (momoWallet) targetWallet = momoWallet;
-                }
-                await assignTransactionToWallet(params.fromTransactionId, targetWallet.id);
-                router.setParams({ fromTransactionId: undefined, initialAmount: undefined, transactionType: undefined });
-            }
-
-            if (params.fromTransactionId) {
-                Alert.alert('Success', 'Wallet created and transaction linked!');
-            }
-        } catch (error) {
-            console.error('Error saving wallet:', error);
-            Alert.alert('Error', 'Failed to save your wallet. Please try again.');
-        } finally {
-            setIsSaving(false);
-        }
-    };
+    const empty = !!data && data.lines.length === 0;
+    const openWallet = (w: Wallet) => router.push({ pathname: '/wallet', params: { walletId: w.id } });
 
     return (
-        <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
-            <StatusBar style="dark" />
-            <View className="px-6 pt-8 pb-4">
-                <Text className="text-[#1642E5] font-manrope-bold text-[28px]">My Wallets</Text>
-            </View>
-
-            <ScrollView
-                className="flex-1"
-                contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor="#1642E5"
-                    />
-                }
+        <>
+            <Screen
+                bottomInset={TAB_BAR_SPACE}
+                header={<TopBar title="Wallets" leading="none" right={<BandPill icon="plus" label="Add" onPress={() => setAddOpen(true)} />} />}
+                scrollProps={{
+                    refreshControl: <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={RAW.onBand} colors={[RAW.onBand]} />,
+                }}
             >
-                <View className="mt-2">
-                    {isLoading ? (
-                        <View className="py-20 items-center">
-                            <ActivityIndicator size="large" color="#1642E5" />
-                        </View>
-                    ) : wallets.length > 0 ? (
-                        <View>
-                            {wallets.map((wallet, index) => (
-                                <Animated.View
-                                    key={wallet.id}
-                                    {...{ entering: FadeInDown.delay(index * 100) } as any}
-                                    className="mb-4"
-                                >
-                                    <Pressable
-                                        onPress={() => handleWalletPress(wallet)}
-                                        onLongPress={() => {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                            handleEditWallet(wallet);
-                                        }}
-                                        delayLongPress={500}
-                                        className="rounded-[24px] overflow-hidden"
-                                        style={{
-                                            shadowColor: '#1642E5',
-                                            shadowOffset: { width: 0, height: 8 },
-                                            shadowOpacity: 0.15,
-                                            shadowRadius: 16,
-                                            elevation: 8,
-                                        }}
-                                    >
-                                        <LinearGradient
-                                            colors={['#1E5AFF', '#1642E5', '#0E1F5B']}
-                                            start={{ x: 0, y: 0 }}
-                                            end={{ x: 1, y: 1 }}
-                                            className="justify-center"
-                                            style={{ height: 98, paddingHorizontal: 24 }}
-                                        >
-                                            <View className="flex-row justify-between items-center">
-                                                <View className="flex-1 mb-8" style={{ gap: 2, paddingTop: 8 }}>
-                                                    <Text className="text-white/70 font-manrope-medium text-[14px] uppercase mt-4">
-                                                        {wallet.name}
-                                                    </Text>
-                                                    <Text className="text-white font-manrope-bold text-[32px]">
-                                                        GHS {formatMoney(spentThisMonthByWallet[wallet.id])}
-                                                    </Text>
-                                                    <Text className="text-white/60 font-manrope-medium text-[12px] uppercase tracking-wider">
-                                                        Spent this month
-                                                    </Text>
-                                                </View>
-
-                                                <HugeiconsIcon icon={ArrowRight01Icon} size={24} color="rgba(255,255,255,0.7)" />
-                                            </View>
-                                        </LinearGradient>
-                                    </Pressable>
-                                </Animated.View>
-                            ))}
-
-                            <Pressable
-                                onPress={() => setIsSelectTypeSheetVisible(true)}
-                                className="mt-4 py-5 px-6 rounded-[20px] flex-row items-center"
-                                style={{ borderWidth: 1, borderColor: '#E5E7EB', borderStyle: 'dashed' }}
-                            >
-                                <View className="w-10 h-10 rounded-full border border-[#D1D5DB] items-center justify-center mr-4">
-                                    <HugeiconsIcon icon={AddCircleHalfDotIcon} size={20} color="#9CA3AF" />
+                {loading && !data ? (
+                    <LoadingCards />
+                ) : error && !data ? (
+                    <Banner
+                        tone="danger"
+                        title="Couldn’t load your wallets"
+                        body="Check your connection and try again."
+                        action={{ label: 'Try again', onPress: () => { setLoading(true); load(); } }}
+                    />
+                ) : empty ? (
+                    <EmptyWallets onAutopilot={() => router.push('/sms-settings')} onAdd={() => setAddOpen(true)} />
+                ) : data && (
+                    <>
+                        <Card hero gap={16}>
+                            <View style={{ gap: 2 }}>
+                                <Text size={13} weight="semibold" tone="secondary">You have</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }} accessible accessibilityLabel={`GHS ${listAmount(data.total)}`}>
+                                    <Text size={15} weight="bold" tone="secondary">GHS</Text>
+                                    <Text weight="extrabold" size={32} style={{ letterSpacing: -0.96 }}>{listAmount(data.total)}</Text>
                                 </View>
-                                <Text className="text-[#6B7280] font-manrope-medium text-[18px]">Add new wallet</Text>
-                            </Pressable>
-                        </View>
-                    ) : (
-                        <View className="py-20 items-center justify-center bg-[#F9FAFB] rounded-[24px] border border-dashed border-[#E5E7EB]">
-                            <Image
-                                source={require('../../assets/images/no-wallets.png')}
-                                style={{ width: 180, height: 100, marginBottom: 20, opacity: 0.6 }}
-                                resizeMode="contain"
-                            />
-                            <Text className="text-[#6B7280] font-manrope-semibold text-[18px] text-center mb-2">
-                                No wallets found
-                            </Text>
-                            <Pressable onPress={() => setIsSelectTypeSheetVisible(true)}>
-                                <Text className="text-[#1642E5] font-manrope-bold text-[16px]">Add your first wallet</Text>
-                            </Pressable>
-                        </View>
-                    )}
+                                <Text variant="meta" tone="tertiary">
+                                    Across {data.counted} {data.counted === 1 ? 'wallet' : 'wallets'}{data.cashUncounted ? ' · Cash not counted' : ''}
+                                </Text>
+                            </View>
+                            <ListGroup bare>
+                                {data.lines.map((l) => (
+                                    <WalletRow key={l.wallet.id} line={l} onPress={() => openWallet(l.wallet)} onCount={() => setCountFor(l.wallet)} />
+                                ))}
+                            </ListGroup>
+                        </Card>
+
+                        {data.comingUp.length > 0 && (
+                            <Card hero gap={8}>
+                                <CardHeader title="Coming up" />
+                                <ListGroup bare>
+                                    {data.comingUp.map((c) => <ComingUpRow key={c.id} item={c} onPress={() => router.push('/expected-income')} />)}
+                                </ListGroup>
+                            </Card>
+                        )}
+                    </>
+                )}
+            </Screen>
+
+            <AddWalletSheet
+                visible={addOpen}
+                onClose={() => setAddOpen(false)}
+                onAdded={() => load()}
+                onCash={() => setCountFor(data?.lines.find((l) => l.wallet.type === 'cash')?.wallet ?? null)}
+            />
+            <CountCashSheet visible={countFor !== undefined} wallet={countFor ?? null} onClose={() => setCountFor(undefined)} onSaved={load} />
+        </>
+    );
+}
+
+function WalletRow({ line, onPress, onCount }: { line: WalletLine; onPress: () => void; onCount: () => void }) {
+    const w = line.wallet;
+    const isCash = w.type === 'cash';
+    const meta = line.uncounted
+        ? 'Not counted yet'
+        : line.lastActivity && Date.now() - line.lastActivity.getTime() < 86_400_000
+            ? `Updated ${ago(line.lastActivity)}`
+            : line.lastActivity
+                ? `Last message ${shortDate(line.lastActivity)}`
+                : isCash ? `Counted ${ago(new Date(w.updated_at ?? w.created_at))}` : 'No alerts yet';
+
+    return (
+        <ListRow
+            leading={<CategoryTile tone={isCash ? 'cash' : 'accent'} icon={isCash ? 'cash' : w.type === 'bank' ? 'bank' : 'wallet'} />}
+            title={w.name}
+            meta={meta}
+            value={line.uncounted ? undefined : listAmount(Number(w.current_balance) || 0)}
+            trailing={line.uncounted ? <Button label="Count" variant="secondary" size="sm" onPress={onCount} /> : 'none'}
+            onPress={onPress}
+            accessibilityLabel={`${w.name}, ${line.uncounted ? 'not counted yet' : `GHS ${listAmount(Number(w.current_balance) || 0)}`}`}
+        />
+    );
+}
+
+function ComingUpRow({ item, onPress }: { item: ComingUp; onPress: () => void }) {
+    const when = item.inDays === 0 ? 'today' : item.inDays === 1 ? 'tomorrow' : `in ${item.inDays} days`;
+    return (
+        <ListRow
+            leading={<CategoryTile tone="cash" icon="receive" />}
+            title={item.label}
+            meta={item.meta}
+            trailing={
+                <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                    <Text size={15} weight="semibold" tone="success">≈ {heroAmount(item.amount)}</Text>
+                    <Text variant="meta" weight="semibold" tone="secondary">{when}</Text>
                 </View>
-            </ScrollView>
+            }
+            onPress={onPress}
+            accessibilityLabel={`${item.label}, about GHS ${heroAmount(item.amount)}, ${when}`}
+        />
+    );
+}
 
-            <SelectWalletTypeBottomSheet
-                isVisible={isSelectTypeSheetVisible}
-                onClose={() => setIsSelectTypeSheetVisible(false)}
-                onSelect={handleSelectType}
-            />
+/** Shows the wallets you're likely to have, quietly, and how they'll appear (Figma 1006:1341). */
+function EmptyWallets({ onAutopilot, onAdd }: { onAutopilot: () => void; onAdd: () => void }) {
+    const { colors } = useTheme();
+    const ghosts: { name: string; icon: 'wallet' | 'bank' }[] = [
+        { name: 'MTN MoMo', icon: 'wallet' },
+        { name: 'Telecel Cash', icon: 'wallet' },
+        { name: 'Your bank', icon: 'bank' },
+    ];
+    return (
+        <Card hero gap={16}>
+            <View style={{ gap: 8 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                {ghosts.map((g) => (
+                    <View key={g.name} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.bg.muted, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 10 }}>
+                        <Icon name={g.icon} size={18} color={colors.text.tertiary} />
+                        <Text size={13} weight="semibold" tone="secondary">{g.name}</Text>
+                    </View>
+                ))}
+            </View>
+            <View style={{ gap: 6, alignItems: 'center' }}>
+                <Text variant="cardTitle" align="center">Wallets add themselves</Text>
+                <Text size={13} tone="secondary" align="center">The first alert from each MoMo wallet or bank creates it, with its balance.</Text>
+            </View>
+            <Button label="Turn on autopilot" icon="flash" onPress={onAutopilot} />
+            <Button label="Add one by hand" variant="ghost" onPress={onAdd} />
+        </Card>
+    );
+}
 
-            <ConfigureWalletBottomSheet
-                isVisible={isConfigureSheetVisible}
-                selectedWallets={selectedWalletTypes}
-                onClose={() => setIsConfigureSheetVisible(false)}
-                onConfigure={handleConfigure}
-                onFinish={() => {
-                    setIsConfigureSheetVisible(false);
-                    fetchWallets();
-                }}
-                isLoading={isSaving}
-            />
-
-            <EditWalletBottomSheet
-                isVisible={isEditSheetVisible}
-                wallet={selectedWalletForEdit}
-                onClose={() => {
-                    setIsEditSheetVisible(false);
-                    setSelectedWalletForEdit(null);
-                }}
-                onSuccess={fetchWallets}
-            />
-        </View>
+/** Same two cards, greyed (Figma 1006:1426). */
+function LoadingCards() {
+    return (
+        <>
+            <Card hero gap={14}>
+                <Skeleton width={70} height={10} radius={5} />
+                <Skeleton width={160} height={28} radius={8} />
+                <SkeletonRow /><SkeletonRow /><SkeletonRow />
+            </Card>
+            <Card hero gap={14}>
+                <Skeleton width={90} height={14} radius={6} />
+                <SkeletonRow />
+            </Card>
+        </>
     );
 }

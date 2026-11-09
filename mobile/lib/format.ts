@@ -56,3 +56,13 @@ export function initials(name: string): string {
     const parts = name.trim().split(/\s+/).filter((p) => /[A-Za-z]/.test(p[0] ?? ''));
     return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?';
 }
+
+/** "just now", "2 min ago", "3h ago", then "24 Nov". For data ages ("Updated 2 min ago"). */
+export function ago(d: Date, now = new Date()): string {
+    const mins = Math.floor((now.getTime() - d.getTime()) / 60_000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return shortDate(d);
+}

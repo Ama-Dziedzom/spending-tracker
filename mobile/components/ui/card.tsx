@@ -1,8 +1,9 @@
 import React from 'react';
-import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { RADIUS, SPACE } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { Text } from './text';
+import { Tap } from './tap';
 
 interface CardProps {
     children: React.ReactNode;
@@ -26,9 +27,9 @@ export function Card({ children, hero, padding, gap, onPress, style }: CardProps
     };
     if (onPress) {
         return (
-            <Pressable onPress={onPress} style={({ pressed }) => [base, { opacity: pressed ? 0.85 : 1 }, style]}>
+            <Tap onPress={onPress} style={({ pressed }) => [base, { opacity: pressed ? 0.85 : 1 }, style]}>
                 {children}
-            </Pressable>
+            </Tap>
         );
     }
     return <View style={[base, style]}>{children}</View>;

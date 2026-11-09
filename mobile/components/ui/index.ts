@@ -17,5 +17,6 @@ export { SegmentedControl } from './segmented-control';
 export { Sheet } from './sheet';
 export { FloatingTabBar, TAB_BAR_SPACE } from './tab-bar';
 export { Text, type TextVariant } from './text';
+export { Tap } from './tap';
 export { ToastProvider, useToast, type ToastOptions } from './toast';
 export { TopBar, RoundButton, BandPill } from './top-bar';

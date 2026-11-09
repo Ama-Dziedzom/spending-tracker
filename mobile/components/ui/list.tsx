@@ -1,9 +1,10 @@
 import React from 'react';
-import { Pressable, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Switch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { RADIUS, RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { Icon } from './icon';
 import { Text } from './text';
+import { Tap } from './tap';
 
 /** 11 Bold uppercase label above a group. On the band it's white at 75 %. */
 export function SectionLabel({ children, onBand }: { children: string; onBand?: boolean }) {
@@ -58,7 +59,7 @@ interface ListRowProps {
     meta?: string;
     /** Right-hand value: amount ("85.00", "+200.00") or a status word ("On"). */
     value?: string;
-    valueTone?: 'primary' | 'secondary' | 'success';
+    valueTone?: 'primary' | 'secondary' | 'success' | 'accent';
     /** Amounts are 15 SemiBold; settings values are 13 Medium. */
     valueStyle?: 'amount' | 'setting';
     trailing?: 'chevron' | 'none' | React.ReactNode;
@@ -67,15 +68,18 @@ interface ListRowProps {
     /** Vertical padding: 11 for transaction rows, 9 for settings. */
     dense?: boolean;
     accessibilityLabel?: string;
+    /** 16 by default; 18 next to 44 tiles (Add sheet, Figma 1003:733). */
+    chevronSize?: number;
 }
 
 /** Tile, title, meta, value, chevron or toggle. Min height 44. Text wraps. */
 export function ListRow({
     leading, title, meta, value, valueTone = 'primary', valueStyle = 'amount',
-    trailing = 'none', toggle, onPress, dense, accessibilityLabel,
+    trailing = 'none', toggle, onPress, dense, accessibilityLabel, chevronSize = 16,
 }: ListRowProps) {
     const { colors } = useTheme();
-    const valueColor = valueTone === 'success' ? colors.status.success : valueTone === 'secondary' ? colors.text.secondary : colors.text.primary;
+    const valueColor = valueTone === 'success' ? colors.status.success : valueTone === 'secondary' ? colors.text.secondary
+        : valueTone === 'accent' ? colors.brand['accent-text'] : colors.text.primary;
 
     const body = (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: dense ? 9 : 11, minHeight: 44 }}>
@@ -99,21 +103,21 @@ export function ListRow({
                     accessibilityLabel={title}
                 />
             )}
-            {trailing === 'chevron' && <Icon name="next" size={16} color={colors.text.tertiary} />}
+            {trailing === 'chevron' && <Icon name="next" size={chevronSize} color={colors.text.tertiary} />}
             {trailing !== 'chevron' && trailing !== 'none' && trailing}
         </View>
     );
 
     if (!onPress) return body;
     return (
-        <Pressable
+        <Tap
             onPress={onPress}
             accessibilityRole="button"
             accessibilityLabel={accessibilityLabel ?? [title, meta, value].filter(Boolean).join(', ')}
             style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}
         >
             {body}
-        </Pressable>
+        </Tap>
     );
 }
 

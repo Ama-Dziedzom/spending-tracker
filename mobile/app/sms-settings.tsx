@@ -1,34 +1,19 @@
-import { View, Text, Pressable, ScrollView, Switch, Alert, Platform, PermissionsAndroid, Linking } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HugeiconsIcon } from '@hugeicons/react-native';
-import {
-    ArrowLeft01Icon,
-    Mail01Icon,
-    Notification03Icon,
-    InformationCircleIcon,
-    HelpCircleIcon,
-    CircleIcon
-} from '@hugeicons/core-free-icons';
-import * as Haptics from 'expo-haptics';
+import React, { useEffect, useState } from 'react';
+import { Linking, PermissionsAndroid, Platform, View } from 'react-native';
+import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS } from '../constants/theme';
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { supabase, getSession } from '../lib/supabase';
-import { syncSessionToAppGroup } from '../lib/shareSync';
-import { getShareSamples, setShareSamples } from '../lib/review-service';
+import * as Haptics from 'expo-haptics';
+import {
+    Button, Card, CategoryTile, Icon, ListGroup, ListRow, Screen, Sheet, Text, TopBar, useToast, type IconName,
+} from '@/components/ui';
+import { useTheme } from '@/lib/theme';
+import { getSession } from '@/lib/supabase';
+import { syncSessionToAppGroup } from '@/lib/shareSync';
+import { getShareSamples, setShareSamples } from '@/lib/review-service';
+import { lastAlertAt } from '@/lib/settings-service';
+import { ago } from '@/lib/format';
 
-function formatAgo(iso: string): string {
-    const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins} min ago`;
-    const hrs = Math.round(mins / 60);
-    if (hrs < 24) return `${hrs} hr${hrs === 1 ? '' : 's'} ago`;
-    const days = Math.round(hrs / 24);
-    return `${days} day${days === 1 ? '' : 's'} ago`;
-}
+const tile = (icon: IconName) => <CategoryTile tone="accent" icon={icon} size={34} />;
 
 // Bold parts sit at odd indexes
 const IOS_AUTOPILOT_STEPS: string[][] = [
@@ -39,289 +24,135 @@ const IOS_AUTOPILOT_STEPS: string[][] = [
     ['Tap ', 'Done', '. From now on, MoMo and bank alerts log themselves as they arrive.', ''],
 ];
 
-export default function SmsSettings() {
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const [smsEnabled, setSmsEnabled] = useState(false);
-    const [hasPermission, setHasPermission] = useState(false);
-    const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null);
-    const [lastSmsAt, setLastSmsAt] = useState<string | null>(null);
-    const [shareSamples, setShareSamplesState] = useState(false);
+const SMS_KEY = 'sms_auto_logging_enabled';
+
+/**
+ * Autopilot (Figma 1010:1870). Status first, in plain words, with the last
+ * time it worked. Opt-in learning explained in one sentence.
+ */
+export default function Autopilot() {
+    const { colors } = useTheme();
+    const toast = useToast();
+    const [last, setLast] = useState<Date | null | undefined>(undefined);
+    const [signedIn, setSignedIn] = useState<boolean | null>(null);
+    const [androidOn, setAndroidOn] = useState(false);
+    const [samples, setSamples] = useState(false);
+    const [stepsOpen, setStepsOpen] = useState(false);
 
     useEffect(() => {
-        const loadSettings = async () => {
-            const val = await AsyncStorage.getItem('sms_auto_logging_enabled');
-            setSmsEnabled(val === 'true');
-
-            // Real status: signed in (the share sheet needs this) + last SMS logged
+        (async () => {
             const session = await getSession();
-            setIsSignedIn(!!session);
+            setSignedIn(!!session);
+            setAndroidOn((await AsyncStorage.getItem(SMS_KEY)) === 'true');
             if (session) {
-                getShareSamples().then(setShareSamplesState);
-                const { data } = await supabase
-                    .from('transactions')
-                    .select('created_at')
-                    .not('raw_sms', 'is', null)
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-                setLastSmsAt(data?.[0]?.created_at ?? null);
+                getShareSamples().then(setSamples).catch(() => {});
+                setLast(await lastAlertAt().catch(() => null));
+            } else {
+                setLast(null);
             }
-
-            if (Platform.OS === 'android') {
-                const checkPerm = await PermissionsAndroid.check(
-                    PermissionsAndroid.PERMISSIONS.RECEIVE_SMS
-                );
-                setHasPermission(checkPerm);
-            }
-        };
-        loadSettings();
+        })();
     }, []);
 
-    const requestSmsPermission = async (): Promise<boolean> => {
-        if (Platform.OS !== 'android') return false;
-        try {
-            const granted = await PermissionsAndroid.request(
-                PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
-                {
-                    title: 'SMS Permission Needed',
-                    message: 'LogIt needs permission to read incoming transaction SMS messages so it can parse and log them automatically.',
-                    buttonNeutral: 'Ask Me Later',
-                    buttonNegative: 'Cancel',
-                    buttonPositive: 'OK',
-                }
-            );
-            const isGranted = granted === PermissionsAndroid.RESULTS.GRANTED;
-            setHasPermission(isGranted);
-            return isGranted;
-        } catch (err) {
-            console.warn(err);
-            return false;
-        }
-    };
+    const ios = Platform.OS === 'ios';
+    // iPhone can't tell LogIt whether the automation exists; an alert in the last two weeks means it works.
+    const on = ios ? !!last && Date.now() - last.getTime() < 14 * 86_400_000 : androidOn;
 
-    const handleToggleAutoLogging = async (newValue: boolean) => {
-        if (newValue) {
-            // Turning ON
-            if (Platform.OS === 'android') {
-                const permitted = await requestSmsPermission();
-                if (!permitted) {
-                    Alert.alert(
-                        'Permission Required',
-                        'To enable auto-logging, please grant SMS permissions so LogIt can listen for transaction messages.'
-                    );
-                    return;
-                }
+    const toggleAndroid = async (value: boolean) => {
+        if (value) {
+            const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS, {
+                title: 'Let LogIt read money alerts',
+                message: 'LogIt reads MoMo and bank alerts as they arrive and logs them for you. Other messages are ignored.',
+                buttonPositive: 'Continue',
+                buttonNegative: 'Not now',
+            }).catch(() => PermissionsAndroid.RESULTS.DENIED);
+            if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+                toast.show({ message: 'Allow SMS in Settings › Apps › LogIt › Permissions to turn this on.', icon: 'info' });
+                return;
             }
-            await AsyncStorage.setItem('sms_auto_logging_enabled', 'true');
-            setSmsEnabled(true);
-
-            // Re-sync session parameters
+            await AsyncStorage.setItem(SMS_KEY, 'true');
+            setAndroidOn(true);
             const session = await getSession();
-            if (session) {
-                syncSessionToAppGroup(session, null);
-            }
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            if (session) syncSessionToAppGroup(session, null);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         } else {
-            // Turning OFF
-            await AsyncStorage.setItem('sms_auto_logging_enabled', 'false');
-            setSmsEnabled(false);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await AsyncStorage.setItem(SMS_KEY, 'false');
+            setAndroidOn(false);
         }
     };
+
+    const toggleSamples = async (value: boolean) => {
+        setSamples(value);
+        if (!(await setShareSamples(value))) {
+            setSamples(!value);
+            toast.show({ message: 'Couldn’t save that. Try again.', icon: 'alert' });
+        }
+    };
+
+    const status = signedIn === false
+        ? { title: 'Autopilot is paused', meta: 'Log in again and it picks up where it left off.' }
+        : on
+            ? { title: 'Autopilot is on', meta: last ? `Last alert logged ${ago(last)}` : 'Waiting for your first alert' }
+            : { title: 'Autopilot is off', meta: ios ? 'Set up the Shortcuts automation below.' : 'Turn on Read SMS alerts below.' };
 
     return (
-        <View style={{ paddingTop: insets.top }} className="flex-1 bg-slate-50">
-            <StatusBar style="dark" />
-            
-            {/* Custom Header */}
-            <View className="px-4 flex-row items-center justify-between border-b border-slate-100 pb-4 bg-white shadow-sm shadow-slate-200/20">
-                <Pressable
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        router.back();
-                    }}
-                    className="w-10 h-10 items-center justify-center rounded-full bg-slate-50 active:bg-slate-100"
-                >
-                    <HugeiconsIcon icon={ArrowLeft01Icon} size={20} color="#1E293B" />
-                </Pressable>
-                <Text className="text-slate-900 font-manrope-bold text-[18px]">SMS Integration</Text>
-                <View className="w-10" />
-            </View>
+        <>
+            <Screen header={<TopBar title="Autopilot" />} contentStyle={{ gap: 12 }}>
+                <Card gap={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
+                    <CategoryTile tone={on ? 'success' : 'warn'} icon="flash" size={34} />
+                    <View style={{ flex: 1, gap: 2 }}>
+                        <Text size={15} weight="bold">{last === undefined ? ' ' : status.title}</Text>
+                        <Text variant="meta" tone="secondary">{last === undefined ? ' ' : status.meta}</Text>
+                    </View>
+                </Card>
 
-            <ScrollView className="flex-1 px-4 pt-6" contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
-                
-                {Platform.OS === 'android' ? (
-                    <Animated.View {...{ entering: FadeInDown.duration(600) } as any} className="mb-6">
-                        {/* Auto-Logging Switch Card */}
-                        <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm shadow-slate-200/50">
-                            <View className="flex-row items-center justify-between mb-4">
-                                <View className="flex-row items-center flex-1 pr-4">
-                                    <View className="w-12 h-12 bg-indigo-50 rounded-2xl items-center justify-center">
-                                        <HugeiconsIcon icon={Mail01Icon} size={24} color={COLORS.primary} />
-                                    </View>
-                                    <View className="ml-4 flex-1">
-                                        <Text className="text-slate-900 font-manrope-bold text-[18px]">Auto-Log SMS Transactions</Text>
-                                        <Text className="text-slate-400 font-manrope text-[12px] mt-0.5">Logs in background instantly</Text>
-                                    </View>
-                                </View>
-                                <Switch
-                                    value={smsEnabled}
-                                    onValueChange={handleToggleAutoLogging}
-                                    trackColor={{ false: '#E2E8F0', true: COLORS.primary }}
-                                    thumbColor="#FFFFFF"
-                                />
-                            </View>
-                            
-                            <View className="border-t border-slate-50 pt-4 mt-2">
-                                <View className="flex-row items-center">
-                                    <View className={`w-3 h-3 rounded-full ${smsEnabled && hasPermission ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                    <Text className="text-slate-500 font-manrope-semibold text-[14px] ml-2.5">
-                                        Status: {smsEnabled && hasPermission ? 'Background Service Running' : 'Auto-Logging Inactive'}
-                                    </Text>
-                                </View>
-                            </View>
-                        </View>
-                    </Animated.View>
+                {ios ? (
+                    <ListGroup label="iPhone" labelOnBand>
+                        <ListRow dense leading={tile('settings')} title="Shortcuts automation" value={on ? 'Steps' : 'Set up'} valueStyle="setting" valueTone="accent" trailing="chevron" onPress={() => setStepsOpen(true)} />
+                        <ListRow dense leading={tile('paste')} title="Send a test" meta="Paste an alert and see what LogIt reads" trailing="chevron" onPress={() => router.push('/paste')} />
+                    </ListGroup>
                 ) : (
-                    <Animated.View {...{ entering: FadeInDown.duration(600) } as any} className="mb-6">
-                        {/* iOS Share Extension Card */}
-                        <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm shadow-slate-200/50">
-                            <View className="flex-row items-center mb-4">
-                                <View className="w-12 h-12 bg-indigo-50 rounded-2xl items-center justify-center">
-                                    <HugeiconsIcon icon={Mail01Icon} size={24} color={COLORS.primary} />
-                                </View>
-                                <View className="ml-4 flex-1">
-                                    <Text className="text-slate-900 font-manrope-bold text-[18px]">iPhone autopilot</Text>
-                                    <Text className={`${isSignedIn === false ? 'text-rose-500' : 'text-emerald-600'} font-manrope-semibold text-[12px] mt-0.5`}>
-                                        {isSignedIn === null
-                                            ? 'Checking…'
-                                            : !isSignedIn
-                                                ? 'Sign in to share messages'
-                                                : lastSmsAt
-                                                    ? `Ready · last SMS logged ${formatAgo(lastSmsAt)}`
-                                                    : 'Ready · no messages shared yet'}
-                                    </Text>
-                                </View>
-                            </View>
-                            
-                            <Text className="text-slate-500 font-manrope text-[14px] leading-6 border-t border-slate-50 pt-4">
-                                Apple doesn’t let apps read your messages. Instead, a Shortcuts automation hands each MoMo or bank alert to LogIt the moment it arrives. Set it up once below.
-                            </Text>
-                        </View>
-                    </Animated.View>
+                    <ListGroup label="Android" labelOnBand>
+                        <ListRow dense leading={tile('message')} title="Read SMS alerts" meta="Logs in the background as they arrive" toggle={{ value: androidOn, onChange: toggleAndroid }} />
+                        <ListRow dense leading={tile('paste')} title="Send a test" meta="Paste an alert and see what LogIt reads" trailing="chevron" onPress={() => router.push('/paste')} />
+                    </ListGroup>
                 )}
 
-                {/* Instructions Section */}
-                <Animated.View {...{ entering: FadeInDown.delay(100).duration(600) } as any} className="mb-6">
-                    <Text className="text-slate-400 font-manrope-bold text-[12px] uppercase tracking-[2px] ml-4 mb-3">
-                        {Platform.OS === 'ios' ? 'Turn on autopilot · once, about a minute' : 'How it works on Android'}
+                <ListGroup label="Learning">
+                    <ListRow
+                        dense
+                        leading={tile('shield')}
+                        title="Help LogIt read more banks"
+                        meta="Share the wording of messages LogIt can’t read, with every amount, name and number removed."
+                        toggle={{ value: samples, onChange: toggleSamples }}
+                    />
+                </ListGroup>
+
+                <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 4 }}>
+                    <Icon name="lock" size={14} color={colors.text.tertiary} />
+                    <Text variant="meta" tone="tertiary" style={{ flex: 1 }}>
+                        LogIt only reads bank and MoMo alerts. Chats that mention money are ignored, and only you can see your transactions.
                     </Text>
-                    
-                    <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm shadow-slate-200/50">
-                        {Platform.OS === 'ios' ? (
-                            <View>
-                                {IOS_AUTOPILOT_STEPS.map((step, i) => (
-                                    <View key={i} className={`flex-row items-start ${i > 0 ? 'mt-4' : ''}`}>
-                                        <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
-                                            <Text className="text-slate-600 font-manrope-bold text-[14px]">{i + 1}</Text>
-                                        </View>
-                                        <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                            {step.map((part, j) =>
-                                                j % 2 === 1
-                                                    ? <Text key={j} className="font-manrope-bold text-slate-900">{part}</Text>
-                                                    : part
-                                            )}
-                                        </Text>
-                                    </View>
-                                ))}
+                </View>
+            </Screen>
 
-                                <Pressable
-                                    onPress={() => Linking.openURL('shortcuts://').catch(() => {})}
-                                    className="mt-6 h-12 rounded-2xl items-center justify-center"
-                                    style={({ pressed }) => ({ backgroundColor: COLORS.primary, opacity: pressed ? 0.85 : 1 })}
-                                >
-                                    <Text className="text-white font-manrope-bold text-[15px]">Open Shortcuts</Text>
-                                </Pressable>
-
-                                <Text className="text-slate-400 font-manrope text-[13px] leading-5 mt-5 border-t border-slate-50 pt-4">
-                                    Missed a few? In Messages, press and hold one, tap More, select the others, then Share › LogIt.
-                                </Text>
-                            </View>
-                        ) : (
-                            <View className="space-y-6">
-                                <View className="flex-row items-start">
-                                    <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
-                                        <Text className="text-slate-600 font-manrope-bold text-[14px]">1</Text>
-                                    </View>
-                                    <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        Once enabled, LogIt starts a lightweight background listener that runs automatically on your device.
-                                    </Text>
-                                </View>
-                                
-                                <View className="flex-row items-start mt-4">
-                                    <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
-                                        <Text className="text-slate-600 font-manrope-bold text-[14px]">2</Text>
-                                    </View>
-                                    <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        Whenever a bank or Mobile Money transaction SMS arrives, the background listener instantly catches it.
-                                    </Text>
-                                </View>
-
-                                <View className="flex-row items-start mt-4">
-                                    <View className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center mt-0.5 border border-slate-100">
-                                        <Text className="text-slate-600 font-manrope-bold text-[14px]">3</Text>
-                                    </View>
-                                    <Text className="text-slate-600 font-manrope text-[14px] ml-4 flex-1 leading-6">
-                                        It’s logged to the right wallet straight away, with a short note like “Spent GHS 10.00 on MTN Airtime · MTN MoMo”. Anything LogIt can’t read waits for you in Needs review.
-                                    </Text>
-                                </View>
-                            </View>
-                        )}
-                    </View>
-                </Animated.View>
-                
-                {/* Help LogIt read more banks (opt-in) */}
-                <Animated.View {...{ entering: FadeInDown.delay(150).duration(600) } as any} className="mb-6">
-                    <View className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm shadow-slate-200/50">
-                        <View className="flex-row items-center justify-between">
-                            <View className="flex-1 pr-4">
-                                <Text className="text-slate-900 font-manrope-bold text-[16px]">Help LogIt read more banks</Text>
-                                <Text className="text-slate-500 font-manrope text-[13px] leading-5 mt-1.5">
-                                    When a message can’t be read, share its wording with every amount, name and number removed, so LogIt can learn your bank.
-                                </Text>
-                            </View>
-                            <Switch
-                                value={shareSamples}
-                                onValueChange={async (on) => {
-                                    setShareSamplesState(on);
-                                    Haptics.selectionAsync();
-                                    const ok = await setShareSamples(on);
-                                    if (!ok) {
-                                        setShareSamplesState(!on);
-                                        Alert.alert('Couldn’t save that', 'Check your connection and try again.');
-                                    }
-                                }}
-                                disabled={!isSignedIn}
-                                trackColor={{ false: '#E2E8F0', true: COLORS.primary }}
-                                thumbColor="#FFFFFF"
-                            />
+            <Sheet
+                visible={stepsOpen}
+                onClose={() => setStepsOpen(false)}
+                title="Set up autopilot"
+                subtitle="Once, in the Shortcuts app. Takes about a minute."
+                footer={<Button label="Open Shortcuts" onPress={() => Linking.openURL('shortcuts://').catch(() => {})} />}
+            >
+                {IOS_AUTOPILOT_STEPS.map((step, i) => (
+                    <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
+                        <View style={{ width: 26, height: 26, borderRadius: 999, backgroundColor: colors.bg.muted, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text size={13} weight="bold">{i + 1}</Text>
                         </View>
+                        <Text tone="secondary" style={{ flex: 1 }}>
+                            {step.map((part, j) => (j % 2 === 1 ? <Text key={j} weight="bold">{part}</Text> : part))}
+                        </Text>
                     </View>
-                </Animated.View>
-
-                {/* Security Card */}
-                <Animated.View {...{ entering: FadeInDown.delay(200).duration(600) } as any}>
-                    <View className="bg-indigo-50/50 rounded-[32px] p-6 border border-indigo-50 flex-row items-start">
-                        <HugeiconsIcon icon={InformationCircleIcon} size={22} color={COLORS.primary} className="mt-0.5" />
-                        <View className="ml-4 flex-1">
-                            <Text className="text-slate-900 font-manrope-bold text-[16px]">Your messages stay yours</Text>
-                            <Text className="text-slate-500 font-manrope text-[13px] leading-5 mt-1.5">
-                                LogIt only reads bank and Mobile Money alerts, and chats that mention money are ignored. Each alert is sent securely to your own account to be read, and only you can see your transactions.
-                            </Text>
-                        </View>
-                    </View>
-                </Animated.View>
-            </ScrollView>
-        </View>
+                ))}
+            </Sheet>
+        </>
     );
 }

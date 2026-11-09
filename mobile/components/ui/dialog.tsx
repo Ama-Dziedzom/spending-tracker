@@ -18,13 +18,15 @@ interface DialogProps {
     /** Safe choice, on the left. */
     cancelLabel: string;
     confirmLabel: string;
+    /** Confirm above cancel, full width (Log out, Figma 1013:2008). */
+    stacked?: boolean;
 }
 
 /**
  * Only for things that can't be undone or lose work. The safe choice sits on
  * the left. Never used for offline or errors (those are banners/toasts).
  */
-export function Dialog({ visible, onCancel, onConfirm, icon, tone = 'danger', title, body, cancelLabel, confirmLabel }: DialogProps) {
+export function Dialog({ visible, onCancel, onConfirm, icon, tone = 'danger', title, body, cancelLabel, confirmLabel, stacked }: DialogProps) {
     const { colors, shadows } = useTheme();
     const danger = tone === 'danger';
     return (
@@ -48,10 +50,17 @@ export function Dialog({ visible, onCancel, onConfirm, icon, tone = 'danger', ti
                     </View>
                     <Text variant="cardTitle" align="center" accessibilityRole="header">{title}</Text>
                     {body && <Text size={13} tone="secondary" align="center">{body}</Text>}
-                    <View style={{ flexDirection: 'row', gap: 8, alignSelf: 'stretch' }}>
-                        <Button label={cancelLabel} onPress={onCancel} variant="secondary" size="md" fill />
-                        <Button label={confirmLabel} onPress={onConfirm} variant={danger ? 'danger' : 'ink'} size="md" fill />
-                    </View>
+                    {stacked ? (
+                        <View style={{ gap: 8, alignSelf: 'stretch', marginTop: 4 }}>
+                            <Button label={confirmLabel} onPress={onConfirm} variant={danger ? 'danger' : 'ink'} />
+                            <Button label={cancelLabel} onPress={onCancel} variant="secondary" />
+                        </View>
+                    ) : (
+                        <View style={{ flexDirection: 'row', gap: 8, alignSelf: 'stretch' }}>
+                            <Button label={cancelLabel} onPress={onCancel} variant="secondary" size="md" fill />
+                            <Button label={confirmLabel} onPress={onConfirm} variant={danger ? 'danger' : 'ink'} size="md" fill />
+                        </View>
+                    )}
                 </Pressable>
             </Pressable>
         </Modal>

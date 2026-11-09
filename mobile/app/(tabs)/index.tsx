@@ -8,14 +8,13 @@ import {
 import { SpendingCard, SpendingCardSkeleton, type Period } from '@/components/spending/spending-card';
 import { FirstRunCard, SalaryPromptCard } from '@/components/spending/prompt-cards';
 import { DayDetailSheet } from '@/components/spending/day-detail-sheet';
-import { LinkWalletsFlow } from '@/components/spending/link-wallets-flow';
 import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
 import { AddEntrySheet } from '@/components/transactions/add-entry-sheet';
 import { useTabContext } from './_layout';
 import { supabase, type Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
-import { getPendingReviewCount } from '@/lib/review-service';
+import { getCheckCount } from '@/lib/check-service';
 import { getIncomePrompts, logExpectedIncome, markIncomeReceived, snoozeIncome, type IncomePrompt } from '@/lib/income-service';
 import { fetchSpendingWindow, summarise, type SpendingSummary } from '@/lib/spending-service';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
@@ -41,13 +40,11 @@ export default function Spending() {
     const [txs, setTxs] = useState<TransactionWithWallet[]>([]);
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [reviewCount, setReviewCount] = useState(0);
-    const [unmatchedCount, setUnmatchedCount] = useState(0);
     const [incomePrompt, setIncomePrompt] = useState<IncomePrompt | null>(null);
 
     const [dayOpen, setDayOpen] = useState<Date | null>(null);
     const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
     const [incomeSheetFor, setIncomeSheetFor] = useState<IncomePrompt | null>(null);
-    const [linkOpen, setLinkOpen] = useState(false);
 
     // Entries inside their Undo window are left out, so totals change at once.
     const removing = usePendingRemovals();
@@ -65,19 +62,18 @@ export default function Spending() {
             setName((meta.full_name as string | undefined)?.split(' ')[0] ?? user?.email?.split('@')[0] ?? null);
             setAvatar((meta.avatar as AvatarChoice | undefined) ?? null);
 
-            const [window, walletList, pending, prompts, unmatched] = await Promise.all([
+            // Check covers both unread alerts and entries with no wallet yet.
+            const [window, walletList, pending, prompts] = await Promise.all([
                 fetchSpendingWindow(),
                 getWallets(),
-                getPendingReviewCount(),
+                getCheckCount(),
                 getIncomePrompts(),
-                supabase.from('transactions').select('*', { count: 'exact', head: true }).is('wallet_id', null),
             ]);
             setTxs(window);
             setLoaded(true);
             setWallets(walletList);
             setReviewCount(pending);
             setIncomePrompt(prompts[0] ?? null);
-            setUnmatchedCount(unmatched.count ?? 0);
             setError(false);
         } catch (e) {
             console.error('Error loading Spending:', e);
@@ -168,16 +164,6 @@ export default function Spending() {
                     />
                 )}
 
-                {!loading && unmatchedCount > 0 && (
-                    <Banner
-                        tone="info"
-                        icon="wallet"
-                        title={`${unmatchedCount} ${unmatchedCount === 1 ? 'payment needs' : 'payments need'} a wallet`}
-                        body="Tell LogIt which account they came from."
-                        action={{ label: 'Link', onPress: () => setLinkOpen(true) }}
-                    />
-                )}
-
                 {!loading && !firstRun && (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                         <Chip icon="cash" label="Log cash" onPress={() => tabs?.openAdd('cash')} />
@@ -220,7 +206,6 @@ export default function Spending() {
                 } : undefined}
             />
 
-            <LinkWalletsFlow visible={linkOpen} onClose={() => setLinkOpen(false)} onDone={fetchData} />
         </>
     );
 }

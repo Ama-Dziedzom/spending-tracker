@@ -4,6 +4,7 @@ import { HIT_SLOP } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { Icon, type IconName } from './icon';
 import { Text } from './text';
+import { Tap } from './tap';
 
 type Tone = 'info' | 'warn' | 'success' | 'danger';
 
@@ -71,14 +72,14 @@ export function ActionBanner({ icon, tone = 'warn', title, body, actionLabel, on
                 <Text variant="row" weight="bold">{title}</Text>
                 {body && <Text variant="meta" tone="secondary">{body}</Text>}
             </View>
-            <Pressable
+            <Tap
                 onPress={onPress}
                 hitSlop={HIT_SLOP}
                 accessibilityRole="button"
-                style={({ pressed }) => ({ backgroundColor: colors.brand['ink-button'], borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9, opacity: pressed ? 0.85 : 1 })}
+                style={({ pressed }) => ({ backgroundColor: colors.brand['ink-button'], borderRadius: 999, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center', opacity: pressed ? 0.85 : 1 })}
             >
                 <Text size={13} weight="bold" style={{ color: colors.brand['on-ink-button'] }}>{actionLabel}</Text>
-            </Pressable>
+            </Tap>
         </View>
     );
 }

@@ -39,7 +39,7 @@ export function DayDetailSheet({ date, transactions, isBiggest, onClose, onTrans
                             <TransactionRow key={tx.id} tx={tx} onPress={() => { onClose(); onTransaction(tx); }} />
                         ))}
                     </ListGroup>
-                    <Button label="See all transactions" variant="secondary" size="md" onPress={() => { onClose(); onSeeAll(); }} />
+                    <Button label="See all transactions" variant="secondary" onPress={() => { onClose(); onSeeAll(); }} />
                 </>
             )}
         </Sheet>

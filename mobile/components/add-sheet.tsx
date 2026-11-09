@@ -27,8 +27,9 @@ export function AddSheet({ visible, onClose, onChoose }: Props) {
                 <ListRow
                     leading={<CategoryTile tone="accent" icon="paste" size={44} />}
                     title="Paste a message"
-                    meta="A MoMo or bank alert"
+                    meta="From MoMo or your bank"
                     trailing="chevron"
+                    chevronSize={18}
                     onPress={pick(() => router.push('/paste'))}
                 />
                 <ListRow
@@ -36,6 +37,7 @@ export function AddSheet({ visible, onClose, onChoose }: Props) {
                     title="Log cash"
                     meta="Spent cash you took out"
                     trailing="chevron"
+                    chevronSize={18}
                     onPress={pick(() => onChoose('cash'))}
                 />
                 <ListRow
@@ -43,6 +45,7 @@ export function AddSheet({ visible, onClose, onChoose }: Props) {
                     title="Add manually"
                     meta="Amount, category, wallet"
                     trailing="chevron"
+                    chevronSize={18}
                     onPress={pick(() => onChoose('manual'))}
                 />
                 <ListRow
@@ -50,6 +53,7 @@ export function AddSheet({ visible, onClose, onChoose }: Props) {
                     title="Expected income"
                     meta="Salary from a bank that doesn’t text"
                     trailing="chevron"
+                    chevronSize={18}
                     onPress={pick(() => router.push('/expected-income'))}
                 />
             </ListGroup>

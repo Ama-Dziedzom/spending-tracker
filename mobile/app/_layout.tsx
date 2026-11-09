@@ -13,6 +13,8 @@ import { ToastProvider } from '@/components/ui/toast';
 import '../global.css';
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { AppLockProvider } from '@/components/app-lock';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { syncSessionToAppGroup } from '@/lib/shareSync';
@@ -87,7 +89,13 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <LogItThemeProvider>
           <ToastProvider>
-            <AppStack />
+            {/* Face ID lock covers everything, sheets included. */}
+            <AppLockProvider>
+              {/* Sheets render here, above the tabs and the floating tab bar. */}
+              <BottomSheetModalProvider>
+                <AppStack />
+              </BottomSheetModalProvider>
+            </AppLockProvider>
           </ToastProvider>
         </LogItThemeProvider>
       </SafeAreaProvider>
@@ -126,7 +134,12 @@ function AppStack() {
             <Stack.Screen name="success" options={{ headerShown: false, animation: 'fade' }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="wallet-details" options={{ headerShown: false }} />
+            <Stack.Screen name="profile" options={{ headerShown: false }} />
+            <Stack.Screen name="notification-settings" options={{ headerShown: false }} />
+            <Stack.Screen name="help" options={{ headerShown: false }} />
+            <Stack.Screen name="delete-account" options={{ headerShown: false }} />
+            <Stack.Screen name="sms-settings" options={{ headerShown: false }} />
+            <Stack.Screen name="paste" options={{ headerShown: false }} />
             <Stack.Screen name="notifications" options={{ headerShown: false }} />
             <Stack.Screen name="review" options={{ headerShown: false }} />
             <Stack.Screen name="expected-income" options={{ headerShown: false }} />

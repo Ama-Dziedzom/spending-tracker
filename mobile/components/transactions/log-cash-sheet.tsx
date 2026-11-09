@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Button, CategoryTile, Icon, Sheet, Text, useToast, type IconName } from '@/components/ui';
 import { HIT_SLOP } from '@/constants/theme';
@@ -11,14 +11,51 @@ import { categoryStyle } from '@/lib/category-style';
 import { shortDate } from '@/lib/format';
 import { AmountInput, parseAmount } from './pickers';
 import { money } from './money';
+import { Tap } from '@/components/ui/tap';
 
 /** Quick chips (Figma 1005:1227). Each is a category plus the entry's name. */
-const CHIPS: { key: string; label: string; icon: IconName; category: string; description: string }[] = [
-    { key: 'trotro', label: 'Trotro', icon: 'transport', category: 'transport', description: 'Trotro' },
-    { key: 'food', label: 'Food', icon: 'food', category: 'food', description: 'Food' },
-    { key: 'market', label: 'Market', icon: 'shopping', category: 'shopping', description: 'Market' },
-    { key: 'gift', label: 'Gift', icon: 'people', category: 'gifts', description: 'Gift' },
-    { key: 'other', label: 'Other', icon: 'more', category: 'cash', description: 'Cash spend' },
+const CHIPS: {
+    key: string;
+    label: string;
+    icon: IconName;
+    category: string;
+    description: string;
+}[] = [
+    {
+        key: 'trotro',
+        label: 'Trotro',
+        icon: 'transport',
+        category: 'transport',
+        description: 'Trotro',
+    },
+    {
+        key: 'food',
+        label: 'Food',
+        icon: 'food',
+        category: 'food',
+        description: 'Food',
+    },
+    {
+        key: 'market',
+        label: 'Market',
+        icon: 'shopping',
+        category: 'shopping',
+        description: 'Market',
+    },
+    {
+        key: 'gift',
+        label: 'Gift',
+        icon: 'people',
+        category: 'gifts',
+        description: 'Gift',
+    },
+    {
+        key: 'other',
+        label: 'Other',
+        icon: 'more',
+        category: 'cash',
+        description: 'Cash spend',
+    },
 ];
 
 const LAST_CHIP = 'logit.lastCashChip';
@@ -27,11 +64,7 @@ const LAST_CHIP = 'logit.lastCashChip';
  * Log cash (Figma 1005:1161): cash is the one thing LogIt can't see. Quick
  * chips and a running "cash left" make it painless.
  */
-export function LogCashSheet({ visible, onClose, onSuccess }: {
-    visible: boolean;
-    onClose: () => void;
-    onSuccess: (id: string) => void;
-}) {
+export function LogCashSheet({ visible, onClose, onSuccess }: { visible: boolean; onClose: () => void; onSuccess: (id: string) => void }) {
     const { colors } = useTheme();
     const toast = useToast();
     const [wallet, setWallet] = useState<Wallet | null | undefined>(undefined); // undefined = loading, null = none
@@ -45,14 +78,20 @@ export function LogCashSheet({ visible, onClose, onSuccess }: {
         let live = true;
         setAmount('');
         setBusy(false);
-        AsyncStorage.getItem(LAST_CHIP).then((c) => { if (live) setChip(c); }).catch(() => {});
+        AsyncStorage.getItem(LAST_CHIP)
+            .then((c) => {
+                if (live) setChip(c);
+            })
+            .catch(() => {});
         (async () => {
             const cash = (await getWallets().catch(() => [] as Wallet[])).find((w) => w.type === 'cash') ?? null;
             if (!live) return;
             setWallet(cash);
             setSource(cash ? await lastCashIn(cash.id) : null);
         })();
-        return () => { live = false; };
+        return () => {
+            live = false;
+        };
     }, [visible]);
 
     const value = parseAmount(amount);
@@ -63,8 +102,8 @@ export function LogCashSheet({ visible, onClose, onSuccess }: {
     const subtitle = source
         ? `From the ${money(source.amount)} you took out ${dayWord(source.date)}`
         : wallet
-            ? `From your ${wallet.name} wallet`
-            : 'LogIt will start a Cash wallet for you';
+          ? `From your ${wallet.name} wallet`
+          : 'LogIt will start a Cash wallet for you';
 
     const save = async () => {
         if (value <= 0 || busy) return;
@@ -82,35 +121,58 @@ export function LogCashSheet({ visible, onClose, onSuccess }: {
                 description: c.description,
             });
             if (picked) AsyncStorage.setItem(LAST_CHIP, picked.key).catch(() => {});
-            toast.show({ message: `Logged · ${money(value)} on ${categoryStyle(c.category).label}` });
+            toast.show({
+                message: `Logged · ${money(value)} on ${categoryStyle(c.category).label}`,
+            });
             onSuccess(id);
             onClose();
         } catch (e) {
-            toast.show({ message: e instanceof Error ? e.message : 'Couldn’t log it. Try again.', icon: 'alert' });
+            toast.show({
+                message: e instanceof Error ? e.message : 'Couldn’t log it. Try again.',
+                icon: 'alert',
+            });
         } finally {
             setBusy(false);
         }
     };
 
     return (
-        <Sheet visible={visible} onClose={onClose}>
+        <Sheet
+            visible={visible}
+            onClose={onClose}
+            footer={
+                <Button
+                    label={value > 0 ? `Log ${money(value)} cash` : 'Log cash'}
+                    busy={busy}
+                    busyLabel="Logging"
+                    disabled={value <= 0 || wallet === undefined}
+                    onPress={save}
+                />
+            }
+        >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                 <CategoryTile tone="cash" icon="cash" size={44} />
                 <View style={{ flex: 1, gap: 1 }}>
-                    <Text variant="screenTitle" size={20} style={{ letterSpacing: -0.4 }} accessibilityRole="header">Log cash</Text>
-                    <Text size={13} tone="secondary">{wallet === undefined ? ' ' : subtitle}</Text>
+                    <Text variant="screenTitle" size={20} style={{ letterSpacing: -0.4 }} accessibilityRole="header">
+                        Log cash
+                    </Text>
+                    <Text size={13} tone="secondary">
+                        {wallet === undefined ? ' ' : subtitle}
+                    </Text>
                 </View>
             </View>
 
             <AmountInput value={amount} onChange={setAmount} autoFocus />
 
-            <Text variant="sectionLabel" tone="tertiary" size={12}>What was it for?</Text>
+            <Text variant="sectionLabel" tone="tertiary" size={12}>
+                What was it for?
+            </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
                 {CHIPS.map((c) => {
                     const active = c.key === chip;
                     const fg = active ? colors.brand['on-accent'] : colors.text.primary;
                     return (
-                        <Pressable
+                        <Tap
                             key={c.key}
                             onPress={() => setChip(active ? null : c.key)}
                             hitSlop={HIT_SLOP}
@@ -118,43 +180,64 @@ export function LogCashSheet({ visible, onClose, onSuccess }: {
                             accessibilityState={{ selected: active }}
                             accessibilityLabel={c.label}
                             style={({ pressed }) => ({
-                                flexDirection: 'row', alignItems: 'center', gap: 6,
-                                paddingLeft: 12, paddingRight: 14, paddingVertical: 9, borderRadius: 999,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                paddingLeft: 12,
+                                paddingRight: 14,
+                                minHeight: 44,
+                                borderRadius: 999,
                                 backgroundColor: active ? colors.brand.accent : colors.bg.muted,
                                 opacity: pressed ? 0.8 : 1,
                             })}
                         >
-                            <Icon name={c.icon} size={16} color={active ? fg : colors.cat[categoryTone(c.category)] ?? colors.text.secondary} />
-                            <Text size={13} weight="bold" style={{ color: fg }}>{c.label}</Text>
-                        </Pressable>
+                            <Icon name={c.icon} size={16} color={active ? fg : (colors.cat[categoryTone(c.category)] ?? colors.text.secondary)} />
+                            <Text size={13} weight="bold" style={{ color: fg }}>
+                                {c.label}
+                            </Text>
+                        </Tap>
                     );
                 })}
             </View>
 
-            {left !== null && balance !== null && balance > 0 && (
-                left >= 0 ? (
-                    <View style={{ backgroundColor: colors.cat['cash-tint'], borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {left !== null &&
+                balance !== null &&
+                balance > 0 &&
+                (left >= 0 ? (
+                    <View
+                        style={{
+                            backgroundColor: colors.cat['cash-tint'],
+                            borderRadius: 16,
+                            paddingHorizontal: 14,
+                            paddingVertical: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                        }}
+                    >
                         <Icon name="cash" size={18} color={colors.cat.cash} />
-                        <Text size={13} weight="semibold">{money(left)} cash left after this</Text>
+                        <Text size={13} weight="semibold">
+                            {money(left)} cash left after this
+                        </Text>
                     </View>
                 ) : (
-                    <View style={{ backgroundColor: colors.status['warn-tint'], borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View
+                        style={{
+                            backgroundColor: colors.status['warn-tint'],
+                            borderRadius: 16,
+                            paddingHorizontal: 14,
+                            paddingVertical: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                        }}
+                    >
                         <Icon name="alert" size={18} color={colors.status.warn} />
                         <Text size={13} weight="semibold" style={{ flex: 1 }}>
                             That’s more than the {money(balance)} LogIt knows about. You can count your cash in Wallets.
                         </Text>
                     </View>
-                )
-            )}
-
-            <Button
-                label={value > 0 ? `Log ${money(value)} cash` : 'Log cash'}
-                busy={busy}
-                busyLabel="Logging"
-                disabled={value <= 0 || wallet === undefined}
-                onPress={save}
-                style={{ marginTop: 8 }}
-            />
+                ))}
         </Sheet>
     );
 }
@@ -169,8 +252,7 @@ function categoryTone(category: string): 'transport' | 'food' | 'shopping' | 'pe
 function dayWord(d: Date): string {
     const now = new Date();
     const days = Math.round(
-        (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-            - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86_400_000,
+        (new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86_400_000,
     );
     if (days === 0) return 'today';
     if (days === 1) return 'yesterday';
@@ -190,5 +272,8 @@ async function lastCashIn(walletId: string): Promise<{ amount: number; date: Dat
         .order('transaction_date', { ascending: false })
         .limit(1);
     if (error || !data?.[0]) return null;
-    return { amount: Number(data[0].amount), date: new Date(data[0].transaction_date) };
+    return {
+        amount: Number(data[0].amount),
+        date: new Date(data[0].transaction_date),
+    };
 }

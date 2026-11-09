@@ -50,6 +50,7 @@ export default function TabLayout() {
                 <Tabs.Screen name="wallets" options={{ title: 'Wallets' }} />
                 <Tabs.Screen name="insights" options={{ title: 'Insights' }} />
                 <Tabs.Screen name="transactions" options={{ title: 'Transactions', href: null }} />
+                <Tabs.Screen name="wallet" options={{ title: 'Wallet', href: null }} />
             </Tabs>
 
             <AddSheet visible={addSheetVisible} onClose={() => setAddSheetVisible(false)} onChoose={onChoose} />

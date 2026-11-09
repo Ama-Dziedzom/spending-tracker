@@ -1,379 +1,156 @@
-import { View, Text, Pressable, Alert, ScrollView, Switch, RefreshControl, Platform } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { getPendingReviewCount } from '../lib/review-service';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import React, { useCallback, useState } from 'react';
+import { Platform, Pressable, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
-    Logout01Icon,
-    UserIcon,
-    ArrowRight01Icon,
-    Mail01Icon,
-    DollarCircleIcon,
-    Notification03Icon,
-    Database02Icon,
-    Delete02Icon,
-    Download02Icon,
-    InformationCircleIcon,
-    Calendar02Icon,
-    Clock01Icon,
-    Tick01Icon,
-    InboxIcon,
-    MoneyReceive01Icon,
-    SmartPhone01Icon,
-} from '@hugeicons/core-free-icons';
-import { formatPhone } from '../lib/phone';
-import * as Haptics from 'expo-haptics';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { COLORS } from '../constants/theme';
-import { RoundButton } from '@/components/ui';
+    Avatar, CategoryTile, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast,
+    type IconName,
+} from '@/components/ui';
+import { useAppLock } from '@/components/app-lock';
+import { useTheme, type ThemePreference } from '@/lib/theme';
+import { getProfile, lastAlertAt, setHideWidgetAmounts, type Profile } from '@/lib/settings-service';
+import { getShareSamples, setShareSamples } from '@/lib/review-service';
+import { getWallets } from '@/lib/wallet-service';
+import { getExpectedIncome } from '@/lib/income-service';
+import { formatPhone } from '@/lib/phone';
 
-function cn(...inputs: ClassValue[]) {
-    return twMerge(clsx(inputs));
-}
+const THEMES = [
+    { value: 'light', label: 'Light' },
+    { value: 'dark', label: 'Dark' },
+    { value: 'auto', label: 'Auto' },
+] as const;
 
-// Reusable Components
-const SettingsSection = ({
-    title,
-    children,
-    delay = 0
-}: {
-    title: string;
-    children: React.ReactNode;
-    delay?: number;
-}) => (
-    <Animated.View
-        {...{ entering: FadeInDown.delay(delay).duration(600) } as any}
-        className="mb-8"
-    >
-        <Text className="text-slate-400 font-manrope-bold text-[12px] uppercase tracking-[2px] ml-6 mb-3">{title}</Text>
-        <View className="bg-white mx-4 rounded-[32px] overflow-hidden border border-slate-100 shadow-sm shadow-slate-200/50">
-            {children}
-        </View>
-    </Animated.View>
-);
+/** 34 tile, 18 icon (Figma 1010:1698). */
+const tile = (icon: IconName) => <CategoryTile tone="accent" icon={icon} size={34} />;
 
-const SettingsItem = ({
-    icon,
-    label,
-    value,
-    onPress,
-    showChevron = true,
-    destructive = false,
-}: {
-    icon: any;
-    label: string;
-    value?: string;
-    onPress?: () => void;
-    showChevron?: boolean;
-    destructive?: boolean;
-}) => (
-    <Pressable
-        onPress={onPress}
-        disabled={!onPress}
-        className={cn(
-            "flex-row items-center px-5 py-5 border-b border-slate-50 last:border-b-0",
-            onPress ? "active:bg-slate-50" : ""
-        )}
-    >
-        <View className={cn(
-            "w-11 h-11 rounded-2xl items-center justify-center",
-            destructive ? "bg-red-50" : "bg-slate-50"
-        )}>
-            <HugeiconsIcon icon={icon} size={22} color={destructive ? "#F43F5E" : COLORS.primary} />
-        </View>
-        <View className="ml-4 flex-1">
-            <Text className={cn(
-                "font-manrope-bold text-[16px]",
-                destructive ? "text-rose-500" : "text-slate-900"
-            )}>{label}</Text>
-            {value && <Text className="text-slate-500 font-manrope text-[14px] mt-0.5">{value}</Text>}
-        </View>
-        {showChevron && onPress && (
-            <HugeiconsIcon icon={ArrowRight01Icon} size={20} color="#CBD5E1" />
-        )}
-    </Pressable>
-);
-
-const SettingsToggle = ({
-    icon,
-    label,
-    value,
-    onToggle
-}: {
-    icon: any;
-    label: string;
-    value: boolean;
-    onToggle: (val: boolean) => void;
-}) => (
-    <View className="flex-row items-center px-5 py-5 border-b border-slate-50 last:border-b-0">
-        <View className="w-11 h-11 bg-slate-50 rounded-2xl items-center justify-center">
-            <HugeiconsIcon icon={icon} size={22} color={COLORS.primary} />
-        </View>
-        <View className="ml-4 flex-1">
-            <Text className="text-slate-900 font-manrope-bold text-[16px]">{label}</Text>
-        </View>
-        <Switch
-            value={value}
-            onValueChange={(val) => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onToggle(val);
-            }}
-            trackColor={{ false: '#E2E8F0', true: COLORS.primary }}
-            thumbColor="#FFFFFF"
-        />
-    </View>
-);
-
+/**
+ * Settings (Figma 1010:1661). Opened from your avatar on Spending. Profile up
+ * top, then Money, Autopilot, App. Every row shows its value so you rarely
+ * need to open it.
+ */
 export default function Settings() {
-    const [reviewCount, setReviewCount] = useState<number | null>(null);
-    useFocusEffect(
-        React.useCallback(() => {
-            supabase.auth.getUser().then(({ data }) => setUser(data.user));
-            getPendingReviewCount().then(setReviewCount);
-        }, [])
-    );
-    const router = useRouter();
-    const insets = useSafeAreaInsets();
-    const [user, setUser] = useState<User | null>(null);
-    const [refreshing, setRefreshing] = useState(false);
+    const { colors, shadows, preference, setPreference } = useTheme();
+    const toast = useToast();
+    const lock = useAppLock();
+    const [profile, setProfile] = useState<Profile | null>(null);
+    const [walletCount, setWalletCount] = useState<number | null>(null);
+    const [expected, setExpected] = useState<string | null>(null);
+    const [autopilotOn, setAutopilotOn] = useState<boolean | null>(null);
+    const [shareSamples, setShareSamplesState] = useState(false);
 
-    // Settings States
-    const [notifDaily, setNotifDaily] = useState(true);
-    const [notifBudget, setNotifBudget] = useState(true);
-    const [timeFormat24, setTimeFormat24] = useState(true);
-    const [currency, setCurrency] = useState('GHS');
-    const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
-    const [smsEnabled, setSmsEnabled] = useState(false);
+    useFocusEffect(useCallback(() => {
+        let live = true;
+        (async () => {
+            const [p, wallets, income, samples, last, androidOn] = await Promise.all([
+                getProfile(),
+                getWallets().catch(() => []),
+                getExpectedIncome().catch(() => []),
+                getShareSamples().catch(() => false),
+                lastAlertAt().catch(() => null),
+                AsyncStorage.getItem('sms_auto_logging_enabled').catch(() => null),
+            ]);
+            if (!live) return;
+            setProfile(p);
+            setWalletCount(wallets.length);
+            setExpected(income.length === 0 ? 'None' : income.length === 1 ? income[0].label : `${income.length} set`);
+            setShareSamplesState(samples);
+            // iPhone: on if an alert has come in through autopilot in the last two weeks.
+            setAutopilotOn(Platform.OS === 'android' ? androidOn === 'true' : !!last && Date.now() - last.getTime() < 14 * 86_400_000);
+        })();
+        return () => { live = false; };
+    }, []));
 
-    useEffect(() => {
-        const getUser = async () => {
-            const { data } = await supabase.auth.getUser();
-            setUser(data.user);
-        };
-        getUser();
-    }, []);
-
-    // Refresh SMS state when settings screen is focused
-    useEffect(() => {
-        const getSmsPref = async () => {
-            const val = await AsyncStorage.getItem('sms_auto_logging_enabled');
-            setSmsEnabled(val === 'true');
-        };
-        getSmsPref();
-    }, [refreshing]);
-
-    const onRefresh = React.useCallback(async () => {
-        setRefreshing(true);
-        const { data } = await supabase.auth.getUser();
-        setUser(data.user);
-        setRefreshing(false);
-    }, []);
-
-    const onLogout = async () => {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            Alert.alert('Error', error.message);
-        } else {
-            router.replace('/login');
+    const toggleSamples = async (on: boolean) => {
+        setShareSamplesState(on);
+        if (!(await setShareSamples(on))) {
+            setShareSamplesState(!on);
+            toast.show({ message: 'Couldn’t save that. Try again.', icon: 'alert' });
         }
     };
 
-    const clearAllData = async () => {
-        Alert.alert(
-            'Clear All Data',
-            'This action is permanent and will delete all your transactions, budgets, and wallets. Are you absolutely sure?',
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Clear Data',
-                    style: 'destructive',
-                    onPress: async () => {
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        Alert.alert('Success', 'All data has been cleared.');
-                    }
-                }
-            ]
-        );
+    const toggleLock = async (on: boolean) => {
+        const ok = await lock.setEnabled(on);
+        if (!ok && on) toast.show({ message: `Set up ${lock.method} in your phone’s settings first.`, icon: 'info' });
     };
 
+    const toggleHideAmounts = async (on: boolean) => {
+        if (!profile) return;
+        const next = on ? { ...profile.hideWidgetAmounts, lock_screen: true } : { lock_screen: false, home_screen: false };
+        setProfile({ ...profile, hideWidgetAmounts: next });
+        try {
+            await setHideWidgetAmounts(next);
+        } catch (e) {
+            setProfile(profile);
+            toast.show({ message: e instanceof Error ? e.message : 'Couldn’t save that.', icon: 'alert' });
+        }
+    };
+
+    const hide = profile?.hideWidgetAmounts;
+    const hideMeta = !hide ? undefined
+        : hide.lock_screen && hide.home_screen ? 'On for the lock and home screen'
+            : hide.lock_screen ? 'On for the lock screen'
+                : hide.home_screen ? 'On for the home screen' : undefined;
+    const notificationsOn = profile ? Object.values(profile.notifications).some(Boolean) : null;
+
     return (
-        <View style={{ paddingTop: insets.top }} className="flex-1 bg-slate-50">
-            {/* Header */}
-            <View className="px-6 flex-row items-center justify-center mb-2">
-                {/* Settings is now a pushed screen, not a tab (handoff §6). */}
-                <View style={{ position: 'absolute', left: 24 }}>
-                    <RoundButton icon="back" label="Back" tone="card" onPress={() => router.back()} />
-                </View>
-                <Text className="text-slate-900 font-manrope-bold text-[24px]">Settings</Text>
-            </View>
-            <StatusBar style="dark" />
-            <ScrollView
-                className="flex-1"
-                contentContainerStyle={{
-                    paddingBottom: insets.bottom + 40
+        <Screen band={{ height: 500 }} header={<TopBar title="Settings" />} contentStyle={{ gap: 10 }}>
+            <Pressable
+                onPress={() => router.push('/profile')}
+                accessibilityRole="button"
+                accessibilityLabel={`Profile, ${profile?.name ?? ''}`}
+                style={{
+                    backgroundColor: colors.bg.surface, borderRadius: 24, paddingHorizontal: 16, paddingVertical: 12,
+                    flexDirection: 'row', alignItems: 'center', gap: 14, ...shadows.card,
                 }}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor={COLORS.primary}
-                    />
-                }
             >
-                {/* Content Section */}
-                <View className="flex-1 pt-4">
-
-                    {/* Profile Section */}
-                    <SettingsSection title="Personal Profile" delay={100}>
-                        <SettingsItem
-                            icon={UserIcon}
-                            label="Display Name"
-                            value={user?.user_metadata?.full_name || 'Set your name'}
-                            onPress={() => { }}
-                        />
-                        <SettingsItem
-                            icon={SmartPhone01Icon}
-                            label="Phone Number"
-                            value={user?.phone ? formatPhone(user.phone) : 'Add to log in by text'}
-                            onPress={user?.phone ? undefined : () => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                router.push('/add-phone');
-                            }}
-                        />
-                        {user?.email ? (
-                            <SettingsItem
-                                icon={Mail01Icon}
-                                label="Email Address"
-                                value={user.email}
-                            />
-                        ) : null}
-                    </SettingsSection>
-
-                    {/* General Preferences */}
-                    <SettingsSection title="General Preferences" delay={200}>
-                        <SettingsItem
-                            icon={DollarCircleIcon}
-                            label="Primary Currency"
-                            value={currency}
-                            onPress={() => {
-                                Alert.alert('Currency', 'Support for multi-currency is coming soon!');
-                            }}
-                        />
-                        <SettingsItem
-                            icon={Calendar02Icon}
-                            label="Date Format"
-                            value={dateFormat}
-                            onPress={() => {
-                                const formats = ['DD/MM/YYYY', 'MM/DD/YYYY'];
-                                const next = formats[(formats.indexOf(dateFormat) + 1) % formats.length];
-                                setDateFormat(next);
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            }}
-                        />
-                        <SettingsToggle
-                            icon={Clock01Icon}
-                            label="24-hour Time Format"
-                            value={timeFormat24}
-                            onToggle={setTimeFormat24}
-                        />
-                    </SettingsSection>
-
-                    {/* SMS Integration */}
-                    <SettingsSection title="SMS Integration" delay={250}>
-                        <SettingsItem
-                            icon={Mail01Icon}
-                            label={Platform.OS === 'ios' ? "iOS Share Extension" : "SMS Auto-Logging"}
-                            value={Platform.OS === 'ios' ? "Share messages from Messages" : (smsEnabled ? "Enabled" : "Disabled")}
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                router.push('/sms-settings');
-                            }}
-                        />
-                        <SettingsItem
-                            icon={MoneyReceive01Icon}
-                            label="Expected income"
-                            value="Salary & more"
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                router.push('/expected-income');
-                            }}
-                        />
-                        <SettingsItem
-                            icon={InboxIcon}
-                            label="Needs review"
-                            value={reviewCount === null ? undefined : reviewCount === 0 ? "All caught up" : `${reviewCount} waiting for you`}
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                router.push('/review');
-                            }}
-                        />
-                    </SettingsSection>
-
-                    {/* Notifications */}
-                    <SettingsSection title="Notifications" delay={300}>
-                        <SettingsToggle
-                            icon={Notification03Icon}
-                            label="Daily Spending Summary"
-                            value={notifDaily}
-                            onToggle={setNotifDaily}
-                        />
-                        <SettingsToggle
-                            icon={Notification03Icon}
-                            label="Budget Threshold Alerts"
-                            value={notifBudget}
-                            onToggle={setNotifBudget}
-                        />
-                    </SettingsSection>
-
-                    {/* Security & Data */}
-                    <SettingsSection title="Security & Data" delay={400}>
-                        <SettingsItem
-                            icon={Download02Icon}
-                            label="Export Transaction History"
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                Alert.alert('Export', 'Your data export is being prepared.');
-                            }}
-                        />
-                        <SettingsItem
-                            icon={Delete02Icon}
-                            label="Clear Data"
-                            destructive
-                            onPress={clearAllData}
-                        />
-                    </SettingsSection>
-
-                    {/* Logout */}
-                    <Animated.View
-                        {...{ entering: FadeInDown.delay(500).duration(600) } as any}
-                        className="px-4 mb-10"
-                    >
-                        <Pressable
-                            onPress={onLogout}
-                            className="flex-row items-center justify-center py-5 bg-white rounded-[32px] border border-slate-100 shadow-sm shadow-slate-200/50"
-                        >
-                            <HugeiconsIcon icon={Logout01Icon} size={22} color="#F43F5E" />
-                            <Text className="ml-3 text-rose-500 font-manrope-bold text-[16px]">Sign Out</Text>
-                        </Pressable>
-                    </Animated.View>
-
-                    <View className="items-center pb-20">
-                        <View className="bg-slate-100/50 px-4 py-2 rounded-full flex-row items-center">
-                            <HugeiconsIcon icon={InformationCircleIcon} size={14} color="#94A3B8" />
-                            <Text className="text-slate-400 font-manrope text-[12px] ml-1.5">Version 1.0.0 (Build 42)</Text>
-                        </View>
-                    </View>
+                <Avatar choice={profile?.avatar} name={profile?.name} size={52} />
+                <View style={{ flex: 1, gap: 2 }}>
+                    <Text size={16} weight="bold">{profile?.name ?? ' '}</Text>
+                    <Text size={13} tone="secondary">{profile?.phone ? formatPhone(profile.phone) : profile?.email ?? ' '}</Text>
                 </View>
-            </ScrollView>
-        </View>
+                <Icon name="next" size={18} color={colors.text.tertiary} />
+            </Pressable>
+
+            <ListGroup label="Money" labelOnBand>
+                <ListRow dense leading={tile('wallet')} title="Wallets" value={walletCount === null ? '' : String(walletCount)} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/(tabs)/wallets')} />
+                <ListRow dense leading={tile('receive')} title="Expected income" value={expected ?? ''} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/expected-income')} />
+            </ListGroup>
+
+            <ListGroup label="Autopilot" labelOnBand>
+                <ListRow
+                    dense
+                    leading={tile('flash')}
+                    title="Read my alerts"
+                    value={autopilotOn === null ? '' : autopilotOn ? 'On' : 'Set up'}
+                    valueStyle="setting"
+                    valueTone={autopilotOn ? 'success' : 'secondary'}
+                    trailing="chevron"
+                    onPress={() => router.push('/sms-settings')}
+                />
+                <ListRow dense leading={tile('shield')} title="Help LogIt read more banks" toggle={{ value: shareSamples, onChange: toggleSamples }} />
+            </ListGroup>
+
+            <ListGroup label="App">
+                <ListRow
+                    dense
+                    leading={tile('moon')}
+                    title="Theme"
+                    trailing={<SegmentedControl variant="pill" options={THEMES} value={preference} onChange={(v) => setPreference(v as ThemePreference)} />}
+                />
+                <ListRow dense leading={tile('bell')} title="Notifications" value={notificationsOn === null ? '' : notificationsOn ? 'On' : 'Off'} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/notification-settings')} />
+                <ListRow dense leading={tile('lock')} title={`Lock with ${lock.method}`} toggle={{ value: lock.enabled, onChange: toggleLock }} />
+                <ListRow
+                    dense
+                    leading={tile('shield')}
+                    title="Hide amounts on widgets"
+                    meta={hideMeta}
+                    toggle={{ value: !!(hide?.lock_screen || hide?.home_screen), onChange: toggleHideAmounts }}
+                />
+            </ListGroup>
+
+            <ListGroup>
+                <ListRow dense leading={tile('help')} title="Help & privacy" trailing="chevron" onPress={() => router.push('/help')} />
+            </ListGroup>
+        </Screen>
     );
 }

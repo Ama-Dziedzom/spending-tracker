@@ -1,290 +1,78 @@
-import { View, Text, Pressable, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
-import { LinearGradient } from 'expo-linear-gradient';
+import React from 'react';
+import { Platform, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
+import { BrandBand, Button, CategoryTile, Icon, Text } from '@/components/ui';
+import { RAW } from '@/constants/theme';
+import { useTheme } from '@/lib/theme';
 
-const { width, height } = Dimensions.get('window');
+const MONO = Platform.select({ ios: 'Menlo', default: 'monospace' });
 
-const MOCK_FULL =
-    'Your payment of GHS 10.00 to MTN AIRTIME has been completed at 2026-04-05 17:29:57. Your new balance: GHS 20.00. Fee was GHS 0.00 Tax was GHS -. Reference: -. Financial Transaction...';
-const MOCK_SHORT =
-    'Your payment of GHS 10.00 to MTN AIRTIME has been completed at 2026-04-05 17:29:57...';
-
-export default function WelcomeScreen() {
+/**
+ * Welcome (Figma 1000:58): the story in one picture (an alert arrives,
+ * LogIt turns it into an entry), then two ways in.
+ */
+export default function Welcome() {
     const router = useRouter();
+    const { colors, shadows } = useTheme();
     const insets = useSafeAreaInsets();
+    const { height } = useWindowDimensions();
+
+    // Figma: story starts at 110 and the card at 520 on an 844 frame (card is 324 tall).
+    const storyTop = Math.max(insets.top + 16, (110 / 844) * height);
+    const cardHeight = Math.max(324, (324 / 844) * height);
 
     return (
-        <View style={styles.root}>
+        <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
+            <StatusBar style="light" />
+            <BrandBand height={700} />
 
-            {/* ── Gradient background ───────────────────────────────── */}
-            <Svg style={StyleSheet.absoluteFill} width={width} height={height}>
-                <Defs>
-                    <RadialGradient id="ub"
-                        cx={width * 0.55} cy={0} r={height * 0.65}
-                        gradientUnits="userSpaceOnUse">
-                        <Stop offset="0%"   stopColor="#1642E5" stopOpacity="1" />
-                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0" />
-                    </RadialGradient>
-                    <RadialGradient id="tl"
-                        cx={0} cy={0} r={height * 0.45}
-                        gradientUnits="userSpaceOnUse">
-                        <Stop offset="0%"   stopColor="#FFFFFF" stopOpacity="0.75" />
-                        <Stop offset="40%"  stopColor="#B7C4F7" stopOpacity="0.45" />
-                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0"   />
-                    </RadialGradient>
-                    <RadialGradient id="tr"
-                        cx={width * 0.8} cy={-height * 0.05} r={height * 0.55}
-                        gradientUnits="userSpaceOnUse">
-                        <Stop offset="0%"   stopColor="#3558FF" stopOpacity="0.7" />
-                        <Stop offset="100%" stopColor="#1642E5" stopOpacity="0"   />
-                    </RadialGradient>
-                </Defs>
-                <Rect width={width} height={height} fill="#081750" />
-                <Rect width={width} height={height} fill="url(#ub)" />
-                <Rect width={width} height={height} fill="url(#tl)" />
-                <Rect width={width} height={height} fill="url(#tr)" />
-            </Svg>
-
-            {/* ── Main flex column ──────────────────────────────────── */}
-            <View style={[styles.col, {
-                paddingTop:    insets.top + 140, // Shifted back up slightly for elegant, centered vertical proportions
-                paddingBottom: insets.bottom + 30,
-            }]}>
-
-                {/* Card stack — compact, glassmorphic, and progressively blurred */}
-                <View style={styles.stack}>
-                    
-                    {/* Card 1 Container (with stacked deck background card) */}
-                    <View style={{ position: 'relative' }}>
-                        {/* Stack effect background card (renders behind Card 1) */}
-                        <View style={{
-                            position: 'absolute',
-                            bottom: -6,
-                            left: 12,
-                            right: 12,
-                            height: 8, // Reduced to 8px so the side borders are completely hidden behind Card 1's bottom border
-                            borderRadius: 16,
-                            borderWidth: 1,
-                            borderTopWidth: 0, // Removes the horizontal line running through Card 1
-                            borderColor: 'rgba(230, 238, 255, 0.16)',
-                            backgroundColor: 'transparent', // Keeps foreground Card 1 clean
-                            transform: [{ scaleX: 0.96 }],
-                        }} />
-                        
-                        {/* Crisp Foreground Card 1 */}
-                        <BlurView
-                            intensity={50}
-                            tint="light"
-                            style={{
-                                height: 122,
-                                borderRadius: 16,
-                                borderWidth: 1,
-                                borderColor: 'rgba(230, 238, 255, 0.35)',
-                                backgroundColor: 'rgba(230, 238, 255, 0.09)',
-                                paddingHorizontal: 20,
-                                paddingTop: 11,
-                                overflow: 'hidden',
-                            }}
-                        >
-                            <Text style={styles.ct}>MobileMoney</Text>
-                            <Text style={styles.cb}>{MOCK_FULL}</Text>
-                        </BlurView>
-                    </View>
-
-                    <View style={{ height: 12 }} />
-
-                    {/* Card 2 — Subtle Blur & High Opacity */}
-                    <BlurView
-                        intensity={35}
-                        tint="light"
-                        style={{
-                            height: 78,
-                            borderRadius: 16,
-                            borderWidth: 1,
-                            borderColor: 'rgba(230, 238, 255, 0.24)',
-                            backgroundColor: 'rgba(230, 238, 255, 0.07)',
-                            paddingHorizontal: 20,
-                            paddingTop: 10,
-                            overflow: 'hidden',
-                            opacity: 0.5,
-                        }}
-                    >
-                        <Text style={[styles.ct, styles.blurTextSm]}>MobileMoney</Text>
-                        <Text style={[styles.cb, styles.blurTextSm]} numberOfLines={2}>{MOCK_SHORT}</Text>
-                    </BlurView>
-
-                    <View style={{ height: 12 }} />
-
-                    {/* Card 3 — Moderate Blur & Medium Opacity */}
-                    <BlurView
-                        intensity={20}
-                        tint="light"
-                        style={{
-                            height: 78,
-                            borderRadius: 16,
-                            borderWidth: 1,
-                            borderColor: 'rgba(230, 238, 255, 0.18)',
-                            backgroundColor: 'rgba(230, 238, 255, 0.05)',
-                            paddingHorizontal: 20,
-                            paddingTop: 10,
-                            overflow: 'hidden',
-                            opacity: 0.2,
-                        }}
-                    >
-                        <Text style={[styles.ct, styles.blurTextMd]}>MobileMoney</Text>
-                        <Text style={[styles.cb, styles.blurTextMd]} numberOfLines={2}>{MOCK_SHORT}</Text>
-                    </BlurView>
-
-                    <View style={{ height: 12 }} />
-
-                    {/* Card 4 — Heavy Blur & Mid Opacity (Visibly blends behind the headline) */}
-                    {/* <BlurView
-                        intensity={15}
-                        tint="light"
-                        style={{
-                            height: 78,
-                            borderRadius: 16,
-                            borderWidth: 1,
-                            borderColor: 'rgba(230, 238, 255, 0.16)',
-                            backgroundColor: 'rgba(230, 238, 255, 0.04)',
-                            paddingHorizontal: 20,
-                            paddingTop: 10,
-                            overflow: 'hidden',
-                            opacity: 0.2,
-                        }}
-                    >
-                        <Text style={[styles.ct, styles.blurTextLg]}>MobileMoney</Text>
-                        <Text style={[styles.cb, styles.blurTextLg]} numberOfLines={2}>{MOCK_SHORT}</Text>
-                    </BlurView> */}
-
-                </View>
-
-                {/* ── Headline + subtitle (overlays bottom curve of Card 4 cleanly) ──────────────────────────── */}
-                <View style={[styles.textBlock, { marginTop: 55 }]}>
-                    <Text style={styles.headline}>Spend Smart. Zero Effort.</Text>
-                    <Text style={[styles.subtitle, { marginTop: 6 }]}>
-                        Your MoMo and bank transactions, tracked automatically
+            <View style={{ position: 'absolute', top: storyTop, left: 24, right: 24, gap: 12 }} accessible accessibilityLabel="An alert from Mobile Money becomes an entry in LogIt: Akosua Mensah, 120.00">
+                <View
+                    style={{
+                        backgroundColor: RAW.onBandBubble, paddingHorizontal: 14, paddingVertical: 12, gap: 4,
+                        borderTopLeftRadius: 6, borderTopRightRadius: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
+                    }}
+                >
+                    <Text size={11} weight="bold" style={{ color: RAW.onBandBubbleLabel }}>MobileMoney</Text>
+                    <Text style={{ fontFamily: MONO, fontSize: 12, lineHeight: 18, color: RAW.onBandBubbleText }}>
+                        Payment of GHS 120.00 to AKOSUA MENSAH. Current Balance: GHS 26.83
                     </Text>
                 </View>
-
-                {/* ── Flex spacer: pushes buttons to the bottom ──── */}
-                <View style={{ flex: 1, minHeight: 20 }} />
-
-                {/* ── Sign up ──────────────────────────────────────── */}
-                <Pressable
-                    style={styles.signUpBtn}
-                    onPress={() => router.push('/signup')}
+                <View style={{ alignItems: 'center' }}>
+                    <Icon name="down" size={22} color={RAW.onBand} />
+                </View>
+                <View
+                    style={{
+                        backgroundColor: colors.bg.surface, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 12,
+                        flexDirection: 'row', alignItems: 'center', gap: 12, ...shadows.card,
+                    }}
                 >
-                    <Text style={styles.signUpText}>Sign up</Text>
-                </Pressable>
+                    <CategoryTile tone="people" initials="AM" size={40} />
+                    <View style={{ flex: 1, gap: 1 }}>
+                        <Text variant="row">Akosua Mensah</Text>
+                        <Text variant="meta" tone="secondary">MTN MoMo · just now</Text>
+                    </View>
+                    <Text size={15} weight="semibold">120.00</Text>
+                </View>
+            </View>
 
-                <View style={{ height: 14 }} />
-
-                {/* ── Sign in ──────────────────────────────────────── */}
-                <Pressable
-                    style={styles.signInBtn}
-                    onPress={() => router.push('/login')}
-                >
-                    <Text style={styles.signInText}>Sign in</Text>
-                </Pressable>
-
+            <View
+                style={{
+                    position: 'absolute', left: 0, right: 0, bottom: 0, minHeight: cardHeight,
+                    backgroundColor: colors.bg.surface, borderTopLeftRadius: 36, borderTopRightRadius: 36,
+                    paddingTop: 28, paddingHorizontal: 24, paddingBottom: Math.max(34, insets.bottom + 12), gap: 18,
+                }}
+            >
+                <Text weight="extrabold" size={30} style={{ letterSpacing: -0.9 }} accessibilityRole="header">Your money, sorted.</Text>
+                <Text size={15} tone="secondary">LogIt reads your MoMo and bank alerts and keeps track for you.</Text>
+                <View style={{ flex: 1 }} />
+                <View style={{ gap: 10 }}>
+                    <Button label="Create account" size="xl" onPress={() => router.push('/signup')} style={shadows.fab} />
+                    <Button label="I already have an account" size="xl" variant="ghost" onPress={() => router.push('/login')} />
+                </View>
             </View>
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: '#081750' },
-
-    col: {
-        flex: 1,
-        paddingHorizontal: 18, // Broadened cards and buttons to match Figma width
-    },
-
-    stack: {
-        overflow: 'visible',
-    },
-
-    ct: {
-        color: '#FFFFFF',
-        fontFamily: 'Manrope-SemiBold',
-        fontSize: 16, // Boosted for physical device readability
-        lineHeight: 18,
-    },
-    cb: {
-        color: '#FFFFFF',
-        fontFamily: 'Manrope-Regular',
-        fontSize: 14, // Boosted for physical device readability
-        lineHeight: 20,
-    },
-
-    // Progressive visual blur text shadow configurations
-    blurTextSm: {
-        color: 'rgba(230, 238, 255, 0.9)',
-        textShadowColor: 'rgba(230, 238, 255, 0.65)',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 1.5,
-    },
-    blurTextMd: {
-        color: 'rgba(230, 238, 255, 0.65)',
-        textShadowColor: 'rgba(230, 238, 255, 0.45)',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 3.5,
-    },
-    blurTextLg: {
-        color: 'rgba(230, 238, 255, 0.6)',
-        textShadowColor: 'rgba(230, 238, 255, 0.4)',
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 4.0,
-    },
-
-    textBlock: {
-        alignItems: 'center',
-        paddingHorizontal: 22,
-        zIndex: 20, // Ensure text overlays the overlapping Card 4
-    },
-    headline: {
-        color: '#FFFFFF',
-        fontFamily: 'Manrope-SemiBold',
-        fontSize: 30, // Boosted to pop beautifully on high-density screens
-        lineHeight: 38,
-        textAlign: 'center',
-    },
-    subtitle: {
-        color: '#FFFFFF',
-        fontFamily: 'Manrope-Regular',
-        fontSize: 20, // Boosted to pop beautifully on high-density screens
-        lineHeight: 24,
-        textAlign: 'center',
-    },
-
-    // Tall, rounded pill-shaped buttons
-    signUpBtn: {
-        height: 52,
-        backgroundColor: '#E8ECFC',
-        borderRadius: 26,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    signUpText: {
-        color: '#1642E5',
-        fontFamily: 'Manrope-Medium',
-        fontSize: 20,
-    },
-    signInBtn: {
-        height: 52,
-        borderWidth: 1.5,
-        borderColor: '#E8ECFC',
-        borderRadius: 26,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    signInText: {
-        color: '#E8ECFC',
-        fontFamily: 'Manrope-Medium',
-        fontSize: 20,
-    },
-});

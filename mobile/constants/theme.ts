@@ -43,11 +43,17 @@ export const RAW = {
   onBandTertiary: 'rgba(255,255,255,0.75)',
   /** Round buttons and pills sitting on the band. */
   onBandFill: 'rgba(255,255,255,0.16)',
+  /** Welcome: the incoming-alert bubble on the band (Figma 1000:77), and its label and text. */
+  onBandBubble: 'rgba(255,255,255,0.14)',
+  onBandBubbleLabel: 'rgba(255,255,255,0.7)',
+  onBandBubbleText: 'rgba(255,255,255,0.92)',
   /** Icon circle inside a toast (white at 14 % on bg/inverse). */
   onInverseFill: 'rgba(255,255,255,0.14)',
   bandEllipses: ['#8FA8FF', '#6B5BFF', '#0B2493'] as const, // at 40–45 % opacity
   toastUndo: '#9DB4FF',
   /** Initials avatar artwork (Figma "LogIt / Avatar" 989:63). Same in both modes. */
+  /** Mobile network dots next to a phone number (handoff §12.4, not tokenised). */
+  networkDot: { MTN: '#FFCC00', Telecel: '#E30613', AT: '#1642E5' } as const,
   avatarInitialsBg: '#FFCC00',
   avatarInitialsInk: '#081750',
 } as const;

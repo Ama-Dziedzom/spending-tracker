@@ -4,6 +4,7 @@ import { FONT } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { Icon } from './icon';
 import { Text } from './text';
+import { Tap } from './tap';
 
 interface AskBarProps {
     /** Read-only bar (Insights) navigates on press; editable bar (Ask LogIt) takes input. */
@@ -51,14 +52,14 @@ export function AskBar({ onPress, value, onChangeText, onSubmit, onKeyboard, onM
                     <Icon name="keyboard" size={20} color={colors.text.secondary} />
                 </Pressable>
             )}
-            <Pressable
+            <Tap
                 onPress={onMic}
                 accessibilityRole="button"
                 accessibilityLabel="Start voice question"
                 style={({ pressed }) => ({ width: 44, height: 44, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.brand.accent, opacity: pressed ? 0.85 : 1 })}
             >
                 <Icon name="mic" size={22} color={colors.brand['on-accent']} />
-            </Pressable>
+            </Tap>
         </View>
     );
 }
@@ -99,7 +100,7 @@ export function LogItLabel() {
 export function SuggestionRow({ label, onPress }: { label: string; onPress: () => void }) {
     const { colors } = useTheme();
     return (
-        <Pressable
+        <Tap
             onPress={onPress}
             accessibilityRole="button"
             style={({ pressed }) => ({
@@ -112,7 +113,7 @@ export function SuggestionRow({ label, onPress }: { label: string; onPress: () =
             <Icon name="sparkle" size={14} color={colors.brand['accent-text']} />
             <Text size={13} weight="semibold" style={{ flex: 1 }}>{label}</Text>
             <Icon name="next" size={14} color={colors.text.tertiary} />
-        </Pressable>
+        </Tap>
     );
 }
 
