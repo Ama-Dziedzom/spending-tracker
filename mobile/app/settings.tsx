@@ -3,7 +3,7 @@ import { Platform, Pressable, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-    Avatar, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast,
+    Avatar, Button, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast,
     type IconName,
 } from '@/components/ui';
 import { useAppLock } from '@/components/app-lock';
@@ -171,10 +171,10 @@ export default function Settings() {
                 <ListRow dense leading={tile('help')} title="Help & privacy" trailing="chevron" onPress={() => router.push('/help')} />
             </ListGroup>
 
-            {/* Easy to find, not alarming: its own group, last. Red stays for Delete account (Profile). */}
-            <ListGroup>
-                <ListRow dense leading={tile('logout')} title="Log out" onPress={() => setLogoutOpen(true)} />
-            </ListGroup>
+            {/* Stands apart from the settings: full-width, red-tinted, last on the page. */}
+            <View style={{ marginTop: 8 }}>
+                <Button label="Log out" icon="logout" variant="dangerSoft" size="lg" onPress={() => setLogoutOpen(true)} />
+            </View>
         </Screen>
         <Dialog
             visible={logoutOpen}
