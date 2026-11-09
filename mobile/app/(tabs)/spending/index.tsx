@@ -22,6 +22,7 @@ import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { usePendingRemovals } from '@/lib/transaction-edits';
 import { longDate, sameDay, time24 } from '@/lib/format';
 import { loadSpendingCache, saveSpendingCache } from '@/lib/spending-cache';
+import { updateWidgetSnapshot } from '@/lib/widget-snapshot';
 import { isNetworkError } from '@/lib/network';
 import { pendingSmsCount } from '@/lib/pending-sms';
 import { NOTIFICATIONS_ASKED } from '../../allow-notifications';
@@ -99,6 +100,7 @@ export default function Spending() {
             setIncomePrompt(prompts[0] ?? null);
             setError(false);
             setOfflineAt(null);
+            updateWidgetSnapshot({ txs: window, wallets: walletList, toCheck: pending }).catch(() => {});
             saveSpendingCache({ txs: window, wallets: walletList, name: (meta.full_name as string | undefined) ?? null, avatar: (meta.avatar as string | undefined) ?? null });
 
             // Ask about notifications after the first alert is logged, not at sign-up (Figma 1016:2297).

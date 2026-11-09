@@ -19,6 +19,7 @@ export default function UpdateRequired() {
             tone="band"
             icon="download"
             title="Update LogIt"
+            layout={{ top: 250, actionsTop: 746, disc: 76, iconSize: 36, titleSize: 24 }}
             body={reason || 'This version can’t read some new MoMo alerts. The update takes under a minute and keeps everything.'}
             primary={{
                 label: 'Update now',

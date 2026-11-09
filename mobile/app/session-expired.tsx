@@ -33,6 +33,7 @@ export default function SessionExpired() {
         <StateScreen
             icon="lock"
             title="Log in again"
+            layout={{ actionsTop: 696, iconSize: 32 }}
             body={`For your safety we log you out after 60 days. We’ll text a code to ${phone ? maskPhone(phone) : 'your phone'}.`}
             primary={{ label: 'Send code', onPress: send, busy: loading, busyLabel: 'Sending code' }}
             secondary={{ label: 'Use a different number', onPress: () => router.replace('/login') }}

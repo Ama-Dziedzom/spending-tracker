@@ -1,0 +1,4 @@
+<resources>
+    <string name="logit_widget_spending_description">Today, the week, or the week with your latest entries. Resize it to switch.</string>
+    <string name="logit_widget_tocheck_description">Only matters when something needs you.</string>
+</resources>

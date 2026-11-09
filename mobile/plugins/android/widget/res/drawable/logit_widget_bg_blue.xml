@@ -1,0 +1,5 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape android:shape="rectangle"><solid android:color="@color/logit_brand_band"/><corners android:radius="28dp"/></shape></item>
+    <item><shape android:shape="rectangle"><gradient android:type="radial" android:centerX="0.2" android:centerY="0.95" android:gradientRadius="170dp" android:startColor="#738FA8FF" android:endColor="#008FA8FF"/><corners android:radius="28dp"/></shape></item>
+    <item><shape android:shape="rectangle"><gradient android:type="radial" android:centerX="0.95" android:centerY="0.05" android:gradientRadius="150dp" android:startColor="#666B5CFF" android:endColor="#006B5CFF"/><corners android:radius="28dp"/></shape></item>
+</layer-list>

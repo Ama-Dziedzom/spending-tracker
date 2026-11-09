@@ -10,13 +10,14 @@ interface Action { label: string; onPress: () => void; icon?: IconName; busy?: b
 
 /**
  * Full-screen system states (Figma section 993:54): Something went wrong,
- * Update required, Session expired, Allow notifications. Message from y 300
- * (170 with a preview), actions from y 672 on an 844 frame, 32 side margins.
+ * Update required, Session expired, Allow notifications. Positions are per
+ * screen on an 844 frame (defaults are Something went wrong: message at
+ * y 300, actions at y 672, 72pt disc with a 34pt icon, 22pt title), 32 side margins.
  *
  * tone 'canvas': 420 band fading to canvas, dark text, accent primary.
  * tone 'band':   full band, white text, white primary with accent label.
  */
-export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title, body, preview, primary, secondary, footnote }: {
+export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title, body, preview, primary, secondary, footnote, layout }: {
     tone?: 'canvas' | 'band';
     icon?: IconName;
     iconTone?: 'accent' | 'danger';
@@ -27,14 +28,20 @@ export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title,
     primary: Action;
     secondary?: Action;
     footnote?: string;
+    /** Figma positions and sizes for this screen, where they differ from the defaults. */
+    layout?: { top?: number; actionsTop?: number; disc?: number; iconSize?: number; titleSize?: number };
 }) {
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
     const { height } = useWindowDimensions();
     const y = (v: number) => Math.round((v / 844) * height);
     const onBand = tone === 'band';
+    const top = layout?.top ?? (preview ? 170 : 300);
+    const actionsTop = layout?.actionsTop ?? 672;
+    const disc = layout?.disc ?? 72;
+    const titleSize = layout?.titleSize ?? (preview ? 24 : 22);
 
-    const disc = onBand
+    const discColors = onBand
         ? { bg: RAW.onBandFill, fg: RAW.onBand }
         : iconTone === 'danger'
             ? { bg: colors.status['danger-tint'], fg: colors.status.danger }
@@ -45,16 +52,16 @@ export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title,
             <StatusBar style="light" />
             {onBand ? <BrandBand full /> : <BrandBand height={420} />}
 
-            <View style={{ position: 'absolute', top: Math.max(insets.top + 24, y(preview ? 170 : 300)), left: 32, right: 32, alignItems: 'center', gap: 14 }}>
+            <View style={{ position: 'absolute', top: Math.max(insets.top + 24, y(top)), left: 32, right: 32, alignItems: 'center', gap: 14 }}>
                 {preview && <View style={{ alignSelf: 'stretch', gap: 8, marginBottom: 2 }}>{preview}</View>}
                 {icon && (
-                    <View style={{ width: 72, height: 72, borderRadius: 999, backgroundColor: disc.bg, alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name={icon} size={34} color={disc.fg} />
+                    <View style={{ width: disc, height: disc, borderRadius: 999, backgroundColor: discColors.bg, alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name={icon} size={layout?.iconSize ?? 34} color={discColors.fg} />
                     </View>
                 )}
                 <Text
                     weight="bold"
-                    size={preview ? 24 : 22}
+                    size={titleSize}
                     align="center"
                     tone={onBand ? 'onBand' : 'primary'}
                     style={preview ? { letterSpacing: -0.48 } : undefined}
@@ -65,7 +72,7 @@ export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title,
                 {body && <Text size={14} align="center" style={{ color: onBand ? RAW.onBandSecondary : colors.text.secondary }}>{body}</Text>}
             </View>
 
-            <View style={{ position: 'absolute', left: 32, right: 32, top: Math.min(y(672), height - insets.bottom - 150), gap: 8 }}>
+            <View style={{ position: 'absolute', left: 32, right: 32, top: Math.min(y(actionsTop), height - insets.bottom - (secondary ? 150 : 84)), gap: 8 }}>
                 {onBand ? (
                     <Tap
                         onPress={primary.onPress}

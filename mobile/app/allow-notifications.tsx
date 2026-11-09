@@ -41,6 +41,7 @@ export default function AllowNotifications() {
                 </>
             }
             title="Know the moment it’s logged"
+            layout={{ actionsTop: 695 }}
             body="One short line per alert, and a Sunday summary. Turn any of them off in Settings."
             primary={{ label: 'Allow notifications', onPress: allow }}
             secondary={{ label: 'Not now', onPress: done }}
