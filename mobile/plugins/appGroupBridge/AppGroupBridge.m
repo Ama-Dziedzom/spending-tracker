@@ -6,6 +6,7 @@
 
 RCT_EXTERN_METHOD(setItem:(NSString *)key value:(NSString *)value)
 RCT_EXTERN_METHOD(removeItem:(NSString *)key)
+RCT_EXTERN_METHOD(reloadWidgets)
 
 @end
 

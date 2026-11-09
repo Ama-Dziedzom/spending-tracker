@@ -35,6 +35,7 @@
     },
     "plugins": [
       "./plugins/withShareExtension",
+      "./plugins/withWidget",
       "./plugins/withAndroidSmsReceiver",
       "./plugins/withXcode27Fixes",
       "expo-router",

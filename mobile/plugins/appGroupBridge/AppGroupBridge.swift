@@ -1,4 +1,5 @@
 import Foundation
+import WidgetKit
 
 // Writes key-value pairs into the App Group shared UserDefaults so the
 // Share Extension can read them without needing a JWTor any other IPC.
@@ -12,6 +13,11 @@ class AppGroupBridge: NSObject {
 
     @objc func removeItem(_ key: String) {
         UserDefaults(suiteName: suiteName)?.removeObject(forKey: key)
+    }
+
+    // Ask iOS to redraw the LogIt widgets after a new snapshot is written.
+    @objc func reloadWidgets() {
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     @objc static func requiresMainQueueSetup() -> Bool { false }

@@ -1,3 +1,4 @@
+import { clearWidgetSnapshot } from '@/lib/widget-snapshot';
 import 'react-native-gesture-handler';
 import { AppState, Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -64,6 +65,7 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       syncSessionToAppGroup(session);
       // Login lapsed on its own (not Log out): "Log in again" (Figma 1014:2313).
+      if (event === 'SIGNED_OUT') clearWidgetSnapshot();
       if (event === 'SIGNED_OUT' && !wasIntentionalSignOut()) {
         lastPhone().then((p) => { if (p) router.replace('/session-expired'); });
       }
