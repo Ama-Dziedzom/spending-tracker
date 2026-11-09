@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Wallet } from './supabase';
 import type { TransactionWithWallet } from './transaction-service';
 import { flowOf, summarise } from './spending-service';
@@ -9,8 +10,9 @@ import { lastAlertAt, getProfile } from './settings-service';
 /**
  * What the home-screen and lock-screen widgets show (Figma 1037:4555,
  * handoff §9). The app writes one small JSON snapshot into the App Group
- * after it loads Spending; the widget extension (plugins/widget) only ever
- * reads that, so widgets never need a session or the network.
+ * after it loads Spending (SharedPreferences on Android); the widgets
+ * (plugins/widget on iOS, plugins/android/widget on Android) only ever
+ * read that, so they never need a session or the network.
  */
 const { AppGroupBridge } = NativeModules;
 const KEY = 'widget_snapshot';
@@ -32,7 +34,7 @@ function age(d: Date | null, now: Date): string {
 }
 
 function write(value: object | null) {
-    if (Platform.OS !== 'ios' || !AppGroupBridge) return;
+    if (!AppGroupBridge) return;
     try {
         if (value) AppGroupBridge.setItem(KEY, JSON.stringify(value));
         else AppGroupBridge.removeItem(KEY);
@@ -48,10 +50,14 @@ export async function updateWidgetSnapshot(input: {
     toCheck: number;
     now?: Date;
 }): Promise<void> {
-    if (Platform.OS !== 'ios' || !AppGroupBridge) return;
+    if (!AppGroupBridge) return;
     const now = input.now ?? new Date();
     const s = summarise(input.txs, now);
-    const [profile, last] = await Promise.all([getProfile().catch(() => null), lastAlertAt().catch(() => null)]);
+    const [profile, last, androidSms] = await Promise.all([
+        getProfile().catch(() => null),
+        lastAlertAt().catch(() => null),
+        Platform.OS === 'android' ? AsyncStorage.getItem('sms_auto_logging_enabled').catch(() => null) : null,
+    ]);
 
     // Newest entries this week, money in or out (moved left out), like the Spending list.
     const latest = input.txs
@@ -88,8 +94,9 @@ export async function updateWidgetSnapshot(input: {
         updatedAt: now.toISOString(),
         hideLockScreen: profile?.hideWidgetAmounts.lock_screen ?? true,
         hideHomeScreen: profile?.hideWidgetAmounts.home_screen ?? false,
-        // iPhone can't see the automation; an alert in the last two weeks means it works (same rule as Autopilot settings).
-        autopilotOn: !last || now.getTime() - last.getTime() < 14 * 86_400_000,
+        // Same rules as Autopilot settings: the SMS switch on Android; on iPhone, which can't
+        // see the automation, an alert in the last two weeks means it works.
+        autopilotOn: Platform.OS === 'android' ? androidSms === 'true' : !last || now.getTime() - last.getTime() < 14 * 86_400_000,
         todaySpent: s.today.spent,
         todayPayments: s.today.payments,
         weekSpent: s.week.spent,

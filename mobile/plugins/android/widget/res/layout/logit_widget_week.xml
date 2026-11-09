@@ -1,0 +1,32 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp" android:background="@drawable/logit_widget_bg_surface">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <ImageView android:layout_width="16dp" android:layout_height="16dp" android:padding="3dp"
+            android:background="@drawable/logit_widget_circle_tint" android:src="@drawable/logit_ic_flash" android:tint="@color/logit_brand_accent_text"/>
+        <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="5dp"
+            android:text="This week" android:textSize="11sp" android:textColor="@color/logit_text_secondary" android:fontFamily="sans-serif-medium" android:maxLines="1"/>
+        <TextView android:id="@+id/chip" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="9sp" android:textColor="@color/logit_status_success" android:fontFamily="sans-serif" android:textStyle="bold" android:maxLines="1"
+            android:paddingStart="7dp" android:paddingEnd="7dp" android:paddingTop="3dp" android:paddingBottom="3dp" android:background="@drawable/logit_widget_chip_success"/>
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="bottom" android:layout_marginTop="6dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GHS"
+                android:textSize="10sp" android:textColor="@color/logit_text_secondary" android:fontFamily="sans-serif-medium"/>
+            <ImageView android:id="@+id/amount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:layout_marginBottom="2dp" android:tint="@color/logit_text_primary"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical">
+            <ImageView android:id="@+id/bars" android:layout_width="112dp" android:layout_height="22dp" android:tint="@color/logit_brand_accent"/>
+            <ImageView android:id="@+id/letters" android:layout_width="112dp" android:layout_height="11dp" android:layout_marginTop="3dp" android:tint="@color/logit_text_primary"/>
+        </LinearLayout>
+    </LinearLayout>
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"/>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical"
+        android:paddingStart="10dp" android:paddingEnd="10dp" android:paddingTop="7dp" android:paddingBottom="7dp" android:background="@drawable/logit_widget_pill_muted">
+        <ImageView android:id="@+id/latest_icon" android:layout_width="12dp" android:layout_height="12dp" android:src="@drawable/logit_ic_people" android:tint="@color/logit_cat_people"/>
+        <TextView android:id="@+id/latest_name" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="6dp"
+            android:textSize="11sp" android:textColor="@color/logit_text_primary" android:fontFamily="sans-serif-medium" android:maxLines="1" android:ellipsize="end"/>
+        <TextView android:id="@+id/latest_amount" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="10sp" android:textColor="@color/logit_text_secondary" android:fontFamily="sans-serif" android:maxLines="1"/>
+    </LinearLayout>
+</LinearLayout>

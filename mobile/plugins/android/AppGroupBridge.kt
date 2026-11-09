@@ -29,6 +29,12 @@ class AppGroupBridge(reactContext: ReactApplicationContext) : ReactContextBaseJa
         sharedPref.edit().remove(key).apply()
     }
 
+    /** Redraws the LogIt home-screen widgets after a new snapshot is written. */
+    @ReactMethod
+    fun reloadWidgets() {
+        LogItWidgets.updateAll(reactApplicationContext)
+    }
+
     /** Lets the app pick up a session the background SMS receiver refreshed. */
     @ReactMethod
     fun getItem(key: String, promise: Promise) {

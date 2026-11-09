@@ -1,0 +1,4 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android" android:minWidth="110dp" android:minHeight="110dp"
+    android:targetCellWidth="2" android:targetCellHeight="2" android:resizeMode="none" android:widgetCategory="home_screen"
+    android:initialLayout="@layout/logit_widget_tocheck" android:previewLayout="@layout/logit_widget_tocheck"
+    android:description="@string/logit_widget_tocheck_description" android:updatePeriodMillis="1800000"/>
