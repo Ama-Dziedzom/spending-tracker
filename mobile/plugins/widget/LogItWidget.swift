@@ -148,21 +148,49 @@ struct BlueBackground: View {
     }
 }
 
+/// Tinted and Clear home screens (and the lock screen) draw a widget in one
+/// colour, where each colour's brightness becomes its opacity: navy text
+/// turns invisible and pale tile fills turn into solid blocks. In those
+/// modes everything is white at set strengths; key amounts are accentable so
+/// they take the user's tint.
+struct Palette {
+    let mono: Bool
+    init(_ mode: WidgetRenderingMode) { mono = mode != .fullColor }
+    var text: Color { mono ? .white : Tok.textPrimary }
+    var text2: Color { mono ? .white.opacity(0.7) : Tok.textSecondary }
+    var text3: Color { mono ? .white.opacity(0.5) : Tok.textTertiary }
+    var accent: Color { mono ? .white : Tok.brandAccent }
+    var accentText: Color { mono ? .white : Tok.brandAccentText }
+    var accentTint: Color { mono ? .white.opacity(0.15) : Tok.brandAccentTint }
+    /// Icon on an accent fill: black is fully see-through in one-colour modes, so it reads as a cut-out.
+    var onAccent: Color { mono ? .black : .white }
+    var line: Color { mono ? .white.opacity(0.2) : Tok.lineDefault }
+    var fill: Color { mono ? .white.opacity(0.12) : Tok.bgMuted }
+    var success: Color { mono ? .white : Tok.statusSuccess }
+    var successTint: Color { mono ? .white.opacity(0.12) : Tok.statusSuccessTint }
+    func tint(_ tone: String) -> Color { mono ? .white.opacity(0.15) : Tok.tint(tone) }
+    func fg(_ tone: String) -> Color { mono ? .white : Tok.fg(tone) }
+}
+
 struct Header: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let text: String
     var onBlue = false
     var body: some View {
         HStack(spacing: 5) {
             ZStack {
-                Circle().fill(onBlue ? Color.white.opacity(0.18) : Tok.brandAccentTint)
-                Image(systemName: "bolt").font(.system(size: 8, weight: .semibold)).foregroundStyle(onBlue ? Color.white : Tok.brandAccentText)
+                Circle().fill(onBlue ? Color.white.opacity(0.18) : p.accentTint)
+                Image(systemName: "bolt").font(.system(size: 8, weight: .semibold)).foregroundStyle(onBlue ? Color.white : p.accentText)
             }.frame(width: 16, height: 16)
-            Text(text).font(manrope(11, "SemiBold")).foregroundStyle(onBlue ? Color.white.opacity(0.85) : Tok.textSecondary).lineLimit(1)
+            Text(text).font(manrope(11, "SemiBold")).foregroundStyle(onBlue ? Color.white.opacity(0.85) : p.text2).lineLimit(1)
         }
     }
 }
 
 struct Bars: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let days: [Snapshot.Day]
     var onBlue = false
     var height: CGFloat = 18
@@ -174,9 +202,10 @@ struct Bars: View {
                 VStack(spacing: 3) {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(color(d))
+                        .widgetAccentable(d.isToday)
                         .frame(width: letters ? 9 : 7, height: d.future || d.value <= 0 ? 3 : Swift.max(4, CGFloat(d.value / Swift.max(max, 1)) * height))
                     if letters {
-                        Text(d.letter).font(manrope(8, d.isToday ? "Bold" : "Medium")).foregroundStyle(d.isToday ? Tok.textPrimary : Tok.textTertiary)
+                        Text(d.letter).font(manrope(8, d.isToday ? "Bold" : "Medium")).foregroundStyle(d.isToday ? p.text : p.text3)
                     }
                 }
             }
@@ -185,19 +214,21 @@ struct Bars: View {
     }
     func color(_ d: Snapshot.Day) -> Color {
         if onBlue { return d.isToday ? .white : Color.white.opacity(d.future || d.value <= 0 ? 0.25 : 0.45) }
-        if d.isToday { return Tok.brandAccent }
-        return d.future || d.value <= 0 ? Tok.lineDefault : Tok.brandAccent.opacity(0.3)
+        if d.isToday { return p.accent }
+        return d.future || d.value <= 0 ? p.line : p.accent.opacity(0.3)
     }
 }
 
 struct Tile: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let symbol: String
     let tone: String
     var size: CGFloat = 26
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: size * 0.32).fill(Tok.tint(tone))
-            Image(systemName: symbol).font(.system(size: size * 0.46, weight: .medium)).foregroundStyle(Tok.fg(tone))
+            RoundedRectangle(cornerRadius: size * 0.32).fill(p.tint(tone))
+            Image(systemName: symbol).font(.system(size: size * 0.46, weight: .medium)).foregroundStyle(p.fg(tone))
         }.frame(width: size, height: size)
     }
 }
@@ -217,7 +248,7 @@ struct TodayView: View {
                     Text("Tap to see").font(manrope(11, "Medium")).foregroundStyle(.white.opacity(0.75))
                 } else {
                     Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
-                    Text(Fmt.m(s.todaySpent)).font(manrope(26, "ExtraBold")).foregroundStyle(.white).minimumScaleFactor(0.6).lineLimit(1)
+                    Text(Fmt.m(s.todaySpent)).font(manrope(26, "ExtraBold")).foregroundStyle(.white).minimumScaleFactor(0.6).lineLimit(1).widgetAccentable()
                     Text(subtitle(s)).font(manrope(11, "Medium")).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
                 Spacer(minLength: 6)
@@ -249,6 +280,8 @@ struct TodayView: View {
 // MARK: - Small · To check
 
 struct ToCheckView: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let s: Snapshot?
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -258,17 +291,17 @@ struct ToCheckView: View {
                 if s.toCheck > 0 {
                     Tile(symbol: "tray", tone: "warn", size: 28)
                     Spacer(minLength: 6)
-                    Text("\(s.toCheck) message\(s.toCheck == 1 ? "" : "s")").font(manrope(17, "Bold")).foregroundStyle(Tok.textPrimary).lineLimit(1).minimumScaleFactor(0.7)
-                    Text("Tap to sort them").font(manrope(11, "Medium")).foregroundStyle(Tok.textSecondary)
+                    Text("\(s.toCheck) message\(s.toCheck == 1 ? "" : "s")").font(manrope(17, "Bold")).foregroundStyle(p.text).lineLimit(1).minimumScaleFactor(0.7).widgetAccentable()
+                    Text("Tap to sort them").font(manrope(11, "Medium")).foregroundStyle(p.text2)
                 } else {
                     Tile(symbol: "checkmark", tone: "success", size: 28)
                     Spacer(minLength: 6)
-                    Text("All caught up").font(manrope(17, "Bold")).foregroundStyle(Tok.textPrimary).lineLimit(1).minimumScaleFactor(0.7)
-                    Text("Nothing to check").font(manrope(11, "Medium")).foregroundStyle(Tok.textSecondary)
+                    Text("All caught up").font(manrope(17, "Bold")).foregroundStyle(p.text).lineLimit(1).minimumScaleFactor(0.7)
+                    Text("Nothing to check").font(manrope(11, "Medium")).foregroundStyle(p.text2)
                 }
             } else {
-                Text("Log in").font(manrope(17, "Bold")).foregroundStyle(Tok.textPrimary)
-                Text("to see your money").font(manrope(11, "Medium")).foregroundStyle(Tok.textSecondary)
+                Text("Log in").font(manrope(17, "Bold")).foregroundStyle(p.text)
+                Text("to see your money").font(manrope(11, "Medium")).foregroundStyle(p.text2)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -279,6 +312,8 @@ struct ToCheckView: View {
 // MARK: - Medium · This week
 
 struct WeekChip: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let change: Double?
     var onBlue = false
     var body: some View {
@@ -286,30 +321,34 @@ struct WeekChip: View {
             let less = c < 0
             Text("\(Fmt.w(c)) \(less ? "less" : "more") than last week")
                 .font(manrope(9, "Bold"))
-                .foregroundStyle(onBlue ? Color.white.opacity(0.85) : (less ? Tok.statusSuccess : Tok.textSecondary))
+                .foregroundStyle(onBlue ? Color.white.opacity(0.85) : (less ? p.success : p.text2))
                 .padding(.horizontal, onBlue ? 0 : 7).padding(.vertical, onBlue ? 0 : 3)
-                .background(onBlue ? AnyView(Color.clear) : AnyView(Capsule().fill(less ? Tok.statusSuccessTint : Tok.bgMuted)))
+                .background(onBlue ? AnyView(Color.clear) : AnyView(Capsule().fill(less ? p.successTint : p.fill)))
                 .lineLimit(1)
         }
     }
 }
 
 struct LatestPill: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let item: Snapshot.Item?
     let hidden: Bool
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: item?.symbol ?? "person.2").font(.system(size: 10)).foregroundStyle(Tok.fg(item?.tone ?? "people"))
-            Text(hidden ? "Latest entry" : (item?.name ?? "Nothing yet")).font(manrope(11, "SemiBold")).foregroundStyle(Tok.textPrimary).lineLimit(1)
+            Image(systemName: item?.symbol ?? "person.2").font(.system(size: 10)).foregroundStyle(p.fg(item?.tone ?? "people"))
+            Text(hidden ? "Latest entry" : (item?.name ?? "Nothing yet")).font(manrope(11, "SemiBold")).foregroundStyle(p.text).lineLimit(1)
             Spacer(minLength: 4)
-            Text(hidden ? "• • •" : item.map { "\(Fmt.m($0.amount)) · \($0.time)" } ?? "").font(manrope(10, "Medium")).foregroundStyle(Tok.textSecondary)
+            Text(hidden ? "• • •" : item.map { "\(Fmt.m($0.amount)) · \($0.time)" } ?? "").font(manrope(10, "Medium")).foregroundStyle(p.text2)
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Tok.bgMuted))
+        .background(RoundedRectangle(cornerRadius: 10).fill(p.fill))
     }
 }
 
 struct WeekView: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let s: Snapshot?
     var body: some View {
         if let s, s.signedIn {
@@ -319,15 +358,15 @@ struct WeekView: View {
                     Header(text: "This week")
                     Spacer()
                     if hidden {
-                        Text("Hidden").font(manrope(9, "Bold")).foregroundStyle(Tok.textSecondary).padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(Tok.bgMuted))
+                        Text("Hidden").font(manrope(9, "Bold")).foregroundStyle(p.text2).padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(p.fill))
                     } else {
                         WeekChip(change: s.weekChange)
                     }
                 }
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(Tok.textSecondary)
-                        Text(hidden ? "• • • •" : Fmt.m(s.weekSpent)).font(manrope(26, "ExtraBold")).foregroundStyle(Tok.textPrimary).lineLimit(1).minimumScaleFactor(0.6)
+                        Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(p.text2)
+                        Text(hidden ? "• • • •" : Fmt.m(s.weekSpent)).font(manrope(26, "ExtraBold")).foregroundStyle(p.text).lineLimit(1).minimumScaleFactor(0.6).widgetAccentable()
                     }
                     Spacer()
                     if !hidden { Bars(days: s.days, height: 22, letters: true) }
@@ -345,6 +384,8 @@ struct WeekView: View {
 // MARK: - Medium · Wallets
 
 struct WalletsView: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let s: Snapshot?
     var body: some View {
         if let s, s.signedIn {
@@ -353,19 +394,19 @@ struct WalletsView: View {
                 HStack {
                     Header(text: "You have")
                     Spacer()
-                    Text(hidden ? "GHS • • •" : "GHS \(Fmt.m(s.walletsTotal))").font(manrope(14, "ExtraBold")).foregroundStyle(Tok.textPrimary)
+                    Text(hidden ? "GHS • • •" : "GHS \(Fmt.m(s.walletsTotal))").font(manrope(14, "ExtraBold")).foregroundStyle(p.text).widgetAccentable()
                 }
                 ForEach(Array(s.wallets.prefix(3).enumerated()), id: \.offset) { _, w in
                     HStack(spacing: 8) {
                         Image(systemName: w.type == "bank" ? "building.columns" : w.type == "cash" ? "banknote" : "creditcard")
-                            .font(.system(size: 11)).foregroundStyle(Tok.textSecondary).frame(width: 16)
-                        Text(w.name).font(manrope(11, "SemiBold")).foregroundStyle(Tok.textPrimary).lineLimit(1)
+                            .font(.system(size: 11)).foregroundStyle(p.text2).frame(width: 16)
+                        Text(w.name).font(manrope(11, "SemiBold")).foregroundStyle(p.text).lineLimit(1)
                         Spacer(minLength: 4)
                         if w.uncounted {
-                            Text("Count").font(manrope(11, "Bold")).foregroundStyle(Tok.brandAccentText)
+                            Text("Count").font(manrope(11, "Bold")).foregroundStyle(p.accentText)
                         } else {
-                            Text(w.age).font(manrope(9, "Medium")).foregroundStyle(Tok.textTertiary)
-                            Text(hidden ? "•••" : Fmt.m(w.balance)).font(manrope(11, "Bold")).foregroundStyle(Tok.textPrimary)
+                            Text(w.age).font(manrope(9, "Medium")).foregroundStyle(p.text3)
+                            Text(hidden ? "•••" : Fmt.m(w.balance)).font(manrope(11, "Bold")).foregroundStyle(p.text)
                         }
                     }
                 }
@@ -381,6 +422,8 @@ struct WalletsView: View {
 // MARK: - Large · Overview
 
 struct OverviewView: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     let s: Snapshot?
     var body: some View {
         if let s, s.signedIn {
@@ -396,7 +439,7 @@ struct OverviewView: View {
                         Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
                         HStack(alignment: .bottom) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(hidden ? "• • • •" : Fmt.m(s.weekSpent)).font(manrope(28, "ExtraBold")).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.6)
+                                Text(hidden ? "• • • •" : Fmt.m(s.weekSpent)).font(manrope(28, "ExtraBold")).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.6).widgetAccentable()
                                 if !hidden { WeekChip(change: s.weekChange, onBlue: true) }
                             }
                             Spacer()
@@ -405,45 +448,45 @@ struct OverviewView: View {
                     }
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(BlueBackground())
+                    .background(p.mono ? AnyView(Color.white.opacity(0.1)) : AnyView(BlueBackground()))
                 }
                 VStack(spacing: 0) {
                     ForEach(Array(s.latest.prefix(3).enumerated()), id: \.offset) { i, e in
                         HStack(spacing: 10) {
                             Tile(symbol: e.symbol, tone: e.tone, size: 26)
                             VStack(alignment: .leading, spacing: 1) {
-                                Text(hidden ? "Entry" : e.name).font(manrope(11, "SemiBold")).foregroundStyle(Tok.textPrimary).lineLimit(1)
-                                Text(hidden ? "" : e.meta).font(manrope(9, "Medium")).foregroundStyle(Tok.textSecondary).lineLimit(1)
+                                Text(hidden ? "Entry" : e.name).font(manrope(11, "SemiBold")).foregroundStyle(p.text).lineLimit(1)
+                                Text(hidden ? "" : e.meta).font(manrope(9, "Medium")).foregroundStyle(p.text2).lineLimit(1)
                             }
                             Spacer()
                             Text(hidden ? "•••" : "\(e.incoming ? "+" : "")\(Fmt.m(e.amount))").font(manrope(11, "Bold"))
-                                .foregroundStyle(e.incoming ? Tok.statusSuccess : Tok.textPrimary)
+                                .foregroundStyle(e.incoming ? p.success : p.text)
                         }
                         .padding(.vertical, 7)
-                        if i < min(2, s.latest.count - 1) { Divider().overlay(Tok.lineDefault) }
+                        if i < min(2, s.latest.count - 1) { Divider().overlay(p.line) }
                     }
                     if s.latest.isEmpty {
-                        Text("Nothing logged yet this week.").font(manrope(11, "Medium")).foregroundStyle(Tok.textSecondary).padding(.vertical, 12)
+                        Text("Nothing logged yet this week.").font(manrope(11, "Medium")).foregroundStyle(p.text2).padding(.vertical, 12)
                     }
                     Spacer(minLength: 6)
                     HStack(spacing: 8) {
                         Link(destination: links.ask) {
                             HStack(spacing: 6) {
-                                Image(systemName: "sparkles").font(.system(size: 11)).foregroundStyle(Tok.brandAccentText)
-                                Text("Ask LogIt").font(manrope(11, "SemiBold")).foregroundStyle(Tok.textTertiary)
+                                Image(systemName: "sparkles").font(.system(size: 11)).foregroundStyle(p.accentText)
+                                Text("Ask LogIt").font(manrope(11, "SemiBold")).foregroundStyle(p.text3)
                                 Spacer()
                                 ZStack {
-                                    Circle().fill(Tok.brandAccent)
-                                    Image(systemName: "mic.fill").font(.system(size: 10)).foregroundStyle(.white)
+                                    Circle().fill(p.accent)
+                                    Image(systemName: "mic.fill").font(.system(size: 10)).foregroundStyle(p.onAccent)
                                 }.frame(width: 24, height: 24)
                             }
                             .padding(.leading, 12).padding(.trailing, 4).padding(.vertical, 4)
-                            .background(Capsule().fill(Tok.bgMuted))
+                            .background(Capsule().fill(p.fill))
                         }
                         Link(destination: links.paste) {
                             ZStack {
-                                Circle().fill(Tok.bgMuted)
-                                Image(systemName: "doc.on.clipboard").font(.system(size: 11)).foregroundStyle(Tok.textSecondary)
+                                Circle().fill(p.fill)
+                                Image(systemName: "doc.on.clipboard").font(.system(size: 11)).foregroundStyle(p.text2)
                             }.frame(width: 32, height: 32)
                         }
                     }
@@ -457,12 +500,14 @@ struct OverviewView: View {
 }
 
 struct SignedOut: View {
+    @Environment(\.widgetRenderingMode) private var mode
+    private var p: Palette { Palette(mode) }
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Header(text: "LogIt")
             Spacer()
-            Text("Log in").font(manrope(22, "ExtraBold")).foregroundStyle(Tok.textPrimary)
-            Text("to see your money").font(manrope(11, "Medium")).foregroundStyle(Tok.textSecondary)
+            Text("Log in").font(manrope(22, "ExtraBold")).foregroundStyle(p.text)
+            Text("to see your money").font(manrope(11, "Medium")).foregroundStyle(p.text2)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .widgetURL(links.login)
