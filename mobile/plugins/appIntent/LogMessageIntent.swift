@@ -17,6 +17,7 @@
 import AppIntents
 import Foundation
 import UserNotifications
+import WidgetKit
 
 // MARK: - Intent
 
@@ -56,6 +57,9 @@ struct LogMessageIntent: AppIntent {
             if case .notSignedIn = outcome { throw LogItIntentError.notSignedIn }
             tally.add(outcome)
         }
+
+        // Widgets show the new numbers without waiting for the app to open.
+        if !tally.logged.isEmpty || tally.review > 0 { WidgetCenter.shared.reloadAllTimelines() }
 
         let summary = tally.summary
         // LogIt's own notification (with the app's name and icon). Turn off
@@ -362,7 +366,10 @@ struct LogItClient {
     private static func outcome(data: Data, status: Int) -> LogOutcome {
         let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
 
-        if status == 400, (json["error"] as? String)?.contains("parse") == true { return .needsReview }
+        if status == 400, (json["error"] as? String)?.contains("parse") == true {
+            WidgetSnapshot.addToCheck()
+            return .needsReview
+        }
         guard (200..<300).contains(status) else {
             return .failed((json["error"] as? String) ?? "Error \(status)")
         }
@@ -385,6 +392,7 @@ struct LogItClient {
         let verb = isLoan ? (isCredit ? "Borrowed" : "Repaid") : (isCredit ? "Received" : "Spent")
         let what = String(format: "%@ GHS %.2f%@", verb, amount, feeText)
         let line = "\(what) · \(category)\n\(desc)\(wallet)\(estimated)"
+        WidgetSnapshot.add(tx: tx, walletName: json["walletName"] as? String)
         return .logged(line)
     }
 
@@ -399,4 +407,130 @@ struct LogItClient {
         ]
         return names[id ?? ""] ?? "Other"
     }
+}
+
+// MARK: - Widget snapshot
+//
+// The widgets read "widget_snapshot" from the App Group, which the app writes
+// in lib/widget-snapshot.ts. When the Shortcut logs an alert while the app is
+// closed, this adds it to that snapshot so the widgets are current right away.
+// Same rules as the app: only spending counts towards today and the week.
+
+enum WidgetSnapshot {
+    private static let key = "widget_snapshot"
+    private static var defaults: UserDefaults? { UserDefaults(suiteName: "group.com.ama.spendingtracker") }
+    private static let symbols: [String: String] = [
+        "food": "fork.knife", "transport": "car", "shopping": "bag", "bills": "doc.text", "airtime": "iphone",
+        "subscription": "repeat", "cash": "banknote", "loans": "arrow.left.arrow.right", "fees": "percent", "transfer": "person.2",
+    ]
+    private static let tones: Set<String> = ["food", "transport", "shopping", "bills", "airtime", "subscription", "cash", "loans", "fees"]
+
+    private static func load() -> [String: Any]? {
+        guard let raw = defaults?.string(forKey: key), let data = raw.data(using: .utf8),
+              var snap = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              snap["signedIn"] as? Bool == true else { return nil }
+        roll(&snap, to: Date())
+        return snap
+    }
+
+    private static func save(_ snap: [String: Any]) {
+        var s = snap
+        s["updatedAt"] = ISO8601DateFormatter().string(from: Date())
+        if let d = try? JSONSerialization.data(withJSONObject: s), let r = String(data: d, encoding: .utf8) {
+            defaults?.set(r, forKey: key)
+        }
+    }
+
+    /// A snapshot from an earlier day or week: start today (and the week) from zero.
+    private static func roll(_ s: inout [String: Any], to now: Date) {
+        var cal = Calendar(identifier: .gregorian)
+        cal.firstWeekday = 2
+        let updated = ISO8601DateFormatter.fractional.date(from: s["updatedAt"] as? String ?? "")
+            ?? ISO8601DateFormatter().date(from: s["updatedAt"] as? String ?? "") ?? .distantPast
+        let today = (cal.component(.weekday, from: now) + 5) % 7
+        if !cal.isDate(updated, inSameDayAs: now) {
+            s["todaySpent"] = 0.0
+            s["todayPayments"] = 0
+        }
+        var days = s["days"] as? [[String: Any]] ?? []
+        if !cal.isDate(updated, equalTo: now, toGranularity: .weekOfYear) || days.count != 7 {
+            s["weekSpent"] = 0.0
+            s["weekChange"] = NSNull()
+            days = ["M", "T", "W", "T", "F", "S", "S"].map { ["letter": $0, "value": 0.0] }
+        }
+        for i in days.indices {
+            days[i]["isToday"] = i == today
+            days[i]["future"] = i > today
+        }
+        s["days"] = days
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_GB")
+        f.dateFormat = "EEE d MMM"
+        s["dateLabel"] = f.string(from: now)
+    }
+
+    static func add(tx: [String: Any], walletName: String?) {
+        guard var s = load() else { return }
+        let amount = (tx["amount"] as? NSNumber)?.doubleValue ?? 0
+        let type = tx["type"] as? String ?? ""
+        let category = tx["category"] as? String ?? ""
+        let isTransfer = tx["is_transfer"] as? Bool ?? false
+        let side = tx["transfer_side"] as? String
+        let out = type == "expense" || type == "debit"
+        let into = type == "income" || type == "credit"
+        let spent = isTransfer ? (side == "from" && !category.isEmpty && category != "transfer") : out
+        let incoming = isTransfer ? (side == "to" && !category.isEmpty && category != "transfer" && category != "income") : into
+        guard spent || incoming else { return }  // moved between your own wallets
+
+        if spent {
+            s["todaySpent"] = ((s["todaySpent"] as? NSNumber)?.doubleValue ?? 0) + amount
+            s["todayPayments"] = ((s["todayPayments"] as? NSNumber)?.intValue ?? 0) + 1
+            s["weekSpent"] = ((s["weekSpent"] as? NSNumber)?.doubleValue ?? 0) + amount
+            if let change = (s["weekChange"] as? NSNumber)?.doubleValue { s["weekChange"] = change + amount }
+            var days = s["days"] as? [[String: Any]] ?? []
+            if let i = days.firstIndex(where: { $0["isToday"] as? Bool == true }) {
+                days[i]["value"] = ((days[i]["value"] as? NSNumber)?.doubleValue ?? 0) + amount
+            }
+            s["days"] = days
+        }
+
+        let t = DateFormatter()
+        t.locale = Locale(identifier: "en_GB")
+        t.dateFormat = "H:mm"
+        let time = t.string(from: Date())
+        let entry: [String: Any] = [
+            "name": name(tx["description"] as? String ?? ""),
+            "meta": [walletName, time].compactMap { $0 }.joined(separator: " · "),
+            "amount": amount,
+            "incoming": incoming,
+            "symbol": incoming ? "arrow.down.left" : symbols[category] ?? "circle.grid.2x2",
+            "tone": incoming ? "success" : category == "transfer" ? "people" : tones.contains(category) ? category : "muted",
+            "time": time,
+        ]
+        s["latest"] = Array(([entry] + (s["latest"] as? [[String: Any]] ?? [])).prefix(3))
+        save(s)
+    }
+
+    static func addToCheck() {
+        guard var s = load() else { return }
+        s["toCheck"] = ((s["toCheck"] as? NSNumber)?.intValue ?? 0) + 1
+        save(s)
+    }
+
+    /// Same as merchantName in lib/money-window.ts: up to the first comma; ALL-CAPS names tidied, acronyms kept.
+    private static func name(_ description: String) -> String {
+        let first = description.split(separator: ",").first.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
+        guard first == first.uppercased() else { return first }
+        return first.split(separator: " ").map { w in
+            w.count <= 3 && w.allSatisfy({ $0.isUppercase }) ? String(w) : w.prefix(1) + w.dropFirst().lowercased()
+        }.joined(separator: " ")
+    }
+}
+
+extension ISO8601DateFormatter {
+    static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }

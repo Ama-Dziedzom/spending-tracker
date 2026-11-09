@@ -1,7 +1,8 @@
 import { NativeModules, Platform } from 'react-native';
 import type { Wallet } from './supabase';
 import type { TransactionWithWallet } from './transaction-service';
-import { flowOf, summarise, shortName } from './spending-service';
+import { flowOf, summarise } from './spending-service';
+import { merchantName } from './money-window';
 import { categoryStyle } from './category-style';
 import { lastAlertAt, getProfile } from './settings-service';
 
@@ -61,7 +62,7 @@ export async function updateWidgetSnapshot(input: {
             const incoming = flowOf(t) === 'in';
             const style = categoryStyle(t.category || 'other');
             return {
-                name: shortName(t.description) || style.label,
+                name: merchantName(t.description ?? '') || style.label,
                 meta: [t.wallet?.name, time(d)].filter(Boolean).join(' · '),
                 amount: Number(t.amount) || 0,
                 incoming,
