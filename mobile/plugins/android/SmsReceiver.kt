@@ -29,6 +29,10 @@ class SmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        // Settings › Autopilot › Read SMS alerts. Off means nothing is read or sent.
+        val enabled = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getString("sms_auto_logging_enabled", "true")
+        if (enabled == "false") return
 
         val msgs = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         val rawSms = msgs.map { it.messageBody }.joinToString("")

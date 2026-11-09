@@ -6,7 +6,7 @@ import { Button, CategoryTile, Text, useToast, type IconName } from '@/component
 import { AuthLayout, CardLink } from '@/components/onboarding/auth-layout';
 import { useTheme } from '@/lib/theme';
 import { getSession } from '@/lib/supabase';
-import { syncSessionToAppGroup } from '@/lib/shareSync';
+import { syncSessionToAppGroup, setSmsLoggingFlag } from '@/lib/shareSync';
 
 const IOS_STEPS: { title: string; meta: string }[] = [
     { title: 'Open Shortcuts › Automation › New', meta: 'Tap + at the top' },
@@ -18,7 +18,7 @@ const IOS_STEPS: { title: string; meta: string }[] = [
 
 const ANDROID_POINTS: { icon: IconName; title: string; meta: string }[] = [
     { icon: 'shield', title: 'Only money alerts', meta: 'From MoMo and banks. Chats are ignored.' },
-    { icon: 'lock', title: 'Stays in your account', meta: 'Only you can see your transactions.' },
+    { icon: 'lock', title: 'Sent to your account', meta: 'Alert text goes to LogIt’s server to be read and saved. Only you can see it.' },
     { icon: 'flash', title: 'Logs in the background', meta: 'Even when LogIt is closed.' },
 ];
 
@@ -41,6 +41,7 @@ export default function OnboardingAutopilot() {
                 return;
             }
             await AsyncStorage.setItem('sms_auto_logging_enabled', 'true');
+            setSmsLoggingFlag(true);
             const session = await getSession();
             if (session) syncSessionToAppGroup(session, null);
             router.push('/onboarding/test');

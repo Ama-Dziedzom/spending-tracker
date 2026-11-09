@@ -156,7 +156,8 @@ export function looksLikeProviderAlert(sms: string): boolean {
 
 /** First 60 chars for logs, with long digit runs masked (phones, accounts). */
 function previewSms(sms: string): string {
-  return sms.slice(0, 60).replace(/\d{5,}/g, (m) => '•'.repeat(m.length)).replace(/\s+/g, ' ');
+  // Names, amounts, numbers and dates become placeholders before anything is logged.
+  return maskSms(sms).slice(0, 80);
 }
 
 /**

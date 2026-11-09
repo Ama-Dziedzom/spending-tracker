@@ -72,7 +72,7 @@ function withReceiverManifest(config) {
       manifest['uses-permission'] = [];
     }
 
-    const permissions = ['android.permission.RECEIVE_SMS', 'android.permission.READ_SMS'];
+    const permissions = ['android.permission.RECEIVE_SMS'];
     for (const p of permissions) {
       const exists = manifest['uses-permission'].some((item) => item.$['android:name'] === p);
       if (!exists) {

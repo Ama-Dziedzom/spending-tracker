@@ -8,7 +8,7 @@ import {
 } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { getSession } from '@/lib/supabase';
-import { syncSessionToAppGroup } from '@/lib/shareSync';
+import { syncSessionToAppGroup, setSmsLoggingFlag } from '@/lib/shareSync';
 import { getShareSamples, setShareSamples } from '@/lib/review-service';
 import { lastAlertAt } from '@/lib/settings-service';
 import { ago } from '@/lib/format';
@@ -61,7 +61,7 @@ export default function Autopilot() {
         if (value) {
             const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECEIVE_SMS, {
                 title: 'Let LogIt read money alerts',
-                message: 'LogIt reads MoMo and bank alerts as they arrive and logs them for you. Other messages are ignored.',
+                message: 'LogIt reads MoMo and bank alerts as they arrive and logs them for you. The alert text is sent to LogIt’s server to be read and saved to your account. Other messages are ignored.',
                 buttonPositive: 'Continue',
                 buttonNegative: 'Not now',
             }).catch(() => PermissionsAndroid.RESULTS.DENIED);
@@ -70,12 +70,14 @@ export default function Autopilot() {
                 return;
             }
             await AsyncStorage.setItem(SMS_KEY, 'true');
+            setSmsLoggingFlag(true);
             setAndroidOn(true);
             const session = await getSession();
             if (session) syncSessionToAppGroup(session, null);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
         } else {
             await AsyncStorage.setItem(SMS_KEY, 'false');
+            setSmsLoggingFlag(false);
             setAndroidOn(false);
         }
     };

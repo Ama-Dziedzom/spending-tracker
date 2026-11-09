@@ -35,5 +35,20 @@ export function syncSessionToAppGroup(
     AppGroupBridge.removeItem('refresh_token');
     AppGroupBridge.removeItem('default_account_id');
     AppGroupBridge.removeItem('api_url');
+    // Alerts queued offline belong to the account that received them.
+    clearPendingAlerts();
   }
+}
+
+/** Android: the SMS receiver reads this before doing anything. */
+export function setSmsLoggingFlag(on: boolean): void {
+  if (!AppGroupBridge) return;
+  AppGroupBridge.setItem('sms_auto_logging_enabled', on ? 'true' : 'false');
+}
+
+/** Drop alerts saved while offline so they can't land in the next account. */
+export function clearPendingAlerts(): void {
+  if (!AppGroupBridge) return;
+  AppGroupBridge.removeItem('pending_sms');
+  AppGroupBridge.removeItem('pending_sms_received_at');
 }

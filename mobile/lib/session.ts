@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabase';
 import { clearSpendingCache } from './spending-cache';
+import { clearPendingAlerts } from './shareSync';
 
 /**
  * Session expired (Figma 1014:2313): when the login lapses on its own, LogIt
@@ -15,6 +16,7 @@ let intentional = false;
 export async function signOutOnPurpose() {
     intentional = true;
     await clearSpendingCache();
+    clearPendingAlerts();
     try {
         return await supabase.auth.signOut();
     } finally {
