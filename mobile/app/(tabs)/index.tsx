@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Platform, Pressable, RefreshControl, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -9,7 +9,7 @@ import { SpendingCard, SpendingCardSkeleton, type Period } from '@/components/sp
 import { FirstRunCard, SalaryPromptCard } from '@/components/spending/prompt-cards';
 import { DayDetailSheet } from '@/components/spending/day-detail-sheet';
 import { LinkWalletsFlow } from '@/components/spending/link-wallets-flow';
-import { TransactionDetailBottomSheet } from '@/components/transaction-detail-bottom-sheet';
+import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
 import { AddTransactionBottomSheet } from '@/components/add-transaction-bottom-sheet';
 import { useTabContext } from './_layout';
 import { supabase, type Wallet } from '@/lib/supabase';
@@ -19,6 +19,7 @@ import { getPendingReviewCount } from '@/lib/review-service';
 import { getIncomePrompts, logExpectedIncome, markIncomeReceived, snoozeIncome, type IncomePrompt } from '@/lib/income-service';
 import { fetchSpendingWindow, summarise, type SpendingSummary } from '@/lib/spending-service';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
+import { usePendingRemovals } from '@/lib/transaction-edits';
 import { longDate, sameDay } from '@/lib/format';
 import { RAW } from '@/constants/theme';
 
@@ -38,7 +39,6 @@ export default function Spending() {
     const [name, setName] = useState<string | null>(null);
     const [avatar, setAvatar] = useState<AvatarChoice | null>(null);
     const [txs, setTxs] = useState<TransactionWithWallet[]>([]);
-    const [summary, setSummary] = useState<SpendingSummary | null>(null);
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [reviewCount, setReviewCount] = useState(0);
     const [unmatchedCount, setUnmatchedCount] = useState(0);
@@ -48,6 +48,15 @@ export default function Spending() {
     const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
     const [incomeSheetFor, setIncomeSheetFor] = useState<IncomePrompt | null>(null);
     const [linkOpen, setLinkOpen] = useState(false);
+
+    // Entries inside their Undo window are left out, so totals change at once.
+    const removing = usePendingRemovals();
+    const visibleTxs = useMemo(() => {
+        const gone = new Set(txs.filter((t) => removing.has(t.id) && t.transfer_id).map((t) => t.transfer_id));
+        return txs.filter((t) => !removing.has(t.id) && !(t.transfer_id && gone.has(t.transfer_id)));
+    }, [txs, removing]);
+    const [loaded, setLoaded] = useState(false);
+    const summary: SpendingSummary | null = useMemo(() => (loaded ? summarise(visibleTxs) : null), [loaded, visibleTxs]);
 
     const fetchData = useCallback(async () => {
         try {
@@ -64,7 +73,7 @@ export default function Spending() {
                 supabase.from('transactions').select('*', { count: 'exact', head: true }).is('wallet_id', null),
             ]);
             setTxs(window);
-            setSummary(summarise(window));
+            setLoaded(true);
             setWallets(walletList);
             setReviewCount(pending);
             setIncomePrompt(prompts[0] ?? null);
@@ -188,18 +197,17 @@ export default function Spending() {
 
             <DayDetailSheet
                 date={dayOpen}
-                transactions={txs}
+                transactions={visibleTxs}
                 isBiggest={!!dayOpen && !!bigDay && sameDay(dayOpen, bigDay)}
                 onClose={() => setDayOpen(null)}
                 onTransaction={setDetailTx}
                 onSeeAll={() => router.push('/transactions')}
             />
 
-            <TransactionDetailBottomSheet
-                isVisible={!!detailTx}
+            <TransactionDetailSheet
                 transaction={detailTx}
                 onClose={() => setDetailTx(null)}
-                onCategoryUpdated={fetchData}
+                onChanged={fetchData}
             />
 
             <AddTransactionBottomSheet

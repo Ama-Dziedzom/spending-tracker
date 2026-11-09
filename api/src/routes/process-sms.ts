@@ -311,6 +311,32 @@ async function hasNewerSnapshot(walletId: string, smsDate: Date, excludeTxId: st
  * is one, otherwise adjust by the amount. Skipped when the wallet already has a
  * balance from a newer message (this older one is already reflected in it).
  */
+/**
+ * Merchant key for category rules: the description up to the first comma,
+ * lower-cased. Must match merchantKey() in mobile/lib/category-rules.ts.
+ */
+export function merchantKey(description: string): string {
+  return (description.split(',')[0] ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** The user's saved category for this merchant, if any. Never throws. */
+async function ruleCategory(userId: string, description: string): Promise<string | null> {
+  const key = merchantKey(description);
+  if (!key) return null;
+  const { data, error } = await supabaseAdmin
+    .from('category_rules')
+    .select('category')
+    .eq('user_id', userId)
+    .eq('merchant', key)
+    .maybeSingle();
+  if (error) {
+    // Most likely the category_rules migration hasn't run yet.
+    console.error('category_rules lookup failed:', error.message);
+    return null;
+  }
+  return data?.category ?? null;
+}
+
 async function applyBalance(walletId: string, tx: ParsedTx, smsDate: Date | null, txId: string): Promise<boolean> {
   if (smsDate && (await hasNewerSnapshot(walletId, smsDate, txId))) {
     console.log(`⏪ Older SMS for wallet ${walletId}: balance already reflects it, not changed`);
@@ -498,6 +524,12 @@ processSmsRouter.post(
         transaction.is_transfer = true;
         transaction.transfer_type = transaction.type === 'credit' ? 'transfer_in' : 'transfer_out';
         transaction.category = 'transfer';
+      }
+
+      // The user's own rule ("Always use this for Shoprite") beats the guess.
+      if (!transaction.is_transfer) {
+        const ruled = await ruleCategory(userId, transaction.description);
+        if (ruled) transaction.category = ruled;
       }
 
       const wallet = await resolveWallet(userId, accountId, transaction);

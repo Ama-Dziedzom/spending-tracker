@@ -138,6 +138,8 @@ export interface Transaction {
     source?: TransactionSource;
     /** sms = read from the message, estimated = worked out by LogIt, received = when LogIt got it */
     date_source?: 'sms' | 'estimated' | 'received' | 'manual' | null;
+    /** The alert as received, when the entry came from an SMS. */
+    raw_sms?: string | null;
 }
 
 /**

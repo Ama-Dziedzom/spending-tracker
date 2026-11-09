@@ -6,7 +6,8 @@ import {
     SegmentedControl, Screen, Skeleton, SkeletonRow, TAB_BAR_SPACE, Text, TopBar,
 } from '@/components/ui';
 import { TransactionRow, type RowContext } from '@/components/spending/transaction-row';
-import { TransactionDetailBottomSheet } from '@/components/transaction-detail-bottom-sheet';
+import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
+import { usePendingRemovals } from '@/lib/transaction-edits';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
 import {
     dedupeTransfers, fetchTransactionsPage, groupByDay, groupByWeek, searchTransactions,
@@ -59,6 +60,7 @@ export default function Transactions() {
     const [searchRun, setSearchRun] = useState(0);
 
     const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
+    const removing = usePendingRemovals();
 
     // Ignore responses that arrive after the filter changed.
     const requestId = useRef(0);
@@ -120,9 +122,11 @@ export default function Transactions() {
     }, [query, searching, searchRun]);
 
     const groups: TxGroup[] = useMemo(() => {
-        const list = dedupeTransfers(rows);
+        // Hide entries inside their Undo window; both legs of a move go together.
+        const goneTransfers = new Set(rows.filter((r) => removing.has(r.id) && r.transfer_id).map((r) => r.transfer_id));
+        const list = dedupeTransfers(rows).filter((t) => !removing.has(t.id) && !(t.transfer_id && goneTransfers.has(t.transfer_id)));
         return filter === 'moved' ? groupByWeek(list) : groupByDay(list, listAmount);
-    }, [rows, filter]);
+    }, [rows, filter, removing]);
 
     const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
         const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
@@ -250,11 +254,10 @@ export default function Transactions() {
                 )}
             </Screen>
 
-            <TransactionDetailBottomSheet
-                isVisible={!!detailTx}
+            <TransactionDetailSheet
                 transaction={detailTx}
                 onClose={() => setDetailTx(null)}
-                onCategoryUpdated={refreshAll}
+                onChanged={refreshAll}
             />
         </>
     );
