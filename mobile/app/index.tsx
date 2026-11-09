@@ -34,6 +34,11 @@ export default function SplashScreen() {
             new Promise((resolve) => setTimeout(resolve, MIN_SPLASH_MS)),
         ]).then(([destination]) => {
             if (!cancelled) router.replace(destination);
+        }).catch((err) => {
+            // Never strand people on the splash: if the session or biometrics
+            // check fails, log why and send them to Welcome.
+            console.warn('[splash] could not resolve start screen', err);
+            if (!cancelled) router.replace('/welcome');
         });
 
         return () => { cancelled = true; };

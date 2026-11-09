@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold, useFonts } from '@expo-google-fonts/manrope';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { ThemeProvider as LogItThemeProvider, useTheme } from '@/lib/theme';
 import { ToastProvider } from '@/components/ui/toast';
@@ -32,9 +32,22 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded || error) {
+      if (error) console.warn('[fonts] Manrope failed to load', error);
       SplashScreen.hideAsync();
     }
   }, [loaded, error]);
+
+  // Safety net: never leave people on the native splash. If fonts haven't
+  // loaded after 4s, carry on with the system font.
+  const [fontTimeout, setFontTimeout] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      console.warn('[fonts] still loading after 4s, continuing without them');
+      setFontTimeout(true);
+      SplashScreen.hideAsync();
+    }, 4000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Keep the Share Extension in sync with the current session.
   // Fires on login, token refresh, and sign-out.
@@ -65,7 +78,7 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  if (!loaded && !error) {
+  if (!loaded && !error && !fontTimeout) {
     return null;
   }
 
