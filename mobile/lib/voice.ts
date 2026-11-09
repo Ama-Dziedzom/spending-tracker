@@ -52,7 +52,9 @@ export interface Listening { stop: () => void; cancel: () => void }
 const SILENCE_AFTER_WORDS_MS = 2200;
 /** Give up if nothing at all is heard for this long. */
 const WAIT_FOR_FIRST_WORD_MS = 8000;
-const LOCALES = ['en-GH', 'en-US'];
+// iOS has no en-GH recogniser (checked on device, Nov 2026); en-GB is the
+// closest match for Ghanaian English. en-US is the backup.
+const LOCALES = ['en-GB', 'en-US'];
 
 /**
  * Start listening. onWords fires as words arrive (the listening screen shows
@@ -60,7 +62,7 @@ const LOCALES = ['en-GH', 'en-US'];
  *
  * Runs in continuous mode and decides when to stop itself: iOS's own
  * end-of-speech detection cut people off before they'd started talking.
- * Falls back to en-US where the phone has no Ghanaian English recogniser.
+ * Uses en-GB, falling back to en-US if that recogniser isn't available.
  */
 export function listen(onWords: (text: string) => void, onEnd: (finalText: string, error?: string) => void): Listening | null {
     const m = load();
