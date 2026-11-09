@@ -43,12 +43,12 @@ const DOT_BOX = { x: 335.311, y: 184.452, size: 35.922 };
 const LIGHT_BG = '#1642E5';
 const DARK_BG = '#081750';
 
-const DROP_DELAY = 200;
-const DROP_MS = 550;
-const MIN_SHOW_MS = 1000;
+const DROP_DELAY = 300;
+const DROP_MS = 850;
+const MIN_SHOW_MS = 1600;
 /** Never hold people on the splash: go after this even if the start check is slow. */
 const MAX_SHOW_MS = 6000;
-const EXIT_MS = 250;
+const EXIT_MS = 380;
 
 export function LaunchSplash({ ready, onShown, onDone }: {
     /** True once the first real screen is showing. */
