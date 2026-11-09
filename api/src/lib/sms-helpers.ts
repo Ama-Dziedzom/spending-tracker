@@ -25,6 +25,25 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
   UBAGHANA: { type: 'bank', identifier: 'uba', name: 'UBA', color: '#6B7280', nameHints: ['uba'] },
 };
 
+/**
+ * For money moved between the user's own accounts: which provider is on the
+ * other side, from the wording ("…Mine from SCB Standard Chartered Bank",
+ * "…to MTN MoMo"). Returns a PROVIDERS key, never the message's own source.
+ */
+export function counterpartProvider(sms: string, ownSource: string): string | null {
+  const text = sms.toLowerCase();
+  let best: { key: string; at: number } | null = null;
+  for (const [key, p] of Object.entries(PROVIDERS)) {
+    if (key === ownSource) continue;
+    for (const hint of p.nameHints) {
+      const re = new RegExp(`\\b(?:from|to|via)\\s+(?:[a-z0-9]+\\s+){0,2}?${hint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+      const m = re.exec(text);
+      if (m && (!best || m.index < best.at)) best = { key, at: m.index };
+    }
+  }
+  return best?.key ?? null;
+}
+
 const MONTHS: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
 };

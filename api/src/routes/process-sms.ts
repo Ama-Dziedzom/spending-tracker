@@ -16,7 +16,7 @@
 import { Router, type Response } from 'express';
 import { supabaseAdmin } from '../lib/supabase.js';
 import { parseSms } from './parse-sms.js';
-import { PROVIDERS, extractSmsDate } from '../lib/sms-helpers.js';
+import { PROVIDERS, counterpartProvider, extractSmsDate } from '../lib/sms-helpers.js';
 import { recordAnchor, estimateDateFromId } from '../lib/date-estimate.js';
 import { extractUser, type AuthenticatedRequest } from '../middleware/auth.js';
 import { readUnknownSms, maskSms, shapeOf } from '../lib/fallback-reader.js';
@@ -604,6 +604,26 @@ processSmsRouter.post(
         transaction.is_transfer = true;
         transaction.transfer_type = transaction.type === 'credit' ? 'transfer_in' : 'transfer_out';
         transaction.category = 'transfer';
+      }
+
+      // For own-account moves, name the other side when the message says it
+      // ("…Mine from SCB Standard Chartered Bank" -> "From Standard Chartered"),
+      // using the user's own name for that wallet when they have one.
+      if (transaction.is_transfer) {
+        const other = counterpartProvider(rawSms, transaction.source);
+        if (other) {
+          const info = PROVIDERS[other];
+          const { data: otherWallets } = await supabaseAdmin
+            .from('wallets')
+            .select('id, name, type, source_identifier')
+            .eq('user_id', userId)
+            .eq('is_active', true)
+            .eq('type', info.type);
+          const match = (otherWallets ?? []).find((w) =>
+            (w.source_identifier ?? '').toLowerCase() === info.identifier ||
+            info.nameHints.some((h) => (w.name ?? '').toLowerCase().includes(h)));
+          transaction.description = `${transaction.type === 'credit' ? 'From' : 'To'} ${match?.name ?? info.name}`;
+        }
       }
 
       // The user's own rule ("Always use this for Shoprite") beats the guess.
