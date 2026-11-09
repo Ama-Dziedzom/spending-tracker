@@ -3,6 +3,7 @@
 // What this does at `expo prebuild` time:
 //  1. Adopts the UIScene lifecycle (SceneDelegate + Info.plist scene manifest).
 //     Apps built with the iOS 27 SDK are killed at launch without it.
+//     Debug builds create the window early so expo-dev-client's launcher works.
 //  2. Raises every pod's deployment target to 15.1 (Xcode 27 rejects lower).
 //  3. Embeds the prebuilt React.framework, which CocoaPods can leave out of the
 //     embed script ("Library not loaded: @rpath/React.framework/React").
@@ -36,6 +37,16 @@ const WINDOW_SETUP = `#if os(iOS) || os(tvOS)
 
 const WINDOW_SETUP_REPLACEMENT = `    // ${MARKER}: the window and React Native root are created in SceneDelegate:
     // apps built with the iOS 27 SDK must adopt the UIScene lifecycle or they are killed at launch.
+#if DEBUG
+    // ${MARKER}: Debug builds include expo-dev-client, whose launcher needs a window and a
+    // React root *before* super.application(...) runs (else "Cannot find the keyWindow").
+    // Create them here; SceneDelegate attaches this window to the scene when it connects.
+    window = UIWindow(frame: UIScreen.main.bounds)
+    factory.startReactNative(
+      withModuleName: "main",
+      in: window,
+      launchOptions: launchOptions)
+#endif
 `;
 
 const SCENE_DELEGATE = `// ${MARKER}
@@ -50,6 +61,19 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     guard let windowScene = scene as? UIWindowScene,
           let appDelegate = UIApplication.shared.delegate as? AppDelegate,
           let factory = appDelegate.reactNativeFactory else { return }
+
+#if DEBUG
+    // Dev client: reuse the window AppDelegate already handed to the launcher.
+    if let existing = appDelegate.window {
+      existing.windowScene = windowScene
+      self.window = existing
+      existing.makeKeyAndVisible()
+      if let userActivity = connectionOptions.userActivities.first {
+        self.scene(scene, continue: userActivity)
+      }
+      return
+    }
+#endif
 
     var launchOptions: [UIApplication.LaunchOptionsKey: Any] = [:]
     if let url = connectionOptions.urlContexts.first?.url {
