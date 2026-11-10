@@ -4,7 +4,10 @@
 //  1. Adopts the UIScene lifecycle (SceneDelegate + Info.plist scene manifest).
 //     Apps built with the iOS 27 SDK are killed at launch without it.
 //     Debug builds create the window early so expo-dev-client's launcher works.
-//  2. Raises every pod's deployment target to 15.1 (Xcode 27 rejects lower).
+//  2. Sets iOS 17.0 as the minimum for the app and every pod. Newer Xcode
+//     builds pods for its recommended minimum (17.0), and an app target below
+//     that can't import them ("module 'Expo' has a minimum deployment target
+//     of iOS 17.0"). The widgets already need 17.
 //  3. Embeds the prebuilt React.framework, which CocoaPods can leave out of the
 //     embed script ("Library not loaded: @rpath/React.framework/React").
 //  4. Disables user script sandboxing so the JS bundling phase can write
@@ -18,6 +21,7 @@ const {
   withInfoPlist,
   withXcodeProject,
   withDangerousMod,
+  withPodfileProperties,
 } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
@@ -151,6 +155,8 @@ function withSceneManifest(config) {
 
 // ─── Steps 2, 3 & 5: Podfile ─────────────────────────────────────────────────────
 
+const IOS_MIN = '17.0';
+
 const DEPLOYMENT_TARGET_FIX = `
     # ${MARKER}
     installer.pods_project.targets.each do |target|
@@ -165,11 +171,9 @@ const DEPLOYMENT_TARGET_FIX = `
         end
       end
 
-      # Xcode 27 rejects deployment targets below iOS 15.
+      # One minimum for every pod, matching the app (see step 2 above).
       target.build_configurations.each do |config|
-        if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 15.1
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
-        end
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '${IOS_MIN}'
       end
     end
 `;
@@ -215,6 +219,26 @@ function withPodfileFixes(config) {
   ]);
 }
 
+// ─── Step 2: one iOS minimum for the app and its pods ─────────────────────────
+
+function withIosMinimum(config) {
+  config = withPodfileProperties(config, (mod) => {
+    mod.modResults['ios.deploymentTarget'] = IOS_MIN;
+    return mod;
+  });
+  return withXcodeProject(config, (mod) => {
+    const configurations = mod.modResults.pbxXCBuildConfigurationSection();
+    for (const key of Object.keys(configurations)) {
+      const buildSettings = configurations[key].buildSettings;
+      if (!buildSettings || buildSettings.IPHONEOS_DEPLOYMENT_TARGET === undefined) continue;
+      if (parseFloat(String(buildSettings.IPHONEOS_DEPLOYMENT_TARGET).replace(/"/g, '')) < parseFloat(IOS_MIN)) {
+        buildSettings.IPHONEOS_DEPLOYMENT_TARGET = IOS_MIN;
+      }
+    }
+    return mod;
+  });
+}
+
 // ─── Step 4: script sandboxing ────────────────────────────────────────────────
 
 function withScriptSandboxingDisabled(config) {
@@ -250,6 +274,7 @@ module.exports = function withXcode27Fixes(config) {
   config = withSceneDelegate(config);
   config = withSceneManifest(config);
   config = withPodfileFixes(config);
+  config = withIosMinimum(config);
   config = withScriptSandboxingDisabled(config);
   config = withQuotedBundleScript(config);
   return config;
