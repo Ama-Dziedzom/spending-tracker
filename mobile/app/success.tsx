@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, CategoryTile, Text, type IconName } from '@/components/ui';
+import { BAND, Button, CategoryTile, Text, type IconName } from '@/components/ui';
 import { AuthLayout, BandHero, CardLink } from '@/components/onboarding/auth-layout';
 import { useTheme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -29,6 +29,7 @@ export default function YoureIn() {
 
     return (
         <AuthLayout
+            band={BAND.youreIn}
             back={false}
             cardTop={370}
             hero={<BandHero icon="tick" title={first ? `You’re in, ${first}` : 'You’re in'} />}

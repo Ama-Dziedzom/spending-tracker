@@ -4,7 +4,7 @@ export { AskBar, UserBubble, LogItLabel, SuggestionRow, AnswerAction } from './a
 export { Avatar, type AvatarChoice } from './avatar';
 export { Banner, ActionBanner, OfflinePill, FieldError } from './banner';
 export { DayBars, HBars, PAST_OPACITY, type DayBar, type HBar } from './bar-chart';
-export { BrandBand } from './brand-band';
+export { BrandBand, BAND, type BandShape } from './brand-band';
 export { Button, Chip } from './button';
 export { Card, CardHeader, InsetPanel } from './card';
 export { CategoryTile } from './category-tile';

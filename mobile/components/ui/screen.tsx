@@ -4,12 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { SPACE } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
-import { BrandBand } from './brand-band';
+import { BrandBand, type BandShape } from './brand-band';
 
 interface Props {
     children: React.ReactNode;
-    /** Show the blue band. Height per handoff §3. Pass false for plain canvas screens. */
-    band?: false | { height?: number; full?: boolean };
+    /** Show the blue band; a BAND preset from Figma (default: standard). Pass false for plain canvas screens. */
+    band?: false | (Partial<BandShape> & { full?: boolean });
     /** Pinned above the content (e.g. TopBar). */
     header?: React.ReactNode;
     /** Pinned below the content (e.g. Ask bar). The tab bar is handled by the tab layout. */

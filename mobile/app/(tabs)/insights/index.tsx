@@ -2,14 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AskBar, Banner, Card, Icon, ListGroup, ListRow, PAST_OPACITY, Screen, Sheet, Skeleton, Tap, TAB_BAR_SPACE, Text } from '@/components/ui';
+import { BAND, AskBar, Banner, Card, Icon, ListGroup, ListRow, PAST_OPACITY, Screen, Sheet, Skeleton, Tap, TAB_BAR_SPACE, Text } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { loadMoneyWindow, monthLong, cedis, type MoneyWindow } from '@/lib/money-window';
 import { computeInsights, DAYS_NEEDED, pickableMonths, type Finding, type InsightsResult } from '@/lib/insights-engine';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { categoryStyle } from '@/lib/category-style';
 import { shortDate } from '@/lib/format';
-import { RAW, type CategoryColor } from '@/constants/theme';
+import { RAW, type CategoryColor, BAND_CHIP_ALPHA, withAlpha } from '@/constants/theme';
 
 /** Room for the Ask bar that sits above the tab bar. */
 const ASK_BAR_SPACE = 64;
@@ -59,7 +59,7 @@ export default function Insights() {
     return (
         <View style={{ flex: 1 }}>
             <Screen
-                band={{ height: 500 }}
+                band={BAND.insights}
                 bottomInset={TAB_BAR_SPACE + ASK_BAR_SPACE}
                 header={
                     <View style={{ height: 40, marginTop: 10, marginBottom: 16, marginHorizontal: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -70,7 +70,7 @@ export default function Insights() {
                                 accessibilityRole="button"
                                 accessibilityLabel={`Showing ${monthLong(month)}. Choose a month`}
                                 hitSlop={4}
-                                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 36, borderRadius: 999, backgroundColor: RAW.onBandFill, opacity: pressed ? 0.8 : 1 })}
+                                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 36, borderRadius: 999, backgroundColor: withAlpha(colors.brand['ink-button'], BAND_CHIP_ALPHA), opacity: pressed ? 0.8 : 1 })}
                             >
                                 <Icon name="calendar" size={14} color={RAW.onBand} />
                                 <Text size={13} weight="semibold" tone="onBand">{monthLong(month)}</Text>
@@ -98,7 +98,7 @@ export default function Insights() {
                     <>
                         <View style={{ paddingHorizontal: 6, paddingBottom: 6, gap: 6 }}>
                             {data.findings.length > 0 && (
-                                <Text size={13} weight="semibold" style={{ color: RAW.onBandTertiary }}>
+                                <Text size={13} weight="semibold" tone="onBand">
                                     {data.findings.length} {data.findings.length === 1 ? 'thing' : 'things'} LogIt noticed
                                 </Text>
                             )}

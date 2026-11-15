@@ -308,7 +308,8 @@ const styles = StyleSheet.create({
         fontFamily: 'Manrope-Regular',
         fontSize: 16,
         lineHeight: 22,
-        color: 'rgba(255, 255, 255, 0.85)',
+        // White text on the blue header is 100 % only (WCAG AA, handoff §3).
+        color: '#FFFFFF',
     },
     card: {
         flex: 1,

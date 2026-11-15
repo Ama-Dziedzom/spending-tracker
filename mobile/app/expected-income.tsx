@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
-import {
-    Button, Card, CategoryTile, Dialog, Icon, ListGroup, ListRow, RoundButton, Screen, Sheet, Tap, Text, TopBar, useToast,
-} from '@/components/ui';
+import { BAND, Button, Card, CategoryTile, Dialog, Icon, ListGroup, ListRow, RoundButton, Screen, Sheet, Tap, Text, TopBar, useToast } from '@/components/ui';
 import { WalletList } from '@/components/transactions/pickers';
-import { FONT, HIT_SLOP, RAW } from '@/constants/theme';
+import { FONT, HIT_SLOP } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import type { Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
@@ -73,8 +71,8 @@ export default function ExpectedIncomeScreen() {
 
     return (
         <>
-            <Screen header={<TopBar title="Expected income" />} contentStyle={{ gap: 12 }}>
-                <Text size={13} style={{ color: RAW.onBandSecondary, paddingHorizontal: 4 }}>
+            <Screen band={BAND.insights} header={<TopBar title="Expected income" />} contentStyle={{ gap: 12 }}>
+                <Text size={13} weight="semibold" tone="onBand" style={{ paddingHorizontal: 4 }}>
                     Some banks don’t text when money comes in. Tell LogIt what to expect and it’ll ask on the day.
                 </Text>
 

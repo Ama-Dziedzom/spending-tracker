@@ -118,7 +118,7 @@ function LockedScreen({ method, interactive, onUnlock }: { method: string; inter
                     <Icon name="faceid" size={32} color={RAW.onBand} />
                 </View>
                 <Text variant="screenTitle" size={20} tone="onBand" align="center">LogIt is locked</Text>
-                <Text size={13} align="center" style={{ color: RAW.onBandSecondary }}>Look at your phone to open</Text>
+                <Text size={13} weight="semibold" align="center" tone="onBand">Look at your phone to open</Text>
             </View>
             {interactive && (
                 <View style={{ paddingHorizontal: 22, paddingBottom: insets.bottom + 24, gap: 14, alignItems: 'center' }}>

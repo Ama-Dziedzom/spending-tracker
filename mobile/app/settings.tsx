@@ -2,10 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-    Avatar, Button, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast,
-    type IconName,
-} from '@/components/ui';
+import { BAND, Avatar, Button, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast, type IconName } from '@/components/ui';
 import { useAppLock } from '@/components/app-lock';
 import { useTheme, type ThemePreference } from '@/lib/theme';
 import { getProfile, lastAlertAt, setHideWidgetAmounts, type Profile } from '@/lib/settings-service';
@@ -111,7 +108,7 @@ export default function Settings() {
 
     return (
         <>
-        <Screen band={{ height: 500 }} header={<TopBar title="Settings" />} contentStyle={{ gap: 10 }}>
+        <Screen band={BAND.settings} header={<TopBar title="Settings" />} contentStyle={{ gap: 10 }}>
             <Pressable
                 onPress={() => router.push('/profile')}
                 accessibilityRole="button"
@@ -135,7 +132,7 @@ export default function Settings() {
                 <ListRow dense leading={tile('shield')} title="Limits" value={limitCount === null ? '' : limitCount === 0 ? 'None' : `${limitCount} set`} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/limits')} />
             </ListGroup>
 
-            <ListGroup label="Autopilot" labelOnBand>
+            <ListGroup label="Autopilot">
                 <ListRow
                     dense
                     leading={tile('flash')}

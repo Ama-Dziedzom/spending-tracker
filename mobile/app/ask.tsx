@@ -3,10 +3,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-    AskBar, BrandBand, Button, CategoryTile, Icon, ListGroup, ListRow, RoundButton, Sheet, Tap, Text, UserBubble, useToast,
-    type IconName,
-} from '@/components/ui';
+import { BAND, AskBar, BrandBand, Button, CategoryTile, Icon, ListGroup, ListRow, RoundButton, Sheet, Tap, Text, UserBubble, useToast, type IconName } from '@/components/ui';
 import { AnswerView, answerText } from '@/components/ask/answer-view';
 import { ListeningOverlay } from '@/components/ask/listening';
 import { TransactionRow } from '@/components/spending/transaction-row';
@@ -154,7 +151,7 @@ export default function Ask() {
     return (
         <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
             <StatusBar style="light" />
-            <BrandBand height={300} />
+            <BrandBand {...(empty ? BAND.askStart : BAND.askAnswer)} />
             <View style={{ paddingTop: insets.top + 10, paddingHorizontal: 22, height: insets.top + 10 + 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
                     <RoundButton icon="back" label="Back" onPress={() => router.back()} />
@@ -163,7 +160,7 @@ export default function Ask() {
                     </View>
                     <View style={{ flexShrink: 1 }}>
                         <Text size={17} weight="bold" tone="onBand" accessibilityRole="header">Ask LogIt</Text>
-                        <Text size={12} weight="semibold" style={{ color: RAW.onBandTertiary }}>Answers from your own money</Text>
+                        <Text size={12} weight="semibold" tone="onBand">Answers from your own money</Text>
                     </View>
                 </View>
                 <RoundButton icon="more" label="Earlier questions" onPress={openHistory} />
@@ -181,7 +178,7 @@ export default function Ask() {
                         <>
                             <View style={{ gap: 8, paddingHorizontal: 6, marginBottom: 10 }}>
                                 <Text weight="bold" size={24} tone="onBand" style={{ letterSpacing: -0.48 }}>What would you like to know?</Text>
-                                <Text size={14} style={{ color: RAW.onBandTertiary }}>Type, or tap the mic and just ask.</Text>
+                                <Text size={14} weight="semibold" tone="onBand">Type, or tap the mic and just ask.</Text>
                             </View>
                             <View style={{ gap: 8 }}>
                                 {STARTERS.map((s, i) => (

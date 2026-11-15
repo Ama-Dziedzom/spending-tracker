@@ -78,14 +78,17 @@ These replace `COLORS` in `mobile/constants/theme.ts` and the colours in `tailwi
 | `text/tertiary` | `#656B84` | `#9197AE` |
 **Rules for using colours**
 
-- **Text on the blue band** (the gradient at the top of most screens) is plain white, at 100%, 85% or 75%. These are the only colours not tokenised.
+- **Text on the blue band** (the gradient at the top of most screens) is plain white at **100% only**, never faded (no 85%, 75% or other alpha). Show hierarchy with size and weight. Disabled buttons keep their disabled styling. White is the only text colour not tokenised.
+- **No text in the fade.** White text sits only where the band is fully solid. Below that, text uses dark tokens: `text/primary` may sit where the band is at most 50% opacity; `text/secondary` and `text/tertiary` only where the band has completely faded to `bg/canvas`.
+- **Section labels** (MONEY, AUTOPILOT, APP, LEARNING, SUMMARIES, YOU, YOUR DATA…) use `text/tertiary`. A label that sits on the solid band (MONEY on Settings, IPHONE, TELL ME WHEN, HELP) is white at 100%.
+- **Chips on the band** ("+GHS 17", the month chip on Insights) are `brand/ink-button` at 28% opacity with white text, not translucent white.
 - **Blue text and blue icons** use `brand/accent-text`. **Blue fills** (buttons, toggles, the current bar in a chart) use `brand/accent`. In dark mode these are different values on purpose: the fill is deeper so white button labels pass contrast, and the text is lighter so links pass on dark cards.
 - **Category colours** (`cat/*`) are for icons, chart bars and progress bars only. Category labels and tag text use `text/primary`.
 - **Charts:** the current period is the solid colour, and past periods are the same colour at 30% opacity. Do not use the `-tint` tokens for bars.
 - **Going over a limit** uses `status/warn` (amber), never `status/danger`. Danger is only for destructive actions and errors.
-- **Contrast:** all 60 text-and-icon pairs pass in both modes (text 4.5:1, icons 3:1). Do not introduce new colours without re-checking.
+- **Contrast:** all text passes WCAG AA in both modes (4.5:1; 3:1 for text 24px and above or bold 19px and above; icons 3:1). Do not introduce new colours or put text in a band's fade without re-checking. (Updated 15 Nov 2026.)
 
-**The blue band** is `brand/band` with three soft, blurred ellipses (`#8FA8FF`, `#6B5BFF`, `#0B2493` at 40–45% opacity), and it fades into `bg/canvas` from about 45% of its height. It is a gradient bleed, never a hard edge. Chat screens use a shorter band (300px). The listening and lock screens are fully blue.
+**The blue band** is `brand/band` with three soft, blurred ellipses (`#8FA8FF`, `#6B5BFF`, `#0B2493` at 40–45% opacity; the light one is 20% on Autopilot · it works). Each screen sets two values, read from its Figma "Brand band" mask: `solidUntil` (the y where the band is still fully solid = solid stop × band height) and `fadeEnd` (the y where it has fully faded into `bg/canvas` = band height). Solid from 0 to `solidUntil`, then a linear fade to `fadeEnd`, at least ~100px long. Never a hard edge. In code these live as presets in `BAND` (`mobile/components/ui/brand-band.tsx`). The lock, update-required and allow-notifications screens are fully blue.
 
 ## 4. Type, icons, spacing
 

@@ -38,20 +38,18 @@ export const PALETTE: Record<ColorScheme, Palette> = {
  * The MTN network dot is added when the Wallets screen is built (value from Figma).
  */
 export const RAW = {
-  onBand: '#FFFFFF', // text on the blue band, at 100 / 85 / 75 %
-  onBandSecondary: 'rgba(255,255,255,0.85)',
-  onBandTertiary: 'rgba(255,255,255,0.75)',
-  /** Round buttons and pills sitting on the band. */
+  /**
+   * Text and icons on the blue band: plain white at 100 %, never faded
+   * (handoff §3, 15 Nov 2026 WCAG fix). Show hierarchy with size and weight.
+   */
+  onBand: '#FFFFFF',
+  /** Round buttons and pills sitting on the band (fills, not text). */
   onBandFill: 'rgba(255,255,255,0.16)',
-  /** Welcome: the incoming-alert bubble on the band (Figma 1000:77), and its label and text. */
+  /** Welcome: the incoming-alert bubble on the band (Figma 1000:77). Its text is onBand. */
   onBandBubble: 'rgba(255,255,255,0.14)',
-  /** Change chip on the band ("+GHS 17", Figma 1022:4657). */
-  onBandChip: 'rgba(255,255,255,0.18)',
-  onBandBubbleLabel: 'rgba(255,255,255,0.7)',
-  onBandBubbleText: 'rgba(255,255,255,0.92)',
   /** Icon circle inside a toast (white at 14 % on bg/inverse). */
   onInverseFill: 'rgba(255,255,255,0.14)',
-  bandEllipses: ['#8FA8FF', '#6B5BFF', '#0B2493'] as const, // at 40–45 % opacity
+  bandEllipses: ['#8FA8FF', '#6B5BFF', '#0B2493'] as const, // at 40–45 % opacity (the light one at 20 % on Autopilot · it works)
   toastUndo: '#9DB4FF',
   /** Initials avatar artwork (Figma "LogIt / Avatar" 989:63). Same in both modes. */
   /** Mobile network dots next to a phone number (handoff §12.4, not tokenised). */
@@ -64,6 +62,16 @@ export const RAW = {
 export type CategoryColor =
   | 'people' | 'food' | 'shopping' | 'airtime' | 'bills' | 'transport'
   | 'cash' | 'fees' | 'loans' | 'subscription';
+
+/** A token colour at an opacity, for fills only (e.g. brand/ink-button at 28 % for chips on the band). */
+export function withAlpha(hex: string, alpha: number): string {
+  const h = hex.replace('#', '').slice(0, 6);
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Chips on the band ("+GHS 17", the month chip): brand/ink-button at 28 % with white text. */
+export const BAND_CHIP_ALPHA = 0.28;
 
 export const FONT = {
   medium: 'Manrope-Medium',

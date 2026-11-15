@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Banner, Button, Card, Icon, Screen, Skeleton, Tap, TAB_BAR_SPACE, Text, TopBar } from '@/components/ui';
+import { BAND, Banner, Button, Card, Icon, Screen, Skeleton, Tap, TAB_BAR_SPACE, Text, TopBar } from '@/components/ui';
 import { LimitCard } from '@/components/limits/limit-views';
 import { SetLimitSheet } from '@/components/limits/set-limit-sheet';
 import { getLimits, limitStatus, usualWeekly, type Limit } from '@/lib/limits';
@@ -10,7 +10,7 @@ import { WeekChart } from '@/components/insights/week-chart';
 import { useTheme } from '@/lib/theme';
 import { cedis, loadMoneyWindow } from '@/lib/money-window';
 import { categoryDetail, type CategoryDetail } from '@/lib/insights-engine';
-import { RAW } from '@/constants/theme';
+import { BAND_CHIP_ALPHA, withAlpha } from '@/constants/theme';
 
 /**
  * Insight detail (Figma 1022:4640). The number, six weeks with a quiet
@@ -46,7 +46,7 @@ export default function InsightDetail() {
     const askAbout = label.toLowerCase();
 
     return (
-        <Screen band={{ height: 500 }} bottomInset={TAB_BAR_SPACE} header={<TopBar title={label || ' '} />}>
+        <Screen band={BAND.insights} bottomInset={TAB_BAR_SPACE} header={<TopBar title={label || ' '} />}>
             {error ? (
                 <Banner tone="danger" title="Couldn’t load this" body="Check your connection and try again." action={{ label: 'Back', onPress: () => router.back() }} />
             ) : !d ? (
@@ -54,11 +54,11 @@ export default function InsightDetail() {
             ) : (
                 <>
                     <View style={{ paddingHorizontal: 6, paddingBottom: 4, gap: 2 }}>
-                        <Text size={13} weight="semibold" style={{ color: RAW.onBandTertiary }}>This week</Text>
+                        <Text size={13} weight="semibold" tone="onBand">This week</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                             <Text weight="extrabold" size={34} tone="onBand" style={{ letterSpacing: -1.02 }}>GHS {cedis(d.thisWeek)}</Text>
                             {Math.round(d.change) !== 0 && (
-                                <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: RAW.onBandChip }}>
+                                <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: withAlpha(colors.brand['ink-button'], BAND_CHIP_ALPHA) }}>
                                     <Text size={12} weight="bold" tone="onBand">{d.change > 0 ? '+' : '−'}GHS {cedis(d.change)}</Text>
                                 </View>
                             )}

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, Card, CategoryTile, Icon, Screen, Tap, Text, TopBar, useToast } from '@/components/ui';
+import { BAND, Button, Card, CategoryTile, Icon, Screen, Tap, Text, TopBar, useToast } from '@/components/ui';
 import { FONT } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { accountCounts, deleteAccount, exportTransactions } from '@/lib/settings-service';
@@ -41,7 +41,7 @@ export default function DeleteAccount() {
     ];
 
     return (
-        <Screen header={<TopBar title="Delete account" />} contentStyle={{ gap: 12 }}>
+        <Screen band={BAND.insights} header={<TopBar title="Delete account" />} contentStyle={{ gap: 12 }}>
             <Card gap={12}>
                 <CategoryTile tone="danger" icon="trash" size={40} />
                 <Text variant="cardTitle">This deletes everything</Text>

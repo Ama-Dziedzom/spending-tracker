@@ -69,7 +69,7 @@ export function TopBar({ title, subtitle, leading = 'back', onLeading, left, rig
                     {title && (
                         <View style={{ flexShrink: 1 }}>
                             <Text variant={subtitle ? 'cardTitle' : 'screenTitle'} tone="onBand">{title}</Text>
-                            {subtitle && <Text variant="meta" weight="semibold" style={{ color: RAW.onBandTertiary }}>{subtitle}</Text>}
+                            {subtitle && <Text variant="meta" weight="semibold" style={{ color: RAW.onBand }}>{subtitle}</Text>}
                         </View>
                     )}
                 </View>

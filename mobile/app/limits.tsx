@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { Banner, Button, Card, Icon, Screen, Skeleton, SkeletonRow, Tap, Text, TopBar } from '@/components/ui';
+import { BAND, Banner, Button, Card, Icon, Screen, Skeleton, SkeletonRow, Tap, Text, TopBar } from '@/components/ui';
 import { LimitRow } from '@/components/limits/limit-views';
 import { SetLimitSheet } from '@/components/limits/set-limit-sheet';
 import { useTheme } from '@/lib/theme';
 import { getLimits, limitStatus, usualWeekly, WEEKDAYS, type Limit } from '@/lib/limits';
 import { loadMoneyWindow, type MoneyWindow } from '@/lib/money-window';
-import { RAW } from '@/constants/theme';
 
 /**
  * Limits (Figma 1044:5410) and Limits · empty (1044:5488). All limits in
@@ -49,7 +48,7 @@ export default function Limits() {
 
     return (
         <>
-            <Screen band={{ height: 500 }} header={<TopBar title="Limits" />} contentStyle={{ gap: 12 }}>
+            <Screen band={BAND.insights} header={<TopBar title="Limits" />} contentStyle={{ gap: 12 }}>
                 {error && !limits ? (
                     <Banner tone="danger" title="Couldn’t load your limits" body="Check your connection and try again." action={{ label: 'Try again', onPress: load }} />
                 ) : !limits || !window ? (
@@ -67,7 +66,7 @@ export default function Limits() {
                     </Card>
                 ) : (
                     <>
-                        <Text size={13} weight="semibold" style={{ color: RAW.onBandSecondary, paddingHorizontal: 4 }}>
+                        <Text size={13} weight="semibold" tone="onBand" style={{ paddingHorizontal: 4 }}>
                             {resetDays.length === 1 ? `Weekly, reset every ${WEEKDAYS[resetDays[0] - 1]}` : 'Weekly'}
                         </Text>
                         <View style={{ backgroundColor: colors.bg.surface, borderRadius: 24, paddingHorizontal: 16, paddingVertical: 6, ...shadows.card }}>

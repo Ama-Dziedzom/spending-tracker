@@ -3,18 +3,18 @@ import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View, useWindowD
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandBand, Icon, Tap, Text, type IconName } from '@/components/ui';
+import { BAND, BrandBand, Icon, Tap, Text, type BandShape, type IconName } from '@/components/ui';
 import { FONT, RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { ghanaNetwork, toE164 } from '@/lib/phone';
 
 /**
- * Onboarding and sign-in layout (Figma section 993:48): a 420 band with a
+ * Onboarding and sign-in layout (Figma section 993:48): a band with a
  * back button, a 30 ExtraBold title and a subtitle, then a white card from
  * y 300 (on an 844 frame) with 36 corners. Fields at the top, the main
  * action and links pinned to the bottom of the card.
  */
-export function AuthLayout({ title, subtitle, back = true, onBack, hero, cardTop = 300, children, footer }: {
+export function AuthLayout({ title, subtitle, back = true, onBack, hero, cardTop = 300, band = BAND.auth, softLightEllipse, children, footer }: {
     title?: string;
     subtitle?: string;
     back?: boolean;
@@ -23,6 +23,10 @@ export function AuthLayout({ title, subtitle, back = true, onBack, hero, cardTop
     hero?: React.ReactNode;
     /** Where the card starts, in Figma points on an 844 frame. */
     cardTop?: number;
+    /** This screen's band from Figma (default: Sign up / Log in / Code). */
+    band?: BandShape;
+    /** Autopilot · it works: the light ellipse behind the subtitle at 20 %. */
+    softLightEllipse?: boolean;
     children?: React.ReactNode;
     footer?: React.ReactNode;
 }) {
@@ -35,7 +39,7 @@ export function AuthLayout({ title, subtitle, back = true, onBack, hero, cardTop
         <View style={{ flex: 1, backgroundColor: colors.bg.surface }}>
             <StatusBar style="light" />
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.bg.canvas }} />
-            <BrandBand height={420} />
+            <BrandBand {...band} softLightEllipse={softLightEllipse} />
             <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <ScrollView
                     contentContainerStyle={{ flexGrow: 1 }}
@@ -60,7 +64,7 @@ export function AuthLayout({ title, subtitle, back = true, onBack, hero, cardTop
                         ) : (
                             <View style={{ marginTop: 20, paddingHorizontal: 4, gap: 8 }}>
                                 {title && <Text weight="extrabold" size={30} tone="onBand" style={{ letterSpacing: -0.9 }} accessibilityRole="header">{title}</Text>}
-                                {subtitle && <Text size={15} style={{ color: RAW.onBandSecondary }}>{subtitle}</Text>}
+                                {subtitle && <Text size={15} tone="onBand">{subtitle}</Text>}
                             </View>
                         )}
                     </View>
@@ -91,7 +95,7 @@ export function BandHero({ icon, title, subtitle }: { icon: IconName; title: str
                 </View>
             </View>
             <Text weight="extrabold" size={26} tone="onBand" align="center" style={{ letterSpacing: -0.78 }} accessibilityRole="header">{title}</Text>
-            {subtitle && <Text size={14} align="center" style={{ color: RAW.onBandSecondary }}>{subtitle}</Text>}
+            {subtitle && <Text size={14} weight="semibold" align="center" tone="onBand">{subtitle}</Text>}
         </>
     );
 }

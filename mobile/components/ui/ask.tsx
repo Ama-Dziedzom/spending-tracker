@@ -101,7 +101,7 @@ export function LogItLabel() {
             <View style={{ width: 26, height: 26, borderRadius: 999, backgroundColor: colors.brand['accent-tint'], alignItems: 'center', justifyContent: 'center' }}>
                 <Icon name="sparkle" size={14} color={colors.brand['accent-text']} />
             </View>
-            <Text size={13} weight="bold" tone="secondary">LogIt</Text>
+            <Text size={13} weight="bold" tone="primary">LogIt</Text>
         </View>
     );
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, Icon, Spinner, Tap, Text, useToast } from '@/components/ui';
+import { BAND, Button, Icon, Spinner, Tap, Text, useToast } from '@/components/ui';
 import { AuthLayout, BandHero, CardLink } from '@/components/onboarding/auth-layout';
 import { useTheme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -72,6 +72,8 @@ export default function AutopilotTest() {
             <AuthLayout
                 back={false}
                 cardTop={400}
+                band={BAND.autopilotWorks}
+                softLightEllipse
                 hero={<BandHero icon="flash" title="Autopilot is on" subtitle={`Your test was logged in ${landedIn} ${landedIn === 1 ? 'second' : 'seconds'}`} />}
                 footer={<Button label="Go to my money" size="xl" onPress={() => router.replace('/spending')} style={shadows.fab} />}
             >

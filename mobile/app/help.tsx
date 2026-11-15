@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Linking, View } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
-import { Button, CategoryTile, Icon, ListGroup, ListRow, Screen, Sheet, Text, TopBar, useToast, type IconName } from '@/components/ui';
+import { BAND, Button, CategoryTile, Icon, ListGroup, ListRow, Screen, Sheet, Text, TopBar, useToast, type IconName } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { exportTransactions } from '@/lib/settings-service';
 import { SUPPORT } from '@/constants/support';
@@ -40,7 +40,7 @@ export default function Help() {
 
     return (
         <>
-            <Screen header={<TopBar title="Help & privacy" />} contentStyle={{ gap: 12 }}>
+            <Screen band={BAND.help} header={<TopBar title="Help & privacy" />} contentStyle={{ gap: 12 }}>
                 <ListGroup label="Help" labelOnBand>
                     <ListRow
                         dense
@@ -55,7 +55,7 @@ export default function Help() {
                     )}
                 </ListGroup>
 
-                <ListGroup label="Your data" labelOnBand>
+                <ListGroup label="Your data">
                     <ListRow
                         dense
                         leading={tile('download')}

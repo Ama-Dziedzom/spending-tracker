@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Card, FieldError, Screen, Text, TopBar } from '@/components/ui';
+import { BAND, Button, Card, FieldError, Screen, Text, TopBar } from '@/components/ui';
 import { FONT, RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '../lib/useAuth';
@@ -42,8 +42,8 @@ export default function PhoneNumberScreen() {
     };
 
     return (
-        <Screen header={<TopBar title="Phone number" />} contentStyle={{ gap: 12 }} scrollProps={{ keyboardShouldPersistTaps: 'handled' }}>
-            <Text size={13} style={{ color: RAW.onBandSecondary, paddingHorizontal: 4 }}>
+        <Screen band={BAND.changePhone} header={<TopBar title="Phone number" />} contentStyle={{ gap: 12 }} scrollProps={{ keyboardShouldPersistTaps: 'handled' }}>
+            <Text size={13} weight="semibold" tone="onBand" style={{ paddingHorizontal: 4 }}>
                 We’ll text a code to your {current ? 'new ' : ''}number. Your transactions move with you.
             </Text>
 
@@ -55,7 +55,7 @@ export default function PhoneNumberScreen() {
             )}
 
             <View style={{ gap: 6 }}>
-                <Text size={11} weight="semibold" style={{ color: current ? colors.text.secondary : RAW.onBandSecondary }}>{current ? 'New number' : 'Your number'}</Text>
+                <Text size={11} weight="semibold" tone="primary">{current ? 'New number' : 'Your number'}</Text>
                 <View
                     style={{
                         flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 50, paddingHorizontal: 14, borderRadius: 16,

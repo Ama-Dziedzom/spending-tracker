@@ -2,7 +2,7 @@ import React from 'react';
 import { Linking, PermissionsAndroid, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Button, CategoryTile, Text, useToast, type IconName } from '@/components/ui';
+import { BAND, Button, CategoryTile, Text, useToast, type IconName } from '@/components/ui';
 import { AuthLayout, CardLink } from '@/components/onboarding/auth-layout';
 import { useTheme } from '@/lib/theme';
 import { getSession } from '@/lib/supabase';
@@ -48,6 +48,7 @@ export default function OnboardingAutopilot() {
         };
         return (
             <AuthLayout
+                band={BAND.authAndroid}
                 title="Let LogIt read money alerts"
                 subtitle="On Android this is one switch."
                 footer={

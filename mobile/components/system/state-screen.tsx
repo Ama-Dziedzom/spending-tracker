@@ -2,7 +2,7 @@ import React from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandBand, Button, Icon, Tap, Text, type IconName } from '@/components/ui';
+import { BAND, BrandBand, Button, Icon, Tap, Text, type IconName } from '@/components/ui';
 import { RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 
@@ -50,7 +50,7 @@ export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title,
     return (
         <View style={{ flex: 1, backgroundColor: onBand ? colors.brand.band : colors.bg.canvas }}>
             <StatusBar style="light" />
-            {onBand ? <BrandBand full /> : <BrandBand height={420} />}
+            {onBand ? <BrandBand full /> : <BrandBand {...BAND.state} />}
 
             <View style={{ position: 'absolute', top: Math.max(insets.top + 24, y(top)), left: 32, right: 32, alignItems: 'center', gap: 14 }}>
                 {preview && <View style={{ alignSelf: 'stretch', gap: 8, marginBottom: 2 }}>{preview}</View>}
@@ -69,7 +69,7 @@ export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title,
                 >
                     {title}
                 </Text>
-                {body && <Text size={14} align="center" style={{ color: onBand ? RAW.onBandSecondary : colors.text.secondary }}>{body}</Text>}
+                {body && <Text size={14} align="center" style={{ color: onBand ? RAW.onBand : colors.text.secondary }}>{body}</Text>}
             </View>
 
             <View style={{ position: 'absolute', left: 32, right: 32, top: Math.min(y(actionsTop), height - insets.bottom - (secondary ? 150 : 84)), gap: 8 }}>
@@ -90,7 +90,7 @@ export function StateScreen({ tone = 'canvas', icon, iconTone = 'accent', title,
                 )}
                 {secondary && (onBand ? (
                     <Tap onPress={secondary.onPress} accessibilityRole="button" style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
-                        <Text size={14} weight="semibold" style={{ color: RAW.onBandSecondary }}>{secondary.label}</Text>
+                        <Text size={14} weight="semibold" style={{ color: onBand ? RAW.onBand : colors.text.secondary }}>{secondary.label}</Text>
                     </Tap>
                 ) : (
                     <Button label={secondary.label} variant="secondary" onPress={secondary.onPress} />

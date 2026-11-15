@@ -3,9 +3,7 @@ import { Linking, PermissionsAndroid, Platform, View } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
-import {
-    Button, Card, CategoryTile, Icon, ListGroup, ListRow, Screen, Sheet, Text, TopBar, useToast, type IconName,
-} from '@/components/ui';
+import { BAND, Button, Card, CategoryTile, Icon, ListGroup, ListRow, Screen, Sheet, Text, TopBar, useToast, type IconName } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { getSession } from '@/lib/supabase';
 import { syncSessionToAppGroup, setSmsLoggingFlag } from '@/lib/shareSync';
@@ -98,7 +96,7 @@ export default function Autopilot() {
 
     return (
         <>
-            <Screen header={<TopBar title="Autopilot" />} contentStyle={{ gap: 12 }}>
+            <Screen band={BAND.autopilotSettings} header={<TopBar title="Autopilot" />} contentStyle={{ gap: 12 }}>
                 <Card gap={0} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }}>
                     <CategoryTile tone={on ? 'success' : 'warn'} icon="flash" size={34} />
                     <View style={{ flex: 1, gap: 2 }}>

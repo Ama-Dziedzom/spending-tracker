@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { Avatar, Button, Text, useToast, type AvatarChoice } from '@/components/ui';
+import { BAND, Avatar, Button, Text, useToast, type AvatarChoice } from '@/components/ui';
 import { AuthLayout, CardLink } from '@/components/onboarding/auth-layout';
 import { useTheme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
@@ -43,6 +43,7 @@ export default function PickAvatar() {
 
     return (
         <AuthLayout
+            band={BAND.authAvatar}
             back={false}
             title="Pick your look"
             subtitle="It shows on your home screen. Change it any time."

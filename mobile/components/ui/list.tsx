@@ -6,13 +6,13 @@ import { Icon } from './icon';
 import { Text } from './text';
 import { Tap } from './tap';
 
-/** 11 Bold uppercase label above a group. On the band it's white at 75 %. */
+/** 11 Bold uppercase label above a group: text/tertiary, or white at 100 % where the band is still solid. */
 export function SectionLabel({ children, onBand }: { children: string; onBand?: boolean }) {
     return (
         <Text
             variant="sectionLabel"
             tone="tertiary"
-            style={[{ marginLeft: 0 }, onBand && { color: RAW.onBandTertiary }]}
+            style={[{ marginLeft: 0 }, onBand && { color: RAW.onBand }]}
         >
             {children}
         </Text>

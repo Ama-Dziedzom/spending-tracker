@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CategoryTile, ListGroup, ListRow, Screen, TopBar, useToast, type IconName } from '@/components/ui';
+import { BAND, CategoryTile, ListGroup, ListRow, Screen, TopBar, useToast, type IconName } from '@/components/ui';
 import { DEFAULT_NOTIFICATIONS, getProfile, setNotificationPrefs, type NotificationPrefs } from '@/lib/settings-service';
 
 const tile = (icon: IconName) => <CategoryTile tone="accent" icon={icon} size={34} />;
@@ -27,13 +27,13 @@ export default function NotificationSettings() {
     };
 
     return (
-        <Screen header={<TopBar title="Notifications" />} contentStyle={{ gap: 12 }}>
+        <Screen band={BAND.notificationSettings} header={<TopBar title="Notifications" />} contentStyle={{ gap: 12 }}>
             <ListGroup label="Tell me when" labelOnBand>
                 <ListRow dense leading={tile('flash')} title="An alert is logged" meta="“Spent GHS 10 on airtime · MTN MoMo”" toggle={{ value: prefs.logged, onChange: set('logged') }} />
                 <ListRow dense leading={tile('check')} title="A message needs a look" toggle={{ value: prefs.needsLook, onChange: set('needsLook') }} />
                 <ListRow dense leading={tile('receive')} title="Salary day" toggle={{ value: prefs.salaryDay, onChange: set('salaryDay') }} />
             </ListGroup>
-            <ListGroup label="Summaries" labelOnBand>
+            <ListGroup label="Summaries">
                 <ListRow dense leading={tile('calendar')} title="Sunday evening summary" meta="Your week in one line" toggle={{ value: prefs.sundaySummary, onChange: set('sundaySummary') }} />
                 <ListRow dense leading={tile('idea')} title="New insights" toggle={{ value: prefs.newInsights, onChange: set('newInsights') }} />
             </ListGroup>

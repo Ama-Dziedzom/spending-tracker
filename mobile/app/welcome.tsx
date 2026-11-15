@@ -3,7 +3,7 @@ import { Platform, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandBand, Button, CategoryTile, Icon, Text } from '@/components/ui';
+import { BAND, BrandBand, Button, CategoryTile, Icon, Text } from '@/components/ui';
 import { RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 
@@ -26,7 +26,7 @@ export default function Welcome() {
     return (
         <View style={{ flex: 1, backgroundColor: colors.bg.canvas }}>
             <StatusBar style="light" />
-            <BrandBand height={700} />
+            <BrandBand {...BAND.welcome} />
 
             <View style={{ position: 'absolute', top: storyTop, left: 24, right: 24, gap: 12 }} accessible accessibilityLabel="An alert from Mobile Money becomes an entry in LogIt: Akosua Mensah, 120.00">
                 <View
@@ -35,8 +35,8 @@ export default function Welcome() {
                         borderTopLeftRadius: 6, borderTopRightRadius: 20, borderBottomLeftRadius: 20, borderBottomRightRadius: 20,
                     }}
                 >
-                    <Text size={11} weight="bold" style={{ color: RAW.onBandBubbleLabel }}>MobileMoney</Text>
-                    <Text style={{ fontFamily: MONO, fontSize: 12, lineHeight: 18, color: RAW.onBandBubbleText }}>
+                    <Text size={11} weight="bold" tone="onBand">MobileMoney</Text>
+                    <Text style={{ fontFamily: MONO, fontSize: 12, lineHeight: 18, color: RAW.onBand }}>
                         Payment of GHS 120.00 to AKOSUA MENSAH. Current Balance: GHS 26.83
                     </Text>
                 </View>

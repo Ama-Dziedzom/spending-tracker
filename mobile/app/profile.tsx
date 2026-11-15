@@ -1,9 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
-import {
-    Avatar, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, Tap, Text, TopBar, useToast, type AvatarChoice,
-} from '@/components/ui';
+import { BAND, Avatar, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, Tap, Text, TopBar, useToast, type AvatarChoice } from '@/components/ui';
 import { AvatarPickerSheet } from '@/components/settings/avatar-picker-sheet';
 import { TextEditSheet } from '@/components/settings/text-edit-sheet';
 import { useTheme } from '@/lib/theme';
@@ -43,7 +41,7 @@ export default function ProfileScreen() {
 
     return (
         <>
-            <Screen header={<TopBar title="Profile" />} contentStyle={{ gap: 12 }}>
+            <Screen band={BAND.profile} header={<TopBar title="Profile" />} contentStyle={{ gap: 12 }}>
                 <View style={{ alignItems: 'center', marginBottom: 6 }}>
                     <Avatar choice={p?.avatar} name={p?.name} size={72} />
                     <Tap
@@ -59,7 +57,7 @@ export default function ProfileScreen() {
                     </Tap>
                 </View>
 
-                <ListGroup label="You" labelOnBand>
+                <ListGroup label="You">
                     <ListRow dense leading={tile('user')} title="Name" value={p?.name ?? 'Add your name'} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => setEdit('name')} />
                     <ListRow
                         dense

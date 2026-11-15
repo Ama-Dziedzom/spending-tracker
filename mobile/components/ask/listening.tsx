@@ -4,7 +4,7 @@ import { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSe
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AnimatedView } from '@/components/ui/animated-view';
-import { BrandBand, Icon, Tap, Text } from '@/components/ui';
+import { BAND, BrandBand, Icon, Tap, Text } from '@/components/ui';
 import { RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 
@@ -25,7 +25,7 @@ export function ListeningOverlay({ visible, words, onDone, onCancel, onType }: {
         <Modal visible={visible} animationType="fade" statusBarTranslucent onRequestClose={onCancel}>
             <View style={{ flex: 1, backgroundColor: colors.brand.band }}>
                 <StatusBar style="light" />
-                <BrandBand full />
+                <BrandBand {...BAND.askListening} />
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 28 }}>
                     <View style={{ width: 176, height: 176, borderRadius: 999, backgroundColor: RAW.onInverseFill, alignItems: 'center', justifyContent: 'center' }}>
                         <View style={{ width: 128, height: 128, borderRadius: 999, backgroundColor: RAW.onBandFill, alignItems: 'center', justifyContent: 'center' }}>
@@ -36,7 +36,7 @@ export function ListeningOverlay({ visible, words, onDone, onCancel, onType }: {
                     </View>
                     <Wave />
                     <View style={{ alignItems: 'center', gap: 10 }} accessibilityLiveRegion="polite">
-                        <Text size={12} weight="semibold" style={{ color: RAW.onBandTertiary }}>Listening…</Text>
+                        <Text size={12} weight="semibold" tone="onBand">Listening…</Text>
                         <Text size={20} weight="bold" tone="onBand" align="center" style={{ lineHeight: 27, minHeight: 54 }}>
                             {words ? `“${words}”` : 'Ask about your money'}
                         </Text>

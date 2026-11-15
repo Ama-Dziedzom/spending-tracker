@@ -159,7 +159,7 @@ export default function Spending() {
                                 <Avatar choice={avatar} name={name} size={38} />
                                 <View style={{ flexShrink: 1 }}>
                                     <Text size={16} weight="bold" tone="onBand">{name ? `Hi ${name}` : 'Hi there'}</Text>
-                                    <Text variant="meta" weight="semibold" style={{ color: RAW.onBandTertiary }}>{longDate(new Date())}</Text>
+                                    <Text variant="meta" weight="semibold" tone="onBand">{longDate(new Date())}</Text>
                                 </View>
                             </Pressable>
                         }
@@ -181,7 +181,7 @@ export default function Spending() {
                 {refreshing && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: -6 }} accessibilityLiveRegion="polite">
                         <Spinner size={16} color={RAW.onBand} />
-                        <Text variant="meta" weight="semibold" style={{ color: RAW.onBandSecondary }}>Checking for new alerts…</Text>
+                        <Text variant="meta" weight="semibold" tone="onBand">Checking for new alerts…</Text>
                     </View>
                 )}
 
