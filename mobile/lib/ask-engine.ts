@@ -78,9 +78,9 @@ function namedMonthStart(index: number, now: Date): Date {
 }
 
 export const STARTERS = [
+    'Am I spending more than I earn?',
     'How much did I spend on food this month?',
-    'Who did I send the most money to?',
-    'Am I spending more on airtime than last month?',
+    'Where can I cut back this month?',
     'Can I afford a GHS 500 phone this month?',
 ];
 

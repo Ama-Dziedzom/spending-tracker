@@ -203,6 +203,101 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
         );
     }
 
+    const about = monthName ? `in ${monthName}` : 'this month';
+
+    if (f.kind === 'inout') {
+        const max = Math.max(1, ...f.months.flatMap((m) => [m.cameIn, m.spent]));
+        const inColor = colors.status.success;
+        const outColor = colors.brand.accent;
+        return (
+            <Card gap={12} onPress={() => onAsk(monthName ? `Did I spend more than I earned in ${monthName}?` : 'Am I spending more than I earn?')}>
+                {top(<Tag tone="cash" icon="wallet" label="In vs out" />, f.period)}
+                <View style={{ gap: 4 }}>
+                    <Text weight="extrabold" size={26} style={{ letterSpacing: -0.78 }}>{f.headline}</Text>
+                    <Text size={13} weight="medium" tone="secondary">{f.body}</Text>
+                </View>
+                <View
+                    style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 78 }}
+                    accessible
+                    accessibilityLabel={f.months.map((m) => `${m.label}: GHS ${cedis(m.cameIn)} in, GHS ${cedis(m.spent)} out`).join('. ')}
+                >
+                    {f.months.map((m, i) => {
+                        const last = i === f.months.length - 1;
+                        const h = (v: number) => (v > 0 ? Math.max(4, (v / max) * 60) : 2);
+                        return (
+                            <View key={m.label + i} style={{ alignItems: 'center', gap: 6, flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, opacity: last ? 1 : PAST_OPACITY + 0.2 }}>
+                                    <View style={{ width: 9, height: h(m.cameIn), borderRadius: 3, backgroundColor: inColor }} />
+                                    <View style={{ width: 9, height: h(m.spent), borderRadius: 3, backgroundColor: outColor }} />
+                                </View>
+                                <Text size={11} weight={last ? 'bold' : 'medium'} tone={last ? 'primary' : 'tertiary'}>{m.label}</Text>
+                            </View>
+                        );
+                    })}
+                </View>
+                <View style={{ flexDirection: 'row', gap: 14 }}>
+                    <Legend color={inColor} label={`In · GHS ${cedis(f.cameIn)}`} />
+                    <Legend color={outColor} label={`Out · GHS ${cedis(f.spent)}`} />
+                </View>
+            </Card>
+        );
+    }
+
+    if (f.kind === 'drains') {
+        return (
+            <Card gap={12} onPress={() => onAsk(monthName ? `Where did most of my money go in ${monthName}?` : 'Where can I cut back this month?')}>
+                {top(<Tag tone="shopping" icon="pieChart" label="Biggest drains" />, f.period)}
+                <Text weight="bold" size={18} style={{ letterSpacing: -0.18 }}>{f.headline}</Text>
+                <View style={{ gap: 10 }}>
+                    {f.rows.map((r) => {
+                        const color = r.style.tone === 'muted' ? colors.text.tertiary : colors.cat[r.style.tone];
+                        return (
+                            <View key={r.category} style={{ gap: 5 }} accessible accessibilityLabel={`${r.style.label}: GHS ${cedis(r.amount)}, ${Math.round(r.share * 100)}% of income`}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                    <Text size={13} weight="semibold">{r.style.label}</Text>
+                                    <Text size={13} weight="semibold" tone="secondary">GHS {cedis(r.amount)} · {Math.round(r.share * 100)}%</Text>
+                                </View>
+                                <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.bg.muted, overflow: 'hidden' }}>
+                                    <View style={{ width: `${Math.min(100, r.share * 100)}%`, height: 6, borderRadius: 3, backgroundColor: color }} />
+                                </View>
+                            </View>
+                        );
+                    })}
+                </View>
+                <Text size={12} weight="medium" tone="tertiary">Share of the GHS {cedis(f.income)} that came in {about}.</Text>
+            </Card>
+        );
+    }
+
+    if (f.kind === 'savings') {
+        const shown = f.rates.filter((r) => r.rate !== null);
+        const max = Math.max(0.01, ...shown.map((r) => Math.abs(r.rate!)));
+        return (
+            <Card gap={12} onPress={() => onAsk('How can I save more each month?')}>
+                {top(<Tag tone="loans" icon="loans" label="Savings rate" />, f.period)}
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                        <Text weight="bold" size={18} style={{ letterSpacing: -0.18 }}>{f.headline}</Text>
+                        <Text size={13} weight="medium" tone="secondary">{f.body}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 5 }} accessibilityElementsHidden>
+                        {f.rates.map((r, i) => (
+                            <View
+                                key={r.label + i}
+                                style={{
+                                    width: 10, borderRadius: 3,
+                                    height: r.rate === null ? 3 : Math.max(4, (Math.abs(r.rate) / max) * 52),
+                                    backgroundColor: r.rate === null ? colors.bg.muted : r.rate < 0 ? colors.status.danger : colors.status.success,
+                                    opacity: i === f.rates.length - 1 ? 1 : PAST_OPACITY + 0.2,
+                                }}
+                            />
+                        ))}
+                    </View>
+                </View>
+            </Card>
+        );
+    }
+
     const first = f.name.split(' ')[0];
     return (
         <Card gap={10} onPress={() => onAsk(`Who did I send the most money to ${monthName ? `in ${monthName}` : 'this month'}?`)}>
@@ -210,6 +305,15 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
             <Text weight="bold" size={18} style={{ letterSpacing: -0.18 }}>{first} got GHS {cedis(f.total)} in {f.sends} {f.sends === 1 ? 'send' : 'sends'}</Text>
             <Text size={13} weight="medium" tone="secondary">More than anyone else {f.current ? 'this month' : `in ${f.period}`}.</Text>
         </Card>
+    );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+    return (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
+            <Text size={12} weight="semibold" tone="secondary">{label}</Text>
+        </View>
     );
 }
 

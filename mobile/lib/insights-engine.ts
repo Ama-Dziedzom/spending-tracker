@@ -30,7 +30,39 @@ export type Finding =
         bars: number[];
     }
     | { kind: 'subscriptions'; total: number; apps: { name: string; amount: number }[]; renewBy: Date | null; period?: string }
-    | { kind: 'people'; name: string; total: number; sends: number; period: string; current: boolean };
+    | { kind: 'people'; name: string; total: number; sends: number; period: string; current: boolean }
+    | {
+        kind: 'inout';
+        period: string;
+        cameIn: number;
+        spent: number;
+        /** "Kept GHS 420", "GHS 300 more out than in" */
+        headline: string;
+        body: string;
+        /** Up to 6 months, oldest first; the last is the month being looked at. */
+        months: MonthFlow[];
+    }
+    | {
+        kind: 'savings';
+        /** The month the rate is for (the last full month when looking at this one). */
+        period: string;
+        /** Share of income kept, -1..1. */
+        rate: number;
+        headline: string;
+        body: string;
+        /** Oldest first; null where nothing came in. */
+        rates: { label: string; rate: number | null }[];
+    }
+    | {
+        kind: 'drains';
+        period: string;
+        income: number;
+        headline: string;
+        /** Biggest first; share is of income. */
+        rows: { category: string; style: CategoryStyle; amount: number; share: number }[];
+    };
+
+export interface MonthFlow { start: Date; label: string; cameIn: number; spent: number }
 
 export interface InsightsResult {
     /** Days since the first entry (capped). Below DAYS_NEEDED → not enough data. */
@@ -65,9 +97,17 @@ export function computeInsights(w: MoneyWindow, now = new Date(), month?: Date):
     }
     const daysOfData = w.firstEntryAt ? Math.min(99, Math.floor((startOfDay(now).getTime() - startOfDay(w.firstEntryAt).getTime()) / 86_400_000) + 1) : 0;
     const findings: Finding[] = [];
+    const monthStart = startOfMonth(now);
 
+    const inout = inOutFinding(w, monthStart, now);
+    if (inout) findings.push(inout);
     const cat = categoryFinding(w.txs, now);
     if (cat) findings.push(cat);
+    const drains = drainsFinding(w, monthStart, now);
+    if (drains) findings.push(drains);
+    // A month in progress has no rate yet, so look at the last full one.
+    const savings = savingsFinding(w, new Date(now.getFullYear(), now.getMonth() - 1, 1), now);
+    if (savings) findings.push(savings);
     const subs = subscriptionsFinding(w.txs, now);
     if (subs) findings.push(subs);
     const people = peopleFinding(w.txs, now);
@@ -252,6 +292,8 @@ function pastMonthInsights(w: MoneyWindow, now: Date, start: Date): InsightsResu
     else headline = `${name}’s spending passed what came in by GHS ${cedis(spent - cameIn)}.`;
 
     const findings: Finding[] = [];
+    const inout = inOutFinding(w, start, now);
+    if (inout) findings.push(inout);
 
     // The category that moved most against the 3 months before.
     let best: { cat: string; change: number; totals: number[] } | null = null;
@@ -280,6 +322,11 @@ function pastMonthInsights(w: MoneyWindow, now: Date, start: Date): InsightsResu
             bars: best.totals,
         });
     }
+
+    const drains = drainsFinding(w, start, now);
+    if (drains) findings.push(drains);
+    const savings = savingsFinding(w, start, now);
+    if (savings) findings.push(savings);
 
     const subs = spentOf(inMonth).filter((t) => catOf(t) === 'subscription');
     if (subs.length) {
@@ -318,4 +365,106 @@ export function pickableMonths(w: MoneyWindow, now = new Date()): { start: Date;
         const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
         return { start, spent: sum(spentOf(between(w.txs, start, end))) };
     });
+}
+
+// ---------------------------------------------------------------------------
+// Money in vs money out
+// ---------------------------------------------------------------------------
+
+/** End of a month for totals: tomorrow for the month in progress, else the 1st of the next. */
+function monthEnd(start: Date, now: Date): Date {
+    const next = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    const tomorrow = addDays(startOfDay(now), 1);
+    return next > tomorrow ? tomorrow : next;
+}
+
+/** In and out for `count` months ending with the one starting at `last`, oldest first. */
+export function monthFlows(w: MoneyWindow, last: Date, now: Date, count = 6): MonthFlow[] {
+    return Array.from({ length: count }, (_, i) => {
+        const start = new Date(last.getFullYear(), last.getMonth() - (count - 1 - i), 1);
+        const list = between(w.txs, start, monthEnd(start, now));
+        return { start, label: monthLong(start).slice(0, 3), cameIn: sum(inOf(list)), spent: sum(spentOf(list)) };
+    });
+}
+
+const isThisMonth = (start: Date, now: Date) => start.getFullYear() === now.getFullYear() && start.getMonth() === now.getMonth();
+
+/** What came in against what went out, with the months before for comparison. */
+function inOutFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
+    const months = monthFlows(w, start, now);
+    const cur = months[months.length - 1];
+    if (cur.cameIn === 0 && cur.spent === 0) return null;
+    const current = isThisMonth(start, now);
+    const net = cur.cameIn - cur.spent;
+    const name = monthLong(start);
+
+    let headline: string;
+    if (cur.cameIn === 0) headline = `GHS ${cedis(cur.spent)} out, nothing logged in`;
+    else if (net >= 0) headline = `Kept GHS ${cedis(net)}`;
+    else headline = `GHS ${cedis(-net)} more out than in`;
+
+    const parts: string[] = [`GHS ${cedis(cur.cameIn)} came in and GHS ${cedis(cur.spent)} went out${current ? ' so far' : ` in ${name}`}.`];
+    const past = months.slice(0, -1).filter((m) => m.spent > 0);
+    if (current && cur.cameIn > 0) {
+        const elapsed = Math.max(1, Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1);
+        const projected = (cur.spent / elapsed) * daysInMonth(now);
+        if (projected > cur.cameIn * 1.02) parts.push(`At this pace spending reaches about GHS ${cedis(projected)}, more than came in.`);
+    } else if (past.length >= 2) {
+        const avg = past.reduce((a, m) => a + m.spent, 0) / past.length;
+        const change = (cur.spent - avg) / avg;
+        if (Math.abs(change) >= 0.1) parts.push(`Spending was ${Math.round(Math.abs(change) * 100)}% ${change > 0 ? 'above' : 'below'} your usual month.`);
+    }
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const stillExpected = current
+        ? w.expected.filter((e) => e.is_active && e.last_confirmed_month !== monthKey && dueDateThisMonth(e.day_of_month, now) > now).reduce((a, e) => a + Number(e.amount), 0)
+        : 0;
+    if (stillExpected > 0) parts.push(`GHS ${cedis(stillExpected)} more is expected later this month.`);
+    else if (cur.cameIn === 0) parts.push('Log your income to see what you keep.');
+
+    return { kind: 'inout', period: current ? 'This month' : name, cameIn: cur.cameIn, spent: cur.spent, headline, body: parts.join(' '), months };
+}
+
+/** Share of income kept in a month, and how that compares with the months before. */
+function savingsFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
+    const months = monthFlows(w, start, now);
+    const rates = months.map((m) => ({ label: m.label, rate: m.cameIn > 0 ? (m.cameIn - m.spent) / m.cameIn : null }));
+    const withIncome = rates.filter((r) => r.rate !== null);
+    const cur = rates[rates.length - 1].rate;
+    // Needs this month and at least two before it with income to call a trend.
+    if (cur === null || withIncome.length < 3) return null;
+    const before = rates.slice(0, -1).filter((r) => r.rate !== null).map((r) => r.rate!);
+    const avg = before.reduce((a, r) => a + r, 0) / before.length;
+    const pct = (r: number) => `${Math.round(r * 100)}%`;
+    const name = monthLong(start);
+
+    const headline = cur >= 0 ? `Kept ${pct(cur)} of income` : `Spent ${pct(-cur)} more than came in`;
+    const diff = cur - avg;
+    let body: string;
+    if (Math.abs(diff) < 0.03) body = `About the same as your average of ${pct(avg)} in the months before.`;
+    else body = `${diff > 0 ? 'Up' : 'Down'} from an average of ${pct(avg)} in the ${before.length} months before.`;
+    if (cur < 0.1 && cur >= 0) body += ' Keeping even 10% each month builds a cushion fast.';
+    return { kind: 'savings', period: name, rate: cur, headline, body, rates };
+}
+
+/** The categories taking the biggest share of what came in. */
+function drainsFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
+    const list = between(w.txs, start, monthEnd(start, now));
+    const income = sum(inOf(list));
+    if (income <= 0) return null;
+    const by = new Map<string, number>();
+    for (const t of spentOf(list)) by.set(catOf(t), (by.get(catOf(t)) ?? 0) + Number(t.amount));
+    const rows = [...by.entries()]
+        .filter(([c]) => c !== 'other')
+        .map(([category, amount]) => ({ category, style: categoryStyle(category), amount, share: amount / income }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 3);
+    if (!rows.length || rows[0].share < 0.1) return null;
+    const lead = rows[0];
+    return {
+        kind: 'drains',
+        period: isThisMonth(start, now) ? 'This month' : monthLong(start),
+        income,
+        headline: `${lead.style.label} takes ${Math.round(lead.share * 100)}% of what comes in`,
+        rows,
+    };
 }

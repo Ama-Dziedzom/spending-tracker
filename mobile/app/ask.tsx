@@ -5,11 +5,14 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BAND, AskBar, BrandBand, Button, CategoryTile, Icon, ListGroup, ListRow, RoundButton, Sheet, Tap, Text, UserBubble, useToast, type IconName } from '@/components/ui';
 import { AnswerView, answerText } from '@/components/ask/answer-view';
+import { ChatAnswer } from '@/components/ask/chat-answer';
 import { ListeningOverlay } from '@/components/ask/listening';
 import { TransactionRow } from '@/components/spending/transaction-row';
 import { useTheme } from '@/lib/theme';
 import { answer as answerQuestion, STARTERS, type Answer, type AskContext } from '@/lib/ask-engine';
 import { loadMoneyWindow } from '@/lib/money-window';
+import { buildMoneySnapshot } from '@/lib/money-snapshot';
+import { askChat, ChatError, type ChatReply, type ChatTurn } from '@/lib/ask-chat';
 import { addToAskHistory, getAskHistory, type PastQuestion } from '@/lib/ask-history';
 import { isNetworkError } from '@/lib/network';
 import { listen, micPermission, requestMic, voiceAvailable, type Listening } from '@/lib/voice';
@@ -22,16 +25,19 @@ interface Turn {
     id: number;
     q: string;
     state: 'thinking' | 'done' | 'offline';
+    /** On-device answer (used when the chat isn't available). */
     answer?: Answer;
+    /** Claude's reply. */
+    chat?: ChatReply;
     /** "Looking at 46 transactions…" */
     looking?: number;
 }
 
 const STARTER_STYLE: { tone: CategoryColor; icon: IconName }[] = [
+    { tone: 'cash', icon: 'wallet' },
     { tone: 'food', icon: 'food' },
-    { tone: 'people', icon: 'people' },
-    { tone: 'airtime', icon: 'airtime' },
     { tone: 'transport', icon: 'idea' },
+    { tone: 'airtime', icon: 'airtime' },
 ];
 
 /**
@@ -47,6 +53,13 @@ export default function Ask() {
     const [turns, setTurns] = useState<Turn[]>([]);
     /** What the last answer was about, so "Why is it up?" knows. */
     const context = useRef<AskContext>({});
+    /** The money summary for this conversation: built once, so the server can cache it. */
+    const snapshot = useRef<string | null>(null);
+    /** False once the server says chat isn't set up; then answers come from the phone. */
+    const chatOn = useRef(true);
+    /** Kept in step with turns, so run() can read the conversation so far. */
+    const turnsRef = useRef<Turn[]>([]);
+    useEffect(() => { turnsRef.current = turns; }, [turns]);
     const input = useRef<TextInput>(null);
     const [source, setSource] = useState<Answer | null>(null);
     const [historyOpen, setHistoryOpen] = useState(false);
@@ -72,9 +85,26 @@ export default function Ask() {
             setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, looking: w.rows.length } : x)));
             // A short, honest pause so the count can be read.
             await new Promise((r) => setTimeout(r, Math.max(0, 600 - (Date.now() - started))));
+            if (chatOn.current) {
+                snapshot.current ??= buildMoneySnapshot(w);
+                try {
+                    const chat = await askChat([...conversation(turnsRef.current, turnId), { role: 'user', content: question }], snapshot.current);
+                    setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', chat, answer: undefined } : x)));
+                    return;
+                } catch (e) {
+                    if (e instanceof ChatError && e.kind === 'busy') {
+                        setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', chat: { reply: e.message, suggestions: [] } } : x)));
+                        return;
+                    }
+                    if (!(e instanceof ChatError)) throw e;
+                    // Not set up on the server, or it failed: answer on the phone instead.
+                    if (e.kind === 'unavailable') chatOn.current = false;
+                    else console.warn('Ask chat failed, answering on the phone:', e.message);
+                }
+            }
             const a = answerQuestion(question, w, context.current);
             if (a.context.category || a.context.period) context.current = a.context;
-            setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', answer: a } : x)));
+            setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', answer: a, chat: undefined } : x)));
         } catch (e) {
             console.error('Ask failed:', e);
             if (isNetworkError(e)) {
@@ -82,8 +112,9 @@ export default function Ask() {
             } else {
                 setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', answer: { shape: 'cant', sentence: 'Something went wrong working that out. Try again in a moment.', chips: [], context: {} } } : x)));
             }
+        } finally {
+            setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 120);
         }
-        setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 120);
     }, []);
 
     /** "Set an airtime limit" opens the limit sheet; anything else is asked. */
@@ -130,11 +161,11 @@ export default function Ask() {
         else if (params.voice) startVoice();
     }, [params.q, params.voice, run, startVoice]);
 
-    const copy = async (a: Answer) => {
+    const copy = async (a: Answer | string) => {
         try {
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             const Clipboard = require('expo-clipboard') as typeof import('expo-clipboard');
-            await Clipboard.setStringAsync(answerText(a));
+            await Clipboard.setStringAsync(typeof a === 'string' ? a : answerText(a));
             toast.show({ message: 'Answer copied' });
         } catch {
             toast.show({ message: 'Couldn’t copy on this build.', icon: 'info' });
@@ -203,6 +234,14 @@ export default function Ask() {
                                 <UserBubble>{t.q}</UserBubble>
                                 {t.state === 'thinking' && <Thinking count={t.looking} />}
                                 {t.state === 'offline' && <OfflineBubble onRetry={() => run(t.q, t.id)} />}
+                                {t.state === 'done' && t.chat && (
+                                    <ChatAnswer
+                                        reply={t.chat}
+                                        onFollowUp={followUp}
+                                        onCopy={() => copy(t.chat!.reply)}
+                                        onRefresh={() => { snapshot.current = null; loadMoneyWindow(true).catch(() => {}); run(t.q, t.id); }}
+                                    />
+                                )}
                                 {t.state === 'done' && t.answer && (
                                     <AnswerView
                                         answer={t.answer}
@@ -237,7 +276,7 @@ export default function Ask() {
             />
 
             <Sheet visible={historyOpen} onClose={() => setHistoryOpen(false)} title="Earlier questions" footer={
-                <Button label="New question" icon="sparkle" onPress={() => { setHistoryOpen(false); setTurns([]); context.current = {}; }} />
+                <Button label="New question" icon="sparkle" onPress={() => { setHistoryOpen(false); setTurns([]); context.current = {}; snapshot.current = null; }} />
             }>
                 {history.length === 0 ? (
                     <Text tone="secondary">Nothing yet. Questions you ask show up here, and re-run on today’s numbers.</Text>
@@ -268,6 +307,19 @@ export default function Ask() {
             </Sheet>
         </View>
     );
+}
+
+/** The finished turns before this one, as chat messages. */
+function conversation(turns: Turn[], before: number): ChatTurn[] {
+    const out: ChatTurn[] = [];
+    for (const t of turns) {
+        if (t.id >= before) break;
+        if (t.state !== 'done') continue;
+        const said = t.chat?.reply ?? (t.answer ? answerText(t.answer) : null);
+        if (!said) continue;
+        out.push({ role: 'user', content: t.q }, { role: 'assistant', content: said });
+    }
+    return out;
 }
 
 /** "Today", "Yesterday", "Mon", "2 Nov" (Figma 1009:1848). */

@@ -6,6 +6,7 @@ import { processSmsRouter } from './routes/process-sms.js';
 import { authSmsRouter } from './routes/auth-sms.js';
 import { deleteAccountRouter } from './routes/delete-account.js';
 import { appConfigRouter } from './routes/app-config.js';
+import { askRouter } from './routes/ask.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,6 +37,8 @@ app.use('/api', deleteAccountRouter);
 app.use('/', deleteAccountRouter);
 app.use('/api', appConfigRouter);
 app.use('/', appConfigRouter);
+app.use('/api', askRouter);
+app.use('/', askRouter);
 
 // ---------------------------------------------------------------------------
 // Start
