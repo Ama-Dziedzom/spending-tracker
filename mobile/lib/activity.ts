@@ -11,7 +11,8 @@ import { getLimits, limitStatus } from './limits';
  * Notifications (Figma 1003:862): what LogIt did and what needs you, newest
  * first. Built from your own activity, so it always matches the app: alerts
  * it logged, messages to check, salary in, this week's insight, limits
- * nearly reached. Unread = newer than when you last opened the list.
+ * nearly reached. An item stays unread (blue dot) until you open it or tap
+ * Mark all read (Figma 1003:862, 1154:5680).
  */
 export type ActivityTone = 'accent' | 'warn' | 'success' | 'insight';
 
@@ -30,15 +31,55 @@ export interface ActivityItem {
         | { kind: 'limits' };
 }
 
-const SEEN = 'logit.notificationsSeenAt';
+/** Everything at or before this time is read (set by Mark all read). Same key as the old "last opened". */
+const READ_BEFORE = 'logit.notificationsSeenAt';
+/** Items opened one by one since then. */
+const READ_IDS = 'logit.notificationsReadIds';
 
-export async function lastSeen(): Promise<Date | null> {
-    const v = await AsyncStorage.getItem(SEEN).catch(() => null);
-    return v ? new Date(v) : null;
+export interface ReadState {
+    before: Date | null;
+    ids: Set<string>;
 }
 
-export async function markSeen(): Promise<void> {
-    await AsyncStorage.setItem(SEEN, new Date().toISOString()).catch(() => {});
+export async function getReadState(): Promise<ReadState> {
+    const [before, ids] = await Promise.all([
+        AsyncStorage.getItem(READ_BEFORE).catch(() => null),
+        AsyncStorage.getItem(READ_IDS).catch(() => null),
+    ]);
+    let list: string[] = [];
+    try { list = ids ? (JSON.parse(ids) as string[]) : []; } catch { list = []; }
+    return { before: before ? new Date(before) : null, ids: new Set(list) };
+}
+
+export function isUnread(item: ActivityItem, read: ReadState): boolean {
+    if (read.ids.has(item.id)) return false;
+    return !read.before || item.at > read.before;
+}
+
+/** One item opened. Returns the new state. */
+export async function markRead(item: ActivityItem, read: ReadState): Promise<ReadState> {
+    const ids = new Set(read.ids).add(item.id);
+    // Keep the list small: only ids still newer than the cut-off matter.
+    await AsyncStorage.setItem(READ_IDS, JSON.stringify([...ids].slice(-200))).catch(() => {});
+    return { before: read.before, ids };
+}
+
+/** Mark all read: everything up to now, and the per-item list starts again. */
+export async function markAllRead(): Promise<ReadState> {
+    const now = new Date();
+    await Promise.all([
+        AsyncStorage.setItem(READ_BEFORE, now.toISOString()).catch(() => {}),
+        AsyncStorage.removeItem(READ_IDS).catch(() => {}),
+    ]);
+    return { before: now, ids: new Set() };
+}
+
+/** Put a Mark all read back (Undo). */
+export async function restoreReadState(read: ReadState): Promise<void> {
+    await Promise.all([
+        read.before ? AsyncStorage.setItem(READ_BEFORE, read.before.toISOString()).catch(() => {}) : AsyncStorage.removeItem(READ_BEFORE).catch(() => {}),
+        AsyncStorage.setItem(READ_IDS, JSON.stringify([...read.ids])).catch(() => {}),
+    ]);
 }
 
 /** "2 min ago", "1 h ago", "Fri", "3 Nov" (Figma 1003:893). */
