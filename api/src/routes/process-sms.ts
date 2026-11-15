@@ -426,6 +426,51 @@ async function applyBalance(walletId: string, tx: ParsedTx, smsDate: Date | null
 
 const STAND_IN_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+/** Cash out at an agent or ATM (same signals categorize() uses for 'cash'). */
+export function isCashOut(sms: string, category: string | null | undefined): boolean {
+  return category === 'cash' || /\b(cash[- ]?out|withdrawal|atm)\b/i.test(sms);
+}
+
+/**
+ * The user's Cash wallet (the oldest if there are several), started at zero
+ * when they don't have one yet. Same defaults as the app's createCashWallet.
+ */
+async function findOrCreateCashWallet(userId: string): Promise<{ id: string; name: string } | null> {
+  const { data: found, error } = await supabaseAdmin
+    .from('wallets')
+    .select('id, name')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .eq('type', 'cash')
+    .order('created_at', { ascending: true })
+    .limit(1);
+  if (error) {
+    console.error('Cash wallet lookup failed:', error.message);
+    return null;
+  }
+  if (found && found.length > 0) return { id: found[0].id, name: found[0].name };
+
+  const { data: created, error: createError } = await supabaseAdmin
+    .from('wallets')
+    .insert({
+      user_id: userId,
+      name: 'Cash',
+      type: 'cash',
+      icon: 'money-01',
+      color: '#169E49',
+      initial_balance: 0,
+      current_balance: 0,
+      is_active: true,
+    })
+    .select('id, name')
+    .single();
+  if (createError || !created) {
+    console.error('Cash wallet auto-create failed:', createError?.message);
+    return null;
+  }
+  return { id: created.id, name: created.name };
+}
+
 /**
  * Adds the silent side of a move between the user's own accounts, marked
  * inferred_from = the alert it came from, so the app can label it "Added by
@@ -816,6 +861,22 @@ processSmsRouter.post(
           transaction.description = `${transaction.type === 'credit' ? 'From' : 'To'} ${match?.name ?? info.name}`;
           counterpartWallet = match ? { id: match.id, name: match.name } : null;
           counterpartSource = other;
+        }
+      }
+
+      // Cash out at an agent or ATM: the money moves into the user's Cash
+      // wallet, it isn't spent yet. What it buys is counted when they log it
+      // (Log cash). Counting the cash-out as spending too would count the
+      // same money twice.
+      if (!transaction.is_transfer && transaction.type === 'debit' && isCashOut(rawSms, transaction.category)) {
+        const cash = await findOrCreateCashWallet(userId);
+        if (cash) {
+          transaction.is_transfer = true;
+          transaction.transfer_type = 'transfer_out';
+          transaction.category = 'transfer';
+          transaction.description = `Cash out to ${cash.name}`;
+          counterpartWallet = cash;
+          counterpartSource = null;
         }
       }
 

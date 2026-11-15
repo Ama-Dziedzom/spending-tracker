@@ -94,8 +94,8 @@ export function categorizeTransaction(
   // Loan repayments (XtraCash, QwikLoan, Fido…) taken from the wallet
   if (/\b(repaid|repayment|loan)\b/.test(sms)) return 'loans';
 
-  // Cash out at an agent / ATM: the money left as cash. Counted as "Cash"
-  // spending; LogIt doesn't follow what the cash was spent on.
+  // Cash out at an agent / ATM. process-sms turns these into a move into the
+  // user's Cash wallet; 'cash' is the label when that can't happen.
   if (/\b(cash[- ]?out|withdrawal|atm)\b/.test(sms)) return 'cash';
 
   // Money out: the payee name is the best signal, then the full SMS text.
