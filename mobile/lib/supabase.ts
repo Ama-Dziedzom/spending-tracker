@@ -144,6 +144,8 @@ export interface Transaction {
     raw_sms?: string | null;
     /** Whether this entry changed its wallet's balance (v1 adds). Null on older rows. */
     balance_applied?: boolean | null;
+    /** Parts of a split entry, adding up to amount (lib/splits.ts). Null when not split. */
+    splits?: { category: string; amount: number }[] | null;
 }
 
 /**

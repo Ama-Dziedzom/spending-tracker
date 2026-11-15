@@ -375,14 +375,29 @@ async function limitWarning(userId: string, category: string | null | undefined,
   const weekKey = start.toISOString().slice(0, 10);
   if (limit.last_warned_week === weekKey) return null;
 
-  const { data: rows } = await supabaseAdmin
+  // Split entries (migration 20261115000000) count only their part in this category.
+  type Row = { amount: number; is_transfer: boolean | null; category: string | null; splits?: unknown };
+  let rows: Row[] | null;
+  let rowsError: { message: string } | null;
+  ({ data: rows, error: rowsError } = await supabaseAdmin
     .from('transactions')
-    .select('amount, is_transfer')
+    .select('amount, is_transfer, category, splits')
     .eq('user_id', userId)
-    .eq('category', category)
+    .or(`category.eq.${category},splits.not.is.null`)
     .in('type', ['debit', 'expense'])
-    .gte('transaction_date', start.toISOString());
-  const spent = (rows ?? []).filter((r) => !r.is_transfer).reduce((s, r) => s + Number(r.amount), 0);
+    .gte('transaction_date', start.toISOString()));
+  if (rowsError && /splits/i.test(rowsError.message)) {
+    ({ data: rows } = await supabaseAdmin
+      .from('transactions')
+      .select('amount, is_transfer, category')
+      .eq('user_id', userId)
+      .eq('category', category)
+      .in('type', ['debit', 'expense'])
+      .gte('transaction_date', start.toISOString()));
+  }
+  const spent = (rows ?? [])
+    .filter((r) => !r.is_transfer)
+    .reduce((s, r) => s + amountIn(r, category), 0);
   const amount = Number(limit.amount);
   if (spent < amount * Number(limit.warn_at)) return null;
 
@@ -469,6 +484,18 @@ async function findOrCreateCashWallet(userId: string): Promise<{ id: string; nam
     return null;
   }
   return { id: created.id, name: created.name };
+}
+
+/** How much of an entry counts in a category: its part when split, else all or nothing. */
+function amountIn(row: { amount: number; category: string | null; splits?: unknown }, category: string): number {
+  const parts = Array.isArray(row.splits) ? (row.splits as { category?: unknown; amount?: unknown }[]) : null;
+  if (parts && parts.length >= 2) {
+    const total = parts.reduce((s, p) => s + Math.round(Number(p.amount) * 100), 0);
+    if (total === Math.round(Number(row.amount) * 100)) {
+      return parts.filter((p) => p.category === category).reduce((s, p) => s + Number(p.amount), 0);
+    }
+  }
+  return row.category === category ? Number(row.amount) : 0;
 }
 
 /**

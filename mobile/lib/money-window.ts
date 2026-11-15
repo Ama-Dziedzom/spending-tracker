@@ -3,6 +3,7 @@ import type { TransactionWithWallet } from './transaction-service';
 import { getWallets } from './wallet-service';
 import { getExpectedIncome, type ExpectedIncome } from './income-service';
 import { flowOf } from './spending-service';
+import { expandSplits } from './splits';
 
 /**
  * What Insights and Ask LogIt read: the last ~9 calendar months of entries,
@@ -10,7 +11,10 @@ import { flowOf } from './spending-service';
  * in a row doesn't refetch.
  */
 export interface MoneyWindow {
+    /** Split entries appear once per part (expandSplits), so category totals add up. */
     txs: TransactionWithWallet[];
+    /** The entries as saved, one row each: for lists and activity. */
+    rows: TransactionWithWallet[];
     wallets: Wallet[];
     expected: ExpectedIncome[];
     /** When the oldest entry ever was logged (for "not enough data"). */
@@ -38,8 +42,10 @@ export async function loadMoneyWindow(force = false): Promise<MoneyWindow> {
         supabase.from('transactions').select('transaction_date').order('transaction_date', { ascending: true }).limit(1),
     ]);
     if (error) throw error;
+    const rows = (data ?? []) as TransactionWithWallet[];
     cache = {
-        txs: (data ?? []) as TransactionWithWallet[],
+        txs: expandSplits(rows),
+        rows,
         wallets,
         expected,
         firstEntryAt: first?.[0]?.transaction_date ? new Date(first[0].transaction_date) : null,

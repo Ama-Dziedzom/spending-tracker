@@ -9,11 +9,13 @@ import { flowOf } from '@/lib/spending-service';
 import { getRule, merchantLabel, removeRule, saveRule } from '@/lib/category-rules';
 import { changeWallet, changeWhen, scheduleRemoval } from '@/lib/transaction-edits';
 import { dayHeading, initials, listAmount, receivedAmount, time24 } from '@/lib/format';
+import { isCashOutMove, partsOf, wholeEntry } from '@/lib/splits';
+import { SplitEditor } from './split-editor';
 import {
     CategoryGrid, CategoryValue, FactRow, IN_CATEGORIES, SPENT_CATEGORIES, WalletList, WhenForm, pickStyle,
 } from './pickers';
 
-type Mode = 'detail' | 'category' | 'wallet' | 'when';
+type Mode = 'detail' | 'category' | 'wallet' | 'when' | 'split';
 
 /**
  * Transaction detail (Figma 1005:804): three facts you can change, then the
@@ -27,12 +29,13 @@ export function TransactionDetailSheet({ transaction, onClose, onChanged }: {
     onChanged: () => void;
 }) {
     const toast = useToast();
-    const [tx, setTx] = useState<TransactionWithWallet | null>(transaction);
+    // A part row from a split (Insights, Ask) opens the whole payment.
+    const [tx, setTx] = useState<TransactionWithWallet | null>(transaction ? wholeEntry(transaction) : null);
     const [mode, setMode] = useState<Mode>('detail');
 
     useEffect(() => {
         if (transaction) {
-            setTx(transaction);
+            setTx(wholeEntry(transaction));
             setMode('detail');
         }
     }, [transaction]);
@@ -59,7 +62,7 @@ export function TransactionDetailSheet({ transaction, onClose, onChanged }: {
         <Sheet
             visible={!!transaction}
             onClose={close}
-            title={titleFor(mode)}
+            title={mode === 'split' && tx && isCashOutMove(tx) ? 'What was this cash for?' : titleFor(mode)}
             footer={tx && mode === 'detail' ? <DetailActions tx={tx} onRemove={remove} /> : undefined}
         >
             {tx && mode === 'detail' && (
@@ -68,6 +71,19 @@ export function TransactionDetailSheet({ transaction, onClose, onChanged }: {
                     onCategory={() => setMode('category')}
                     onWallet={() => setMode('wallet')}
                     onWhen={() => setMode('when')}
+                    onSplit={() => setMode('split')}
+                />
+            )}
+            {tx && mode === 'split' && (
+                <SplitEditor
+                    tx={tx}
+                    cashOut={isCashOutMove(tx)}
+                    onSaved={(result) => {
+                        if (result) setTx({ ...tx, category: result.category, splits: result.splits });
+                        onChanged();
+                        setMode('detail');
+                    }}
+                    onBack={() => setMode('detail')}
                 />
             )}
             {tx && mode === 'category' && (
@@ -107,19 +123,24 @@ export function TransactionDetailSheet({ transaction, onClose, onChanged }: {
 }
 
 function titleFor(mode: Mode): string | undefined {
-    return mode === 'category' ? 'What was it?' : mode === 'wallet' ? 'Which wallet?' : mode === 'when' ? 'When was it?' : undefined;
+    return mode === 'category' ? 'What was it?' : mode === 'wallet' ? 'Which wallet?' : mode === 'when' ? 'When was it?' : mode === 'split' ? 'Split it' : undefined;
 }
 
 // ---------------------------------------------------------------------------
 
-function Detail({ tx, onCategory, onWallet, onWhen }: {
+function Detail({ tx, onCategory, onWallet, onWhen, onSplit }: {
     tx: TransactionWithWallet;
     onCategory: () => void;
     onWallet: () => void;
     onWhen: () => void;
+    onSplit: () => void;
 }) {
     const { colors } = useTheme();
     const flow = flowOf(tx);
+    const parts = partsOf(tx);
+    const cashOut = isCashOutMove(tx);
+    // Splitting is for spending; a cash-out says what the cash went on instead.
+    const canSplit = (flow === 'spent' && !tx.is_transfer) || cashOut;
     const style = categoryStyle(tx.category);
     const isPerson = tx.category === 'transfer' || (flow === 'in' && !tx.category);
     const at = new Date(tx.transaction_date || tx.created_at);
@@ -161,11 +182,25 @@ function Detail({ tx, onCategory, onWallet, onWhen }: {
             <View>
                 <FactRow
                     label="Category"
-                    onPress={flow === 'moved' ? undefined : onCategory}
+                    onPress={flow === 'moved' ? undefined : parts ? onSplit : onCategory}
+                    accessibilityLabel={parts ? 'Change the split' : undefined}
                     value={flow === 'moved'
-                        ? <Text variant="row">Not spending</Text>
-                        : <CategoryValue id={isPerson ? 'transfer' : (tx.category ?? 'other')} />}
+                        ? <Text variant="row">{cashOut ? 'Cash out · not spending' : 'Not spending'}</Text>
+                        : parts
+                            ? <Text variant="row">Split · {parts.length} categories</Text>
+                            : <CategoryValue id={isPerson ? 'transfer' : (tx.category ?? 'other')} />}
                 />
+                {parts && (
+                    <View style={{ gap: 8, paddingBottom: 12 }}>
+                        {[...parts].sort((a, b) => b.amount - a.amount).map((p) => (
+                            <View key={p.category} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <CategoryValue id={p.category} />
+                                <View style={{ flex: 1 }} />
+                                <Text variant="row" tone="secondary">{listAmount(p.amount)}</Text>
+                            </View>
+                        ))}
+                    </View>
+                )}
                 <FactRow
                     divider
                     label="Wallet"
@@ -183,6 +218,15 @@ function Detail({ tx, onCategory, onWallet, onWhen }: {
                     }
                 />
             </View>
+
+            {canSplit && (
+                <Button
+                    label={cashOut ? 'Say what the cash was for' : parts ? 'Change the split' : 'Split across categories'}
+                    variant="secondary"
+                    size="md"
+                    onPress={onSplit}
+                />
+            )}
 
             {rawSms ? (
                 <View style={{ backgroundColor: colors.bg.muted, borderRadius: 18, padding: 14, gap: 8 }}>

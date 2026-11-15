@@ -5,6 +5,7 @@ import { CategoryTile, ListRow } from '@/components/ui';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
 import { categoryStyle } from '@/lib/category-style';
 import { flowOf, startOfWeek } from '@/lib/spending-service';
+import { partsOf } from '@/lib/splits';
 import { dayHeading, initials, listAmount, receivedAmount, shortDate, time24 } from '@/lib/format';
 
 /**
@@ -34,7 +35,8 @@ export function TransactionRow({ tx, onPress, context = 'day', fresh }: {
     const at = new Date(tx.transaction_date || tx.created_at);
     const time = `${tx.date_source === 'estimated' ? '≈ ' : ''}${time24(at)}`;
 
-    const kind = flow === 'moved' ? 'Moved' : flow === 'in' ? 'Received' : isPerson ? 'Sent' : null;
+    const split = !tx.split_parent && partsOf(tx);
+    const kind = flow === 'moved' ? 'Moved' : flow === 'in' ? 'Received' : split ? `Split · ${split.length}` : isPerson ? 'Sent' : null;
     let meta: string;
     if (context === 'moved' && flow === 'moved') {
         meta = [movedRoute(tx), weekdayOrDate(at)].filter(Boolean).join(' · ');

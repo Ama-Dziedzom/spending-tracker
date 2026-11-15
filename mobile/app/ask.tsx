@@ -72,7 +72,7 @@ export default function Ask() {
         try {
             const started = Date.now();
             const w = await loadMoneyWindow();
-            setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, looking: w.txs.length } : x)));
+            setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, looking: w.rows.length } : x)));
             // A short, honest pause so the count can be read.
             await new Promise((r) => setTimeout(r, Math.max(0, 600 - (Date.now() - started))));
             const a = answerQuestion(question, w, context.current);

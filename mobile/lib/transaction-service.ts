@@ -21,6 +21,8 @@ export interface TransactionWithWallet extends Transaction {
         from_wallet?: Wallet;
         to_wallet?: Wallet;
     };
+    /** Client-only: on a part row from expandSplits(), the whole entry it came from. */
+    split_parent?: TransactionWithWallet;
 }
 
 export interface WalletAnalytics {

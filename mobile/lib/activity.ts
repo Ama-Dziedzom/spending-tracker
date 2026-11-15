@@ -63,7 +63,7 @@ export async function getActivity(now = new Date()): Promise<ActivityItem[]> {
     const items: ActivityItem[] = [];
 
     // Alerts LogIt logged by itself, and money that came in.
-    for (const t of w.txs) {
+    for (const t of w.rows) {
         const d = new Date(t.created_at || t.transaction_date);
         if (d < since || !t.raw_sms) continue;
         const flow = flowOf(t);

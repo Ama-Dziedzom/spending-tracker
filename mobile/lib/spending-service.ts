@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import type { TransactionWithWallet } from './transaction-service';
 import { categoryStyle, type CategoryStyle } from './category-style';
 import { sameDay } from './format';
+import { expandSplits } from './splits';
 
 /**
  * Numbers for the v1 Spending screen. One fetch, then pure functions, so the
@@ -146,7 +147,8 @@ export function summarise(txs: TransactionWithWallet[], now = new Date()): Spend
     // Month
     const monthSpent = spent.filter((t) => inRange(t, monthStart, now));
     const byCat = new Map<string, TransactionWithWallet[]>();
-    for (const t of monthSpent) {
+    // A split entry counts in each of its categories.
+    for (const t of expandSplits(monthSpent)) {
         const id = t.category ?? 'other';
         byCat.set(id, [...(byCat.get(id) ?? []), t]);
     }
