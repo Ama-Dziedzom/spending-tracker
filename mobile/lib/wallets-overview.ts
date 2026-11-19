@@ -115,9 +115,10 @@ export interface WalletDetail {
     inThisWeek: number;
     outThisWeek: number;
     recent: TransactionWithWallet[];
-    /** When the balance last came from an alert (or a count, for cash). */
+    /** When the balance last came from an alert, a count, or a correction. */
     balanceAt: Date | null;
-    balanceFrom: 'alert' | 'count' | 'entries';
+    /** 'set': corrected by hand after the latest alert; the next alert takes over again. */
+    balanceFrom: 'alert' | 'count' | 'set' | 'entries';
 }
 
 export async function fetchWalletDetail(walletId: string, now = new Date()): Promise<WalletDetail | null> {
@@ -153,13 +154,18 @@ export async function fetchWalletDetail(walletId: string, now = new Date()): Pro
     }
 
     const snapAt = snap?.[0]?.transaction_date ? new Date(snap[0].transaction_date) : null;
+    const setAt = wallet.balance_set_at ? new Date(wallet.balance_set_at) : null;
+    const updatedAt = wallet.updated_at ? new Date(wallet.updated_at) : null;
+    const setLast = !!setAt && (!snapAt || setAt > snapAt);
     return {
         wallet: wallet as Wallet,
         inThisWeek,
         outThisWeek,
         recent: (recent ?? []) as TransactionWithWallet[],
-        balanceAt: snapAt ?? (wallet.updated_at ? new Date(wallet.updated_at) : null),
-        balanceFrom: snapAt ? 'alert' : wallet.type === 'cash' ? 'count' : 'entries',
+        balanceAt: setLast ? updatedAt ?? setAt : snapAt ?? updatedAt,
+        balanceFrom: wallet.type === 'cash' && !snapAt ? 'count'
+            : setLast ? 'set'
+                : snapAt ? 'alert' : 'entries',
     };
 }
 
@@ -192,12 +198,29 @@ export async function addWallet(input: { type: 'momo' | 'bank' | 'cash'; name: s
 
 /** A starting number for cash. After this, cash-outs top it up and Log cash draws it down. */
 export async function countCash(walletId: string, amount: number): Promise<void> {
+    await setBalance(walletId, amount, 'Couldn’t save your count. Try again.');
+}
+
+/**
+ * "Balance doesn't look right?": the person's number replaces ours. Nothing is
+ * added to their history, so spending totals stay as they were. For MoMo and
+ * bank wallets the next alert that carries a balance takes over again.
+ */
+export async function setBalance(walletId: string, amount: number, failMessage = 'Couldn’t update the balance. Try again.'): Promise<void> {
     // updateWallet's schema doesn't allow balances, so write it directly.
-    const { error } = await supabase
+    const now = new Date().toISOString();
+    let { error } = await supabase
         .from('wallets')
-        .update({ current_balance: amount, updated_at: new Date().toISOString() })
+        .update({ current_balance: amount, balance_set_at: now, updated_at: now })
         .eq('id', walletId);
-    if (error) throw new Error('Couldn’t save your count. Try again.');
+    // Before the balance_set_at migration runs, still save the number.
+    if (error && /balance_set_at/.test(error.message ?? '')) {
+        ({ error } = await supabase
+            .from('wallets')
+            .update({ current_balance: amount, updated_at: now })
+            .eq('id', walletId));
+    }
+    if (error) throw new Error(failMessage);
 }
 
 export async function renameWallet(walletId: string, name: string): Promise<void> {

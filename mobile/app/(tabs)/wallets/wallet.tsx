@@ -4,11 +4,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import {
     Banner, Button, Card, CardHeader, CategoryTile, Dialog, FieldError, Icon, ListGroup, RoundButton, Screen, Sheet,
-    Skeleton, SkeletonRow, TAB_BAR_SPACE, Text, TopBar, useToast,
+    Skeleton, SkeletonRow, TAB_BAR_SPACE, Tap, Text, TopBar, useToast,
 } from '@/components/ui';
 import { TransactionRow } from '@/components/spending/transaction-row';
 import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
-import { CountCashSheet } from '@/components/wallets/count-cash-sheet';
+import { CorrectBalanceSheet } from '@/components/wallets/correct-balance-sheet';
 import { fetchWalletDetail, renameWallet, type WalletDetail } from '@/lib/wallets-overview';
 import { deleteWallet } from '@/lib/wallet-service';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
@@ -32,8 +32,9 @@ export default function WalletScreen() {
     const [error, setError] = useState(false);
     const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
     const [manageOpen, setManageOpen] = useState(false);
-    const [countOpen, setCountOpen] = useState(false);
+    const [correctOpen, setCorrectOpen] = useState(false);
     const removing = usePendingRemovals();
+    const { colors } = useTheme();
 
     const load = useCallback(async () => {
         if (!walletId) return;
@@ -61,7 +62,8 @@ export default function WalletScreen() {
     const footnote = !data?.balanceAt ? null
         : data.balanceFrom === 'alert' ? `Balance from your latest alert · ${ago(data.balanceAt)}`
             : data.balanceFrom === 'count' ? `From your count and what you’ve logged · updated ${ago(data.balanceAt)}`
-                : `Worked out from your entries · updated ${ago(data.balanceAt)}`;
+                : data.balanceFrom === 'set' ? `Set by you · ${ago(data.balanceAt)}. Your next alert will update it.`
+                    : `Worked out from your entries · updated ${ago(data.balanceAt)}`;
 
     return (
         <>
@@ -101,13 +103,25 @@ export default function WalletScreen() {
                                         {listAmount(Number(w.current_balance) || 0)}
                                     </Text>
                                 </View>
-                                {isCash && <Button label="Count" variant="secondary" size="sm" onPress={() => setCountOpen(true)} />}
                             </View>
                             <View style={{ flexDirection: 'row', gap: 10 }}>
                                 <Flow icon="receive" label="In this week" amount={data.inThisWeek} tone="success" />
                                 <Flow icon="sent" label="Out this week" amount={data.outThisWeek} tone="primary" />
                             </View>
                             {footnote && <Text variant="meta" tone="tertiary">{footnote}</Text>}
+                            {/* A fix, not a daily task: kept quiet at the foot of the card. */}
+                            <Tap
+                                onPress={() => setCorrectOpen(true)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Balance doesn’t look right? Correct balance"
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 36, alignSelf: 'flex-start', flexWrap: 'wrap' }}
+                            >
+                                <Text variant="meta" tone="secondary">Balance doesn’t look right?</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <Text variant="meta" weight="bold" tone="accent">Correct balance</Text>
+                                    <Icon name="edit" size={12} color={colors.brand['accent-text']} />
+                                </View>
+                            </Tap>
                         </Card>
 
                         <Card hero gap={8}>
@@ -128,7 +142,7 @@ export default function WalletScreen() {
 
             <TransactionDetailSheet transaction={detailTx} onClose={() => setDetailTx(null)} onChanged={load} />
             {w && <ManageSheet visible={manageOpen} name={w.name} walletId={w.id} onClose={() => setManageOpen(false)} onChanged={load} />}
-            {w && isCash && <CountCashSheet visible={countOpen} wallet={w} onClose={() => setCountOpen(false)} onSaved={load} />}
+            {w && <CorrectBalanceSheet visible={correctOpen} wallet={w} onClose={() => setCorrectOpen(false)} onSaved={load} />}
         </>
     );
 }

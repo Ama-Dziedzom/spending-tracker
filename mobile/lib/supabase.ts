@@ -175,6 +175,8 @@ export interface Wallet {
     color: string;
     initial_balance: number;
     current_balance: number;
+    /** When the person last set the balance by hand (Count cash, Correct balance). */
+    balance_set_at?: string | null;
     source_identifier?: string;
     is_active: boolean;
     created_at: string;
