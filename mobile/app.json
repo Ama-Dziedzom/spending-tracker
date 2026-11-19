@@ -162,7 +162,8 @@
             "./assets/fonts/Manrope-ExtraBold.ttf"
           ]
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

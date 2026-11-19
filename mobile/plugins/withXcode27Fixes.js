@@ -15,6 +15,8 @@
 //  5. Builds the fmt pod as C++17 (Xcode 26.4+ rejects fmt 11.0.2's consteval use).
 //  6. Quotes the react-native-xcode.sh invocation in the JS bundling phase, which
 //     otherwise breaks when the project path contains a space ("My Projects").
+//  7. Silences compiler warnings in the Pods project (Swift and Clang), so
+//     Xcode's issue list only shows warnings from LogIt's own code.
 
 const {
   withAppDelegate,
@@ -172,8 +174,11 @@ const DEPLOYMENT_TARGET_FIX = `
       end
 
       # One minimum for every pod, matching the app (see step 2 above).
+      # Also silence warnings from third-party pods (step 7); our own targets still warn.
       target.build_configurations.each do |config|
         config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '${IOS_MIN}'
+        config.build_settings['SWIFT_SUPPRESS_WARNINGS'] = 'YES'
+        config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
       end
     end
 `;
