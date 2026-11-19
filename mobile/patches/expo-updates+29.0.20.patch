@@ -1,16 +1,16 @@
 diff --git a/node_modules/expo-updates/ios/EXUpdates.podspec b/node_modules/expo-updates/ios/EXUpdates.podspec
-index 4322948..52f7ca4 100644
+index 9d69eee..042633a 100644
 --- a/node_modules/expo-updates/ios/EXUpdates.podspec
 +++ b/node_modules/expo-updates/ios/EXUpdates.podspec
-@@ -101,7 +101,7 @@ Pod::Spec.new do |s|
+@@ -111,7 +111,7 @@ Pod::Spec.new do |s|
      force_bundling_flag = ex_updates_native_debug ? "export FORCE_BUNDLING=1\n" : ""
-     s.script_phase = {
+     script_phase = {
        :name => 'Generate updates resources for expo-updates',
 -      :script => force_bundling_flag + 'bash -l -c "$PODS_TARGET_SRCROOT/../scripts/create-updates-resources-ios.sh"',
 +      :script => force_bundling_flag + 'bash -l -c "\"$PODS_TARGET_SRCROOT/../scripts/create-updates-resources-ios.sh\""',
        :execution_position => :before_compile
      }
- 
+     # :always_out_of_date is only available in CocoaPods 1.13.0 and later
 diff --git a/node_modules/expo-updates/scripts/create-updates-resources-ios.sh b/node_modules/expo-updates/scripts/create-updates-resources-ios.sh
 index 27a58e3..85fb326 100755
 --- a/node_modules/expo-updates/scripts/create-updates-resources-ios.sh
