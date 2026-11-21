@@ -99,15 +99,30 @@ export function extractSmsDate(sms: string, now: Date = new Date()): Date | null
 }
 
 /**
- * Charges the provider took on top of the amount: "Fee charged: GHS3.00",
- * "Fee was GHS 0.50", "TRANSACTION FEE: 1.00", plus "Tax was GHS 0.15" / E-levy.
- * Returns the total, or 0 when there is none.
+ * Charges the provider took on top of the amount. MoMo: "Fee charged: GHS3.00",
+ * "Fee was GHS 0.50", "access fee 0.68". Banks: "Charges: GHS 2.00",
+ * "Transfer charge GHS1.50", "Commission: 0.50", "Fee: 1.00", "COT 0.25".
+ * Plus "Tax was GHS 0.15" / "E-Levy: 0.75". Returns the total, or 0 when none.
+ * ("charged GHS 50" on its own is the amount, not a fee, so it's not matched.)
  */
+const CUR = String.raw`(?:GHS|GH₵|GHC|GH¢|¢|₵)`;
+const FEE_LABEL = String.raw`(?:fee charged|fee was|(?:transaction|access|cash-?out|transfer|service|processing|sms|bank) (?:fees?|charges?)|fees?|charges?|commission|cot)`;
+const TAX_LABEL = String.raw`(?:tax(?: was| charged)?|e-?levy(?: charged| was)?|levy)`;
+
+function sumLabelled(sms: string, label: string): number {
+  // "<label> [of|is|was] [:|=] [GHS] 1.50 [GHS]" — the figure must sit right after the label
+  const re = new RegExp(String.raw`\b${label}\b(?:\s+(?:of|is|was|amount))?\s*[:=]?\s*${CUR}?\s?([\d,]+(?:\.\d+)?)(?!\d)`, 'gi');
+  let total = 0;
+  for (const m of sms.matchAll(re)) {
+    const digits = m[1].replace(/,/g, '');
+    if (digits.split('.')[0].length > 6) continue; // a phone/account number, not money
+    total += parseFloat(digits) || 0;
+  }
+  return total;
+}
+
 export function extractFee(sms: string): number {
-  const num = (s: string | undefined) => (s ? parseFloat(s.replace(/,/g, '')) || 0 : 0);
-  const fee = sms.match(/\b(?:fee charged|fee was|transaction fee|access fee|cash-?out fee)(?:\s+(?:of|is|was))?\s*:?\s*(?:GHS|GH₵|GHC)?\s?([\d,]+(?:\.\d+)?)/i);
-  const tax = sms.match(/\b(?:tax(?: was| charged)?|e-?levy(?: charged)?)\s*:?\s*(?:GHS|GH₵|GHC)\s?([\d,]+(?:\.\d+)?)/i);
-  const total = num(fee?.[1]) + num(tax?.[1]);
+  const total = sumLabelled(sms, FEE_LABEL) + sumLabelled(sms, TAX_LABEL);
   return Math.round(total * 100) / 100;
 }
 

@@ -25,7 +25,8 @@ export async function getCheckItems(): Promise<CheckItem[]> {
     ]);
     if (error) throw error;
     const accounts: CheckItem[] = ((data ?? []) as TransactionWithWallet[])
-        .filter((t) => !t.transfer_id)
+        // An alert's fee rides along with its entry (placeInWallet), so it isn't asked about on its own
+        .filter((t) => !t.transfer_id && t.category !== 'fees')
         .map((tx) => ({ kind: 'account', id: `t:${tx.id}`, tx }));
     const unread: CheckItem[] = reviews.map((r) => ({ kind: 'unread', id: `r:${r.id}`, review: r, prefill: prefillFor(r) }));
     return [...accounts, ...unread];
@@ -35,7 +36,7 @@ export async function getCheckItems(): Promise<CheckItem[]> {
 export async function getCheckCount(): Promise<number> {
     const [{ count: reviews }, { count: unmatched }] = await Promise.all([
         supabase.from('failed_parses').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('transactions').select('id', { count: 'exact', head: true }).is('wallet_id', null).is('transfer_id', null),
+        supabase.from('transactions').select('id', { count: 'exact', head: true }).is('wallet_id', null).is('transfer_id', null).neq('category', 'fees'),
     ]);
     return (reviews ?? 0) + (unmatched ?? 0);
 }
@@ -79,6 +80,17 @@ export async function placeInWallet(tx: TransactionWithWallet, wallet: Wallet, r
     });
     if (error) throw new Error('Couldn’t add it. Check your connection and try again.');
 
+    // Its fee/E-levy row (saved alongside it by process-sms) goes to the same wallet
+    const fee = await feeRowFor(tx);
+    if (fee) {
+        const { error: feeError } = await supabase.rpc('assign_transaction_to_wallet', {
+            p_transaction_id: fee.id,
+            p_wallet_id: wallet.id,
+            p_category_id: 'fees',
+        });
+        if (feeError) console.error('Fee not placed:', feeError.message);
+    }
+
     const p = providerOf(tx.source);
     if (remember && p && (wallet.source_identifier ?? '').toLowerCase() !== p.id) {
         const ok = await updateWallet(wallet.id, { source_identifier: p.id });
@@ -89,6 +101,22 @@ export async function placeInWallet(tx: TransactionWithWallet, wallet: Wallet, r
 
 /** Not money: an entry with no wallet never touched a balance, so it can simply go. */
 export async function discardUnplaced(tx: TransactionWithWallet): Promise<void> {
-    const { error } = await supabase.from('transactions').delete().eq('id', tx.id).is('wallet_id', null);
+    const fee = await feeRowFor(tx);
+    const ids = fee ? [tx.id, fee.id] : [tx.id];
+    const { error } = await supabase.from('transactions').delete().in('id', ids).is('wallet_id', null);
     if (error) throw new Error('Couldn’t skip it. Try again.');
+}
+
+/** The unplaced "Fee · …" row process-sms saved with this entry, if any. */
+async function feeRowFor(tx: TransactionWithWallet): Promise<{ id: string } | null> {
+    if (tx.category === 'fees') return null;
+    const { data } = await supabase
+        .from('transactions')
+        .select('id')
+        .is('wallet_id', null)
+        .eq('category', 'fees')
+        .eq('transaction_date', tx.transaction_date)
+        .eq('description', `Fee · ${tx.description}`.trim())
+        .limit(1);
+    return (data?.[0] as { id: string } | undefined) ?? null;
 }

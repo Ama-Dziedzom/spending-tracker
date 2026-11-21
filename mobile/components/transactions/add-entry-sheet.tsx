@@ -33,6 +33,8 @@ export interface AddPrefill {
     rawSms?: string;
     walletId?: string;
     categoryId?: string;
+    /** Fees + tax the alert mentions; saved as its own Fees entry */
+    fee?: string;
 }
 
 /**
@@ -59,6 +61,7 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
     const [toWalletId, setToWalletId] = useState<string | null>(null);
     const [when, setWhen] = useState<Date | null>(null); // null = now
     const [note, setNote] = useState('');
+    const [fee, setFee] = useState('');
     const [busy, setBusy] = useState(false);
 
     // Reset to sensible defaults each time it opens.
@@ -71,6 +74,7 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
         setKind(k);
         setAmount(prefill?.amount ?? '');
         setNote(prefill?.description ?? '');
+        setFee(prefill?.fee ?? '');
         setWhen(prefill?.date ? new Date(prefill.date) : null);
         setToWalletId(null);
         setCategoryTouched(!!prefill?.categoryId);
@@ -115,16 +119,31 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
                 onSuccess(id);
             } else {
                 const label = pickStyle(category).label;
+                const description = note.trim() || label;
                 const id = await addEntry({
                     kind: kind === 'in' ? 'in' : 'spent',
                     amount: value,
                     category,
                     walletId: wallet.id,
                     when: at,
-                    description: note.trim() || label,
+                    description,
                     rawSms: prefill?.rawSms,
                 });
-                toast.show({ message: kind === 'in' ? `Logged · ${money(value)} received` : `Logged · ${money(value)} on ${label}` });
+                // The alert's fee/E-levy: its own Fees entry, as automatic logging does
+                let feeValue = kind === 'spent' ? parseAmount(fee) : 0;
+                if (feeValue > 0) {
+                    try {
+                        await addEntry({ kind: 'spent', amount: feeValue, category: 'fees', walletId: wallet.id, when: at, description: `Fee · ${description}`, remember: false });
+                    } catch {
+                        feeValue = 0;
+                        toast.show({ message: 'Saved, but the fee didn’t. Add it from + if you need it.', icon: 'alert' });
+                    }
+                }
+                if (feeValue > 0 || kind === 'in' || parseAmount(fee) === 0) toast.show({
+                    message: kind === 'in'
+                        ? `Logged · ${money(value)} received`
+                        : `Logged · ${money(value)} on ${label}${feeValue > 0 ? ` + ${money(feeValue)} fee` : ''}`,
+                });
                 onSuccess(id);
             }
             onClose();
@@ -191,6 +210,22 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
                                 style={{ flex: 1, textAlign: 'right', fontFamily: FONT.semibold, fontSize: 14, color: colors.text.primary, paddingVertical: 13 }}
                             />
                         </View>
+                        {kind === 'spent' && !!prefill?.fee && (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, borderTopWidth: 1, borderTopColor: colors.line.default }}>
+                                <Text variant="row" tone="secondary">Fee</Text>
+                                <BottomSheetTextInput
+                                    value={fee}
+                                    onChangeText={setFee}
+                                    placeholder="0.00"
+                                    placeholderTextColor={colors.text.tertiary}
+                                    accessibilityLabel="Fee and tax from the message"
+                                    keyboardType="decimal-pad"
+                                    returnKeyType="done"
+                                    maxLength={10}
+                                    style={{ flex: 1, textAlign: 'right', fontFamily: FONT.semibold, fontSize: 14, color: colors.text.primary, paddingVertical: 13 }}
+                                />
+                            </View>
+                        )}
                     </View>
 
                     {kind === 'moved' && (

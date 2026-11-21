@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { extractFee } from './sms-fee';
 
 /**
  * "Needs review": SMS that LogIt couldn't read automatically (rows in
@@ -23,6 +24,8 @@ export interface ServerGuess {
     counterparty: string | null;
     reference: string | null;
     provider: string | null;
+    /** Older rows don't have it */
+    fee?: number;
     confidence: number;
 }
 
@@ -31,6 +34,8 @@ export interface ReviewPrefill {
     type?: 'expense' | 'income';
     description?: string;
     date?: string; // ISO
+    /** Fees + tax the alert mentions, logged as a separate Fees entry */
+    fee?: string;
 }
 
 export async function getPendingReviews(): Promise<ReviewItem[]> {
@@ -114,6 +119,9 @@ export function guessFromSms(sms: string): ReviewPrefill {
     }
     if (d && !isNaN(d.getTime()) && d.getTime() <= Date.now() + 86400000) prefill.date = d.toISOString();
 
+    const fee = extractFee(sms);
+    if (fee > 0) prefill.fee = String(fee);
+
     return prefill;
 }
 
@@ -130,6 +138,7 @@ export function prefillFor(item: ReviewItem): ReviewPrefill {
         type: g.direction === 'credit' ? 'income' : g.direction === 'debit' ? 'expense' : local.type,
         description: g.counterparty ?? local.description,
         date: local.date,
+        fee: g.fee ? String(g.fee) : local.fee,
     };
 }
 

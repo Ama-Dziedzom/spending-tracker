@@ -14,6 +14,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { extractFee } from './sms-helpers.js';
 
 export interface FallbackGuess {
   amount: number | null;
@@ -23,6 +24,8 @@ export interface FallbackGuess {
   counterparty: string | null;
   reference: string | null;
   provider: string | null;
+  /** Fees + tax/E-levy on top of the amount; 0 when none */
+  fee: number;
   /** 0–1: how much of an alert's usual shape was found */
   confidence: number;
 }
@@ -103,7 +106,7 @@ export function readUnknownSms(sms: string): FallbackGuess {
 
   const provider = PROVIDER_HINTS.find(([re]) => re.test(text))?.[1] ?? null;
 
-  return { amount, direction, balance, counterparty, reference, provider, confidence: Math.min(1, +confidence.toFixed(2)) };
+  return { amount, direction, balance, counterparty, reference, provider, fee: extractFee(text), confidence: Math.min(1, +confidence.toFixed(2)) };
 }
 
 /**

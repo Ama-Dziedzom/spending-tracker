@@ -20,6 +20,8 @@ export interface NewEntry {
     description: string;
     /** When the entry comes from an alert (Check, Paste · Edit first). */
     rawSms?: string;
+    /** false for side entries (an alert's fee) so they don't become the next default */
+    remember?: boolean;
 }
 
 /** Returns the new entry's id. Throws with a user-facing message on failure. */
@@ -64,7 +66,7 @@ export async function addEntry(e: NewEntry): Promise<string> {
         }
     }
 
-    remember({ walletId: e.walletId, ...(e.kind === 'spent' ? { spentCategory: e.category } : {}) });
+    if (e.remember !== false) remember({ walletId: e.walletId, ...(e.kind === 'spent' ? { spentCategory: e.category } : {}) });
     return data.id as string;
 }
 
