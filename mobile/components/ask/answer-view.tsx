@@ -88,7 +88,12 @@ export function AnswerView({ answer: a, onFollowUp, onSource, onCopy, onRefresh,
                             </View>
                         )}
                     </View>
-                    <HBars rows={a.chart.rows.map((r) => ({ ...r, display: cedis(r.value) }))} color={catColor(a.chart.color)} />
+                    <HBars
+                        rows={a.chart.rows.map((r) => ({ ...r, display: cedis(r.value) }))}
+                        color={catColor(a.chart.color)}
+                        // Month labels ("Sep") fit in 30; chat answers can say "Last week".
+                        labelWidth={Math.min(90, Math.max(30, ...a.chart.rows.map((r) => r.label.length * 7)))}
+                    />
                 </View>
             )}
 

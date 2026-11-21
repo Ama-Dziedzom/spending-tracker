@@ -4,7 +4,22 @@ import { API_URL } from './sms-api';
 /** One message in the Ask LogIt chat, as sent to the server. */
 export interface ChatTurn { role: 'user' | 'assistant'; content: string }
 
-export interface ChatReply { reply: string; suggestions: string[] }
+/** The structured answer from the server (api/src/routes/ask.ts ChatCard). */
+export interface ChatCard {
+    shape: 'total' | 'verdict' | 'ranking' | 'note';
+    sentence: string;
+    amount: number;
+    unit: string;
+    tag: string;
+    tagTone: 'success' | 'warn' | 'neutral';
+    chartTitle: string;
+    delta: string;
+    bars: { label: string; value: number; current: boolean }[];
+    rows: { label: string; value: number; display: string; meta: string; category: string; strong: boolean }[];
+}
+
+/** reply is the plain text (history, Copy); card, when present, is what's drawn. */
+export interface ChatReply { reply: string; suggestions: string[]; card?: ChatCard | null }
 
 /**
  * Why a chat reply couldn't be had. 'unavailable' means the server has no
@@ -32,5 +47,5 @@ export async function askChat(messages: ChatTurn[], snapshot: string): Promise<C
     if (res.status === 503 || res.status === 404) throw new ChatError('unavailable', body.error ?? 'Chat not available');
     if (res.status === 429) throw new ChatError('busy', body.error ?? 'Too many questions. Try again shortly.');
     if (!res.ok || typeof body.reply !== 'string') throw new ChatError('failed', body.error ?? `ask ${res.status}`);
-    return { reply: body.reply, suggestions: Array.isArray(body.suggestions) ? body.suggestions : [] };
+    return { reply: body.reply, suggestions: Array.isArray(body.suggestions) ? body.suggestions : [], card: body.card && typeof body.card === 'object' ? body.card as ChatCard : null };
 }
