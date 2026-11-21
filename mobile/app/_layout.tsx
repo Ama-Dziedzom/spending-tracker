@@ -144,7 +144,9 @@ function AppStack() {
           <Stack screenOptions={{
             gestureEnabled: true,
             gestureDirection: 'horizontal',
-            fullScreenGestureEnabled: Platform.OS === 'ios'
+            // Back only from the left edge, like standard iOS. A full-screen swipe
+            // fired on slightly sideways scrolls and took people back by mistake.
+            fullScreenGestureEnabled: false,
           }}>
             <Stack.Screen name="index" options={{ headerShown: false }} />
             <Stack.Screen name="welcome" options={{ headerShown: false, animation: 'fade' }} />

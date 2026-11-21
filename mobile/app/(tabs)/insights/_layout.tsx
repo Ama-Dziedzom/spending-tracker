@@ -6,5 +6,5 @@ import { Stack } from 'expo-router';
  * inside the tab instead of leaving the tabs.
  */
 export default function TabStack() {
-    return <Stack screenOptions={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: true }} />;
+    return <Stack screenOptions={{ headerShown: false, gestureEnabled: true, fullScreenGestureEnabled: false }} />;
 }
