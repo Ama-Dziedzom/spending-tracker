@@ -56,7 +56,17 @@ export function phoneAuthMessage(error: string | undefined): string {
     }
     if (e.includes('already') && e.includes('registered')) return 'Another LogIt account already uses this number.';
     if (e.includes('rate') || e.includes('seconds')) return 'Please wait a minute before asking for another code.';
-    if (e.includes('expired') || e.includes('invalid')) return 'That code didn’t work or has expired. Ask for a new one.';
-    if (e.includes('provider') || e.includes('sms')) return 'We couldn’t send a text right now. Please try again shortly.';
-    return error || 'Something went wrong. Please try again.';
+    // Every caller uses this when *sending* a code, so "invalid"/"expired" here is
+    // never about a code the user typed: it's the number, or the SMS hook failing.
+    if (e.includes('phone') && e.includes('invalid')) return 'That number doesn’t look right. Check it and try again.';
+    if (e.includes('hook') || e.includes('signature') || e.includes('provider') || e.includes('sms') || e.includes('invalid') || e.includes('expired')) {
+        return withDetail('We couldn’t send a text right now. Please try again shortly.', error);
+    }
+    return withDetail('Something went wrong. Please try again.', error);
+}
+
+/** In development builds, show the raw error under the friendly one so failures can be traced. */
+function withDetail(message: string, raw: string | undefined): string {
+    if (raw) console.warn('[phone auth]', raw);
+    return __DEV__ && raw ? `${message}\n(${raw})` : message;
 }
