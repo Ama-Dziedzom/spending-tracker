@@ -87,6 +87,16 @@ export function weeklyTotals(txs: TransactionWithWallet[], category: string, wee
 }
 
 /**
+ * Card order on Insights: the three from Figma 1022:4574 first (category,
+ * subscriptions, people), then the income cards from "Insights · more
+ * findings" (Figma 1176:5681): in vs out, biggest drains, savings rate.
+ */
+const DESIGN_ORDER: Finding['kind'][] = ['category', 'subscriptions', 'people', 'inout', 'drains', 'savings'];
+function inDesignOrder(findings: Finding[]): Finding[] {
+    return [...findings].sort((a, b) => DESIGN_ORDER.indexOf(a.kind) - DESIGN_ORDER.indexOf(b.kind));
+}
+
+/**
  * Insights for a month. The current month uses this week's findings; a past
  * month (pass its first day) is looked at as a whole month, compared with the
  * months before it.
@@ -113,7 +123,7 @@ export function computeInsights(w: MoneyWindow, now = new Date(), month?: Date):
     const people = peopleFinding(w.txs, now);
     if (people) findings.push(people);
 
-    return { daysOfData, headline: monthHeadline(w, now), findings };
+    return { daysOfData, headline: monthHeadline(w, now), findings: inDesignOrder(findings) };
 }
 
 /**
@@ -355,7 +365,7 @@ function pastMonthInsights(w: MoneyWindow, now: Date, start: Date): InsightsResu
         if (ranked.length === 1 || ranked[0].total >= ranked[1].total * 1.2) findings.push({ kind: 'people', ...ranked[0], period: name, current: false });
     }
 
-    return { daysOfData, headline, findings };
+    return { daysOfData, headline, findings: inDesignOrder(findings) };
 }
 
 /** Months the picker offers: this one and the 5 before, with what was spent in each. */

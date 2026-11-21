@@ -15,9 +15,9 @@ import { RAW, type CategoryColor, BAND_CHIP_ALPHA, withAlpha } from '@/constants
 const ASK_BAR_SPACE = 64;
 
 /**
- * Insights (Figma 1022:4574). One sentence on the month, then up to three
- * findings written as notes: tag, the change, the reason. Ask LogIt sits
- * above the nav.
+ * Insights (Figma 1022:4574 + 1176:5681). One sentence on the month, then
+ * findings written as notes: tag, the change, the reason. The design's three
+ * come first, the income cards after. Ask LogIt sits above the nav.
  */
 export default function Insights() {
     const insets = useSafeAreaInsets();
@@ -206,34 +206,38 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
     const about = monthName ? `in ${monthName}` : 'this month';
 
     if (f.kind === 'inout') {
-        const max = Math.max(1, ...f.months.flatMap((m) => [m.cameIn, m.spent]));
+        // Figma 1176:5760: number and reason on the left, the last three months as paired bars on the right.
+        const months = f.months.slice(-3);
+        const max = Math.max(1, ...months.flatMap((m) => [m.cameIn, m.spent]));
         const inColor = colors.status.success;
         const outColor = colors.brand.accent;
         return (
             <Card gap={12} onPress={() => onAsk(monthName ? `Did I spend more than I earned in ${monthName}?` : 'Am I spending more than I earn?')}>
                 {top(<Tag tone="cash" icon="wallet" label="In vs out" />, f.period)}
-                <View style={{ gap: 4 }}>
-                    <Text weight="extrabold" size={26} style={{ letterSpacing: -0.78 }}>{f.headline}</Text>
-                    <Text size={13} weight="medium" tone="secondary">{f.body}</Text>
-                </View>
-                <View
-                    style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 78 }}
-                    accessible
-                    accessibilityLabel={f.months.map((m) => `${m.label}: GHS ${cedis(m.cameIn)} in, GHS ${cedis(m.spent)} out`).join('. ')}
-                >
-                    {f.months.map((m, i) => {
-                        const last = i === f.months.length - 1;
-                        const h = (v: number) => (v > 0 ? Math.max(4, (v / max) * 60) : 2);
-                        return (
-                            <View key={m.label + i} style={{ alignItems: 'center', gap: 6, flex: 1 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, opacity: last ? 1 : PAST_OPACITY + 0.2 }}>
-                                    <View style={{ width: 9, height: h(m.cameIn), borderRadius: 3, backgroundColor: inColor }} />
-                                    <View style={{ width: 9, height: h(m.spent), borderRadius: 3, backgroundColor: outColor }} />
+                <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                        <Text weight="extrabold" size={30} style={{ letterSpacing: -0.9 }}>{f.headline}</Text>
+                        <Text size={13} weight="medium" tone="secondary">{f.body}</Text>
+                    </View>
+                    <View
+                        style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}
+                        accessible
+                        accessibilityLabel={months.map((m) => `${m.label}: GHS ${cedis(m.cameIn)} in, GHS ${cedis(m.spent)} out`).join('. ')}
+                    >
+                        {months.map((m, i) => {
+                            const last = i === months.length - 1;
+                            const h = (v: number) => (v > 0 ? Math.max(4, (v / max) * 54) : 2);
+                            return (
+                                <View key={m.label + i} style={{ alignItems: 'center', gap: 5 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, opacity: last ? 1 : PAST_OPACITY }}>
+                                        <View style={{ width: 9, height: h(m.cameIn), borderRadius: 3, backgroundColor: inColor }} />
+                                        <View style={{ width: 9, height: h(m.spent), borderRadius: 3, backgroundColor: outColor }} />
+                                    </View>
+                                    <Text size={11} weight={last ? 'bold' : 'medium'} tone={last ? 'primary' : 'tertiary'}>{m.label}</Text>
                                 </View>
-                                <Text size={11} weight={last ? 'bold' : 'medium'} tone={last ? 'primary' : 'tertiary'}>{m.label}</Text>
-                            </View>
-                        );
-                    })}
+                            );
+                        })}
+                    </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 14 }}>
                     <Legend color={inColor} label={`In · GHS ${cedis(f.cameIn)}`} />
