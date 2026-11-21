@@ -23,6 +23,8 @@ interface DayBarsProps {
     /** Opacity for bars before the current one. */
     pastOpacity?: number;
     onPressBar?: (index: number) => void;
+    /** Fade every bar except the current one (a finished week with its peak day picked out). */
+    fadeOthers?: boolean;
     /** Format the value above each bar. */
     format?: (v: number) => string;
 }
@@ -33,7 +35,7 @@ interface DayBarsProps {
  * short bg/muted stubs.
  */
 export function DayBars({
-    bars, maxHeight = 92, color, pastOpacity = PAST_OPACITY, onPressBar, format = (v) => String(Math.round(v)),
+    bars, maxHeight = 92, color, pastOpacity = PAST_OPACITY, onPressBar, fadeOthers, format = (v) => String(Math.round(v)),
 }: DayBarsProps) {
     const { colors } = useTheme();
     const fill = color ?? colors.brand.accent;
@@ -45,7 +47,7 @@ export function DayBars({
             {bars.map((b, i) => {
                 const has = b.value !== null && b.value > 0;
                 const h = has ? Math.max(15, (b.value! / max) * maxHeight) : 10;
-                const isPast = currentIndex >= 0 && i < currentIndex;
+                const isPast = fadeOthers ? i !== currentIndex : currentIndex >= 0 && i < currentIndex;
                 const label = `${b.label}${has ? `, ${format(b.value!)}` : ''}`;
                 const bar = (
                     <View style={{ alignItems: 'center', gap: 6 }}>

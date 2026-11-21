@@ -9,6 +9,7 @@ import {
 import { SpendingCard, SpendingCardSkeleton, type Period } from '@/components/spending/spending-card';
 import { FirstRunCard, SalaryPromptCard } from '@/components/spending/prompt-cards';
 import { DayDetailSheet } from '@/components/spending/day-detail-sheet';
+import { WeekRecapSheet } from '@/components/spending/week-recap-sheet';
 import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
 import { AddEntrySheet } from '@/components/transactions/add-entry-sheet';
 import { useTabContext } from '../_layout';
@@ -18,6 +19,7 @@ import type { TransactionWithWallet } from '@/lib/transaction-service';
 import { getCheckCount } from '@/lib/check-service';
 import { getIncomePrompts, logExpectedIncome, markIncomeReceived, snoozeIncome, type IncomePrompt } from '@/lib/income-service';
 import { fetchSpendingWindow, summarise, type SpendingSummary } from '@/lib/spending-service';
+import { fetchWeekRecap, markRecapSeen, recapDue, type WeekRecap } from '@/lib/week-recap';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { usePendingRemovals } from '@/lib/transaction-edits';
 import { longDate, sameDay, time24 } from '@/lib/format';
@@ -51,6 +53,8 @@ export default function Spending() {
     const [dayOpen, setDayOpen] = useState<Date | null>(null);
     const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
     const [incomeSheetFor, setIncomeSheetFor] = useState<IncomePrompt | null>(null);
+    const [recap, setRecap] = useState<WeekRecap | null>(null);
+    const recapChecked = useRef(false);
 
     // System states (Figma section 993:54)
     /** Set while showing saved numbers because the connection is down: when they were saved. */
@@ -107,6 +111,20 @@ export default function Spending() {
             if (!askedNotifications.current && window.some((t) => t.raw_sms)) {
                 askedNotifications.current = true;
                 if ((await AsyncStorage.getItem(NOTIFICATIONS_ASKED).catch(() => 'true')) !== 'true') router.push('/allow-notifications');
+            }
+
+            // First open in a new week: last week's recap, once (Figma "Week recap · sheet").
+            if (!recapChecked.current) {
+                recapChecked.current = true;
+                (async () => {
+                    if (!(await recapDue())) return;
+                    const r = await fetchWeekRecap();
+                    await markRecapSeen();
+                    if (r) setRecap(r);
+                })().catch((e) => {
+                    recapChecked.current = false; // try again on the next load
+                    console.warn('Week recap not loaded:', e);
+                });
             }
         } catch (e) {
             console.error('Error loading Spending:', e);
@@ -255,6 +273,12 @@ export default function Spending() {
                 isBiggest={!!dayOpen && !!bigDay && sameDay(dayOpen, bigDay)}
                 onClose={() => setDayOpen(null)}
                 onTransaction={setDetailTx}
+                onSeeAll={() => router.push('/spending/transactions')}
+            />
+
+            <WeekRecapSheet
+                recap={recap}
+                onClose={() => setRecap(null)}
                 onSeeAll={() => router.push('/spending/transactions')}
             />
 
