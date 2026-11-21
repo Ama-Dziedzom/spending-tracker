@@ -2,10 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BAND, AskBar, Banner, Card, Icon, ListGroup, ListRow, PAST_OPACITY, Screen, Sheet, Skeleton, Tap, TAB_BAR_SPACE, Text } from '@/components/ui';
+import { BAND, AskBar, Banner, Card, Icon, ListGroup, ListRow, PAST_OPACITY, Screen, SegmentedControl, Sheet, Skeleton, Tap, TAB_BAR_SPACE, Text } from '@/components/ui';
+import { WeekChart } from '@/components/insights/week-chart';
 import { useTheme } from '@/lib/theme';
 import { loadMoneyWindow, monthLong, cedis, type MoneyWindow } from '@/lib/money-window';
-import { computeInsights, DAYS_NEEDED, pickableMonths, type Finding, type InsightsResult } from '@/lib/insights-engine';
+import { computeInsights, computeWeekInsights, DAYS_NEEDED, pickableMonths, pickableWeeks, weekRange, type Finding, type InsightsResult } from '@/lib/insights-engine';
+import { startOfWeek } from '@/lib/spending-service';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { categoryStyle } from '@/lib/category-style';
 import { shortDate } from '@/lib/format';
@@ -28,10 +30,18 @@ export default function Insights() {
     const [window, setWindow] = useState<MoneyWindow | null>(null);
     /** First day of the month being looked at. */
     const [month, setMonth] = useState(() => { const n = new Date(); return new Date(n.getFullYear(), n.getMonth(), 1); });
+    /** Week or month view; week is its Monday (Figma 1180:5728). */
+    const [mode, setMode] = useState<'week' | 'month'>('week');
+    const [week, setWeek] = useState(() => startOfWeek(new Date()));
     const [pickerOpen, setPickerOpen] = useState(false);
+    /** The switch inside the picker; applied when a row is picked. */
+    const [pickerMode, setPickerMode] = useState<'week' | 'month'>('week');
 
-    // Recompute when the month changes, without refetching.
-    useEffect(() => { if (window) setData(computeInsights(window, new Date(), month)); }, [window, month]);
+    // Recompute when the period changes, without refetching.
+    useEffect(() => {
+        if (!window) return;
+        setData(mode === 'week' ? computeWeekInsights(window, week, new Date()) : computeInsights(window, new Date(), month));
+    }, [window, month, week, mode]);
 
     const load = useCallback(async (force = false) => {
         try {
@@ -50,7 +60,12 @@ export default function Insights() {
 
     const ask = (q?: string) => router.push(q ? { pathname: '/ask', params: { q } } : '/ask');
     const now = new Date();
-    const isCurrent = month.getMonth() === now.getMonth() && month.getFullYear() === now.getFullYear();
+    const isCurrent = mode === 'week'
+        ? week.getTime() === startOfWeek(now).getTime()
+        : month.getMonth() === now.getMonth() && month.getFullYear() === now.getFullYear();
+    const periodLabel = mode === 'week' ? (isCurrent ? 'This week' : weekRange(week)) : monthLong(month);
+    /** For Ask questions about a past period: "October", "the week of 10 Nov". */
+    const pastName = isCurrent ? null : mode === 'week' ? `the week of ${week.getDate()} ${monthLong(week).slice(0, 3)}` : monthLong(month);
     const tickColor = colors.brand['accent-text'];
     const notEnough = !!data && data.daysOfData < DAYS_NEEDED && isCurrent;
     // Tab bar: bottom max(inset, 12) + 4, about 62 tall; the Ask bar sits 12 above it.
@@ -66,14 +81,14 @@ export default function Insights() {
                         <Text weight="bold" size={26} tone="onBand" style={{ letterSpacing: -0.52 }} accessibilityRole="header">Insights</Text>
                         {!notEnough && (
                             <Tap
-                                onPress={() => setPickerOpen(true)}
+                                onPress={() => { setPickerMode(mode); setPickerOpen(true); }}
                                 accessibilityRole="button"
-                                accessibilityLabel={`Showing ${monthLong(month)}. Choose a month`}
+                                accessibilityLabel={`Showing ${periodLabel}. Choose a period`}
                                 hitSlop={4}
                                 style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 36, borderRadius: 999, backgroundColor: withAlpha(colors.brand['ink-button'], BAND_CHIP_ALPHA), opacity: pressed ? 0.8 : 1 })}
                             >
                                 <Icon name="calendar" size={14} color={RAW.onBand} />
-                                <Text size={13} weight="semibold" tone="onBand">{monthLong(month)}</Text>
+                                <Text size={13} weight="semibold" tone="onBand">{mode === 'week' ? weekRange(week) : monthLong(month)}</Text>
                                 <Icon name="down" size={12} color={RAW.onBand} />
                             </Tap>
                         )}
@@ -105,9 +120,9 @@ export default function Insights() {
                             <Text weight="bold" size={22} tone="onBand" style={{ letterSpacing: -0.44, lineHeight: 26 }}>{data.headline}</Text>
                         </View>
                         {data.findings.length === 0 && (
-                            <Card><Text tone="secondary">{isCurrent ? 'Nothing stands out yet this month. Quiet is good. LogIt will point things out as they change.' : `Nothing stood out in ${monthLong(month)}.`}</Text></Card>
+                            <Card><Text tone="secondary">{isCurrent ? `Nothing stands out yet this ${mode}. Quiet is good. LogIt will point things out as they change.` : `Nothing stood out in ${pastName}.`}</Text></Card>
                         )}
-                        {data.findings.map((f, i) => <FindingCard key={i} finding={f} onAsk={ask} monthName={isCurrent ? null : monthLong(month)} />)}
+                        {data.findings.map((f, i) => <FindingCard key={i} finding={f} onAsk={ask} monthName={pastName} />)}
                     </>
                 )}
             </Screen>
@@ -116,21 +131,42 @@ export default function Insights() {
                 <AskBar compact onPress={() => ask()} onMic={() => router.push({ pathname: '/ask', params: { voice: '1' } })} />
             </View>
 
-            <Sheet visible={pickerOpen} onClose={() => setPickerOpen(false)} title="Choose a month">
+            <Sheet visible={pickerOpen} onClose={() => setPickerOpen(false)} title="Choose a period">
+                <SegmentedControl
+                    options={[{ value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }]}
+                    value={pickerMode}
+                    onChange={setPickerMode}
+                />
                 <ListGroup bare>
-                    {(window ? pickableMonths(window, now) : []).map(({ start, spent }) => {
-                        const selected = start.getTime() === month.getTime();
-                        return (
-                            <ListRow
-                                key={start.toISOString()}
-                                title={start.getFullYear() === now.getFullYear() ? monthLong(start) : `${monthLong(start)} ${start.getFullYear()}`}
-                                meta={spent > 0 ? `GHS ${cedis(spent)} spent` : 'Nothing logged'}
-                                trailing={selected ? <Icon name="tick" size={18} color={tickColor} /> : 'none'}
-                                onPress={() => { setMonth(start); setPickerOpen(false); }}
-                                accessibilityLabel={`${monthLong(start)}${selected ? ', selected' : ''}`}
-                            />
-                        );
-                    })}
+                    {pickerMode === 'week'
+                        ? (window ? pickableWeeks(window, now) : []).map(({ start, spent, current }, i) => {
+                            const selected = mode === 'week' && start.getTime() === week.getTime();
+                            const name = current ? 'This week' : i === 1 ? 'Last week' : weekRange(start);
+                            const amount = spent > 0 ? `GHS ${cedis(spent)} ${current ? 'so far' : 'spent'}` : 'Nothing logged';
+                            return (
+                                <ListRow
+                                    key={start.toISOString()}
+                                    title={name}
+                                    meta={current || i === 1 ? `${weekRange(start)} · ${amount}` : amount}
+                                    trailing={selected ? <Icon name="tick" size={18} color={tickColor} /> : 'none'}
+                                    onPress={() => { setMode('week'); setWeek(start); setPickerOpen(false); }}
+                                    accessibilityLabel={`${name}${selected ? ', selected' : ''}`}
+                                />
+                            );
+                        })
+                        : (window ? pickableMonths(window, now) : []).map(({ start, spent }) => {
+                            const selected = mode === 'month' && start.getTime() === month.getTime();
+                            return (
+                                <ListRow
+                                    key={start.toISOString()}
+                                    title={start.getFullYear() === now.getFullYear() ? monthLong(start) : `${monthLong(start)} ${start.getFullYear()}`}
+                                    meta={spent > 0 ? `GHS ${cedis(spent)} spent` : 'Nothing logged'}
+                                    trailing={selected ? <Icon name="tick" size={18} color={tickColor} /> : 'none'}
+                                    onPress={() => { setMode('month'); setMonth(start); setPickerOpen(false); }}
+                                    accessibilityLabel={`${monthLong(start)}${selected ? ', selected' : ''}`}
+                                />
+                            );
+                        })}
                 </ListGroup>
             </Sheet>
         </View>
@@ -138,10 +174,10 @@ export default function Insights() {
 }
 
 /** Small tag: category tint, its icon, label in text/primary (Figma 1022:4593). */
-function Tag({ tone, icon, label }: { tone: CategoryColor | 'muted'; icon: Parameters<typeof Icon>[0]['name']; label: string }) {
+function Tag({ tone, icon, label }: { tone: CategoryColor | 'muted' | 'accent'; icon: Parameters<typeof Icon>[0]['name']; label: string }) {
     const { colors } = useTheme();
-    const tint = tone === 'muted' ? colors.bg.muted : colors.cat[`${tone}-tint`];
-    const fg = tone === 'muted' ? colors.text.secondary : colors.cat[tone];
+    const tint = tone === 'muted' ? colors.bg.muted : tone === 'accent' ? colors.brand['accent-tint'] : colors.cat[`${tone}-tint`];
+    const fg = tone === 'muted' ? colors.text.secondary : tone === 'accent' ? colors.brand['accent-text'] : colors.cat[tone];
     return (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingLeft: 8, paddingRight: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: tint }}>
             <Icon name={icon} size={14} color={fg} />
@@ -159,6 +195,21 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
             <Text size={12} weight="medium" tone="tertiary">{meta}</Text>
         </View>
     );
+
+    if (f.kind === 'weeks') {
+        // Figma 1180:5807: the change, the reason, then six weeks with the average line.
+        return (
+            <Card gap={12} onPress={() => onAsk(monthName ? `How much did I spend in ${monthName}?` : 'How does this week compare with last week?')}>
+                {top(<Tag tone="accent" icon="calendar" label="Week by week" />, f.period)}
+                <View style={{ gap: 4 }}>
+                    <Text weight="extrabold" size={30} style={{ letterSpacing: -0.9 }}>{f.headline}</Text>
+                    <Text size={13} weight="medium" tone="secondary">{f.body}</Text>
+                </View>
+                <WeekChart weeks={f.weeks} average={f.average} color={colors.brand.accent} lastLabel={f.lastLabel} />
+                {f.average > 0 && <Text size={12} weight="semibold" tone="tertiary">Average GHS {cedis(f.average)} a week</Text>}
+            </Card>
+        );
+    }
 
     if (f.kind === 'category') {
         const color = f.style.tone === 'muted' ? colors.text.tertiary : colors.cat[f.style.tone];

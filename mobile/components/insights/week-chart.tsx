@@ -9,21 +9,21 @@ import { monthShort } from '@/lib/money-window';
  * a quiet average line, dates under each bar. This week solid, earlier
  * weeks at 30 % (handoff §3).
  */
-export function WeekChart({ weeks, average, color }: { weeks: WeekTotal[]; average: number; color: string }) {
+export function WeekChart({ weeks, average, color, lastLabel = 'This week' }: { weeks: WeekTotal[]; average: number; color: string; /** Label under the last (highlighted) bar. */ lastLabel?: string }) {
     const area = 96;
     const top = 86;
     const max = Math.max(1, average, ...weeks.map((w) => w.total));
     const avgY = area - (average / max) * top;
 
     const label = (w: WeekTotal, i: number) => {
-        if (i === weeks.length - 1) return 'This week';
+        if (i === weeks.length - 1) return lastLabel;
         const prev = weeks[i - 1];
         const newMonth = i === 0 || prev.start.getMonth() !== w.start.getMonth();
         return newMonth ? `${w.start.getDate()} ${monthShort(w.start)}` : String(w.start.getDate());
     };
 
     return (
-        <View style={{ height: 120 }} accessible accessibilityLabel={`Last ${weeks.length} weeks, average GHS ${Math.round(average)}. This week GHS ${Math.round(weeks[weeks.length - 1]?.total ?? 0)}.`}>
+        <View style={{ height: 120 }} accessible accessibilityLabel={`Last ${weeks.length} weeks, average GHS ${Math.round(average)}. ${lastLabel} GHS ${Math.round(weeks[weeks.length - 1]?.total ?? 0)}.`}>
             {average > 0 && <View style={{ position: 'absolute', left: 0, right: 0, top: avgY, height: 1.5, backgroundColor: color }} />}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: area }}>
                 {weeks.map((w, i) => {

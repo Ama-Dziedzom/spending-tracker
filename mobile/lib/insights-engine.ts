@@ -18,6 +18,18 @@ export const DAYS_NEEDED = 7;
 
 export type Finding =
     | {
+        /** Week by week (Figma 1180:5807): the chosen week against the five before it. */
+        kind: 'weeks';
+        period: string;
+        headline: string;
+        body: string;
+        /** Oldest first; the last is the chosen week. */
+        weeks: WeekTotal[];
+        average: number;
+        /** Label under the last bar: "This week" or "17 Nov". */
+        lastLabel: string;
+    }
+    | {
         kind: 'category';
         /** "This week" or "October". */
         period: string;
@@ -93,7 +105,7 @@ export function weeklyTotals(txs: TransactionWithWallet[], category: string, wee
  * subscriptions, people), then the income cards from "Insights · more
  * findings" (Figma 1176:5681): in vs out, biggest drains, savings rate.
  */
-const DESIGN_ORDER: Finding['kind'][] = ['category', 'subscriptions', 'people', 'inout', 'drains', 'savings'];
+const DESIGN_ORDER: Finding['kind'][] = ['weeks', 'category', 'subscriptions', 'people', 'inout', 'drains', 'savings'];
 function inDesignOrder(findings: Finding[]): Finding[] {
     return [...findings].sort((a, b) => DESIGN_ORDER.indexOf(a.kind) - DESIGN_ORDER.indexOf(b.kind));
 }
@@ -464,8 +476,8 @@ function savingsFinding(w: MoneyWindow, start: Date, now: Date): Finding | null 
 }
 
 /** The categories taking the biggest share of what came in. */
-function drainsFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
-    const list = between(w.txs, start, monthEnd(start, now));
+function drainsFinding(w: MoneyWindow, start: Date, now: Date, end?: Date, periodLabel?: string): Finding | null {
+    const list = between(w.txs, start, end ?? monthEnd(start, now));
     const income = sum(inOf(list));
     const spent = sum(spentOf(list));
     if (income <= 0 || spent <= 0) return null;
@@ -485,10 +497,96 @@ function drainsFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
     const pct = Math.round(lead.share * 100);
     return {
         kind: 'drains',
-        period: isThisMonth(start, now) ? 'This month' : monthLong(start),
+        period: periodLabel ?? (isThisMonth(start, now) ? 'This month' : monthLong(start)),
         base,
         income: total,
         headline: base === 'in' ? `${lead.style.label} takes ${pct}% of what comes in` : `${lead.style.label} is ${pct}% of your spending`,
         rows,
     };
+}
+
+// ---------------------------------------------------------------------------
+// Week by week (Figma 1180:5728, 1180:5874)
+// ---------------------------------------------------------------------------
+
+const WEEKDAY = (d: Date) => d.toLocaleDateString('en-GB', { weekday: 'long' });
+const dm = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+/** "17–23 Nov", or "27 Oct – 2 Nov" across months. */
+export function weekRange(start: Date): string {
+    const end = addDays(start, 6);
+    return start.getMonth() === end.getMonth() ? `${start.getDate()}–${dm(end)}` : `${dm(start)} – ${dm(end)}`;
+}
+
+/** Total spending per week for `count` weeks ending with the one starting at `last`, oldest first. */
+function spendingWeeks(txs: TransactionWithWallet[], last: Date, count: number): WeekTotal[] {
+    return Array.from({ length: count }, (_, i) => {
+        const start = addDays(last, -7 * (count - 1 - i));
+        const list = spentOf(between(txs, start, addDays(start, 7)));
+        return { start, total: sum(list), count: list.length };
+    });
+}
+
+/** The last 8 weeks for the picker, newest first; weeks before the first entry are left out. */
+export function pickableWeeks(w: MoneyWindow, now = new Date()): { start: Date; spent: number; current: boolean }[] {
+    const thisWeek = startOfWeek(now);
+    const first = w.firstEntryAt ? startOfWeek(w.firstEntryAt) : thisWeek;
+    return Array.from({ length: 8 }, (_, i) => addDays(thisWeek, -7 * i))
+        .filter((start) => start >= first)
+        .map((start) => ({ start, spent: sum(spentOf(between(w.txs, start, addDays(start, 7)))), current: start.getTime() === thisWeek.getTime() }));
+}
+
+/** Insights for one week (pass its Monday), compared with the weeks before it. */
+export function computeWeekInsights(w: MoneyWindow, weekStart: Date, now = new Date()): InsightsResult {
+    const daysOfData = w.firstEntryAt ? Math.min(99, Math.floor((startOfDay(now).getTime() - startOfDay(w.firstEntryAt).getTime()) / 86_400_000) + 1) : 0;
+    const current = weekStart.getTime() === startOfWeek(now).getTime();
+    const weekEnd = addDays(weekStart, 7);
+    // A week in progress is compared with the same days of the week before, so it's fair.
+    const spanEnd = current ? addDays(startOfDay(now), 1) : weekEnd;
+    const prevStart = addDays(weekStart, -7);
+    const spent = sum(spentOf(between(w.txs, weekStart, spanEnd)));
+    const prevSame = sum(spentOf(between(w.txs, prevStart, addDays(prevStart, (spanEnd.getTime() - weekStart.getTime()) / 86_400_000))));
+    const diff = spent - prevSame;
+    const label = current ? 'This week' : weekRange(weekStart);
+
+    let headline: string;
+    if (spent === 0) headline = current ? 'Nothing has gone out this week yet.' : `Nothing went out ${label}.`;
+    else if (prevSame === 0) headline = current ? `GHS ${cedis(spent)} so far this week.` : `GHS ${cedis(spent)} spent ${label}.`;
+    else if (Math.round(diff) === 0) headline = current ? `GHS ${cedis(spent)} so far, the same as this time last week.` : `GHS ${cedis(spent)} spent, the same as the week before.`;
+    else headline = current
+        ? `GHS ${cedis(spent)} so far, ${cedis(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than this time last week.`
+        : `GHS ${cedis(spent)} spent, ${cedis(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than the week before.`;
+
+    const findings: Finding[] = [];
+
+    // Week by week: the chosen week against the five before it
+    const weeks = spendingWeeks(w.txs, weekStart, 6);
+    const past = weeks.slice(0, -1).filter((x) => x.total > 0);
+    if (spent > 0 || past.length > 0) {
+        const average = past.length ? past.reduce((a, x) => a + x.total, 0) / past.length : 0;
+        let wHead: string;
+        let wBody: string;
+        const by = current ? `by ${WEEKDAY(now)}` : '';
+        if (prevSame > 0) {
+            const pct = Math.round((Math.abs(diff) / prevSame) * 100);
+            wHead = pct === 0 ? 'About the same' : `${diff < 0 ? 'Down' : 'Up'} ${pct}%`;
+            wBody = current
+                ? `GHS ${cedis(spent)} ${by}, ${diff <= 0 ? 'down' : 'up'} from ${cedis(prevSame)} at this point last week.`
+                : `GHS ${cedis(spent)}, ${diff <= 0 ? 'down' : 'up'} from ${cedis(prevSame)} the week before.`;
+        } else {
+            wHead = `GHS ${cedis(spent)}`;
+            wBody = 'Nothing was logged the week before, so there’s nothing to compare yet.';
+        }
+        findings.push({ kind: 'weeks', period: 'Last 6 weeks', headline: wHead, body: wBody, weeks, average, lastLabel: current ? 'This week' : dm(weekStart) });
+    }
+
+    // The category that moved most that week (same rules as the month view)
+    const inWeek = current ? now : addDays(weekEnd, -1);
+    const cat = categoryFinding(w.txs, inWeek);
+    if (cat) findings.push(current ? cat : { ...cat, period: label });
+
+    const drains = drainsFinding(w, weekStart, now, spanEnd, label);
+    if (drains) findings.push(drains);
+
+    return { daysOfData, headline, findings: inDesignOrder(findings) };
 }
