@@ -56,9 +56,11 @@ export type Finding =
     | {
         kind: 'drains';
         period: string;
+        /** What the shares are of: money in, or (when less came in than went out) spending. */
+        base: 'in' | 'spent';
         income: number;
         headline: string;
-        /** Biggest first; share is of income. */
+        /** Biggest first; share is of the base. */
         rows: { category: string; style: CategoryStyle; amount: number; share: number }[];
     };
 
@@ -408,28 +410,33 @@ function inOutFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
     const net = cur.cameIn - cur.spent;
     const name = monthLong(start);
 
+    // Short number + one line, as in Figma 1176:5760 ("GHS 640 left").
     let headline: string;
-    if (cur.cameIn === 0) headline = `GHS ${cedis(cur.spent)} out, nothing logged in`;
-    else if (net >= 0) headline = `Kept GHS ${cedis(net)}`;
-    else headline = `GHS ${cedis(-net)} more out than in`;
+    if (cur.cameIn === 0) headline = `GHS ${cedis(cur.spent)} out`;
+    else if (net >= 0) headline = `GHS ${cedis(net)} left`;
+    else headline = `GHS ${cedis(-net)} over`;
 
-    const parts: string[] = [`GHS ${cedis(cur.cameIn)} came in and GHS ${cedis(cur.spent)} went out${current ? ' so far' : ` in ${name}`}.`];
-    const past = months.slice(0, -1).filter((m) => m.spent > 0);
-    if (current && cur.cameIn > 0) {
-        const elapsed = Math.max(1, Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1);
-        const projected = (cur.spent / elapsed) * daysInMonth(now);
-        if (projected > cur.cameIn * 1.02) parts.push(`At this pace spending reaches about GHS ${cedis(projected)}, more than came in.`);
-    } else if (past.length >= 2) {
-        const avg = past.reduce((a, m) => a + m.spent, 0) / past.length;
-        const change = (cur.spent - avg) / avg;
-        if (Math.abs(change) >= 0.1) parts.push(`Spending was ${Math.round(Math.abs(change) * 100)}% ${change > 0 ? 'above' : 'below'} your usual month.`);
-    }
+    const first = cur.cameIn === 0
+        ? `Nothing logged in yet${current ? '' : ` in ${name}`}.`
+        : `GHS ${cedis(cur.cameIn)} came in, ${cedis(cur.spent)} went out.`;
+    let second = '';
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const stillExpected = current
         ? w.expected.filter((e) => e.is_active && e.last_confirmed_month !== monthKey && dueDateThisMonth(e.day_of_month, now) > now).reduce((a, e) => a + Number(e.amount), 0)
         : 0;
-    if (stillExpected > 0) parts.push(`GHS ${cedis(stillExpected)} more is expected later this month.`);
-    else if (cur.cameIn === 0) parts.push('Log your income to see what you keep.');
+    const prev = months.slice(0, -1).filter((m) => m.cameIn > 0 || m.spent > 0).pop();
+    if (stillExpected > 0) second = `GHS ${cedis(stillExpected)} more is due this month.`;
+    else if (cur.cameIn === 0) second = 'Log your income to see what you keep.';
+    else if (current) {
+        const elapsed = Math.max(1, Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1);
+        const projected = (cur.spent / elapsed) * daysInMonth(now);
+        if (projected > cur.cameIn * 1.02) second = `On pace to spend about GHS ${cedis(projected)}.`;
+    }
+    if (!second && prev && prev.cameIn > 0) {
+        const prevNet = prev.cameIn - prev.spent;
+        if (Math.round(net - prevNet) !== 0) second = `${net > prevNet ? 'More' : 'Less'} left than in ${monthLong(prev.start)}.`;
+    }
+    const parts = [first, second].filter(Boolean);
 
     return { kind: 'inout', period: current ? 'This month' : name, cameIn: cur.cameIn, spent: cur.spent, headline, body: parts.join(' '), months };
 }
@@ -460,21 +467,28 @@ function savingsFinding(w: MoneyWindow, start: Date, now: Date): Finding | null 
 function drainsFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
     const list = between(w.txs, start, monthEnd(start, now));
     const income = sum(inOf(list));
-    if (income <= 0) return null;
+    const spent = sum(spentOf(list));
+    if (income <= 0 || spent <= 0) return null;
+    // With less logged in than out, "% of income" runs past 100 and stops meaning
+    // anything; show each category's share of spending instead.
+    const base: 'in' | 'spent' = income >= spent ? 'in' : 'spent';
+    const total = base === 'in' ? income : spent;
     const by = new Map<string, number>();
     for (const t of spentOf(list)) by.set(catOf(t), (by.get(catOf(t)) ?? 0) + Number(t.amount));
     const rows = [...by.entries()]
         .filter(([c]) => c !== 'other')
-        .map(([category, amount]) => ({ category, style: categoryStyle(category), amount, share: amount / income }))
+        .map(([category, amount]) => ({ category, style: categoryStyle(category), amount, share: amount / total }))
         .sort((a, b) => b.amount - a.amount)
         .slice(0, 3);
     if (!rows.length || rows[0].share < 0.1) return null;
     const lead = rows[0];
+    const pct = Math.round(lead.share * 100);
     return {
         kind: 'drains',
         period: isThisMonth(start, now) ? 'This month' : monthLong(start),
-        income,
-        headline: `${lead.style.label} takes ${Math.round(lead.share * 100)}% of what comes in`,
+        base,
+        income: total,
+        headline: base === 'in' ? `${lead.style.label} takes ${pct}% of what comes in` : `${lead.style.label} is ${pct}% of your spending`,
         rows,
     };
 }

@@ -207,7 +207,9 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
 
     if (f.kind === 'inout') {
         // Figma 1176:5760: number and reason on the left, the last three months as paired bars on the right.
-        const months = f.months.slice(-3);
+        // Only months with something logged; one month alone isn't a trend, so no chart.
+        const months = f.months.filter((m) => m.cameIn > 0 || m.spent > 0).slice(-3);
+        const showChart = months.length >= 2;
         const max = Math.max(1, ...months.flatMap((m) => [m.cameIn, m.spent]));
         const inColor = colors.status.success;
         const outColor = colors.brand.accent;
@@ -219,7 +221,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                         <Text weight="extrabold" size={30} style={{ letterSpacing: -0.9 }}>{f.headline}</Text>
                         <Text size={13} weight="medium" tone="secondary">{f.body}</Text>
                     </View>
-                    <View
+                    {showChart && <View
                         style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}
                         accessible
                         accessibilityLabel={months.map((m) => `${m.label}: GHS ${cedis(m.cameIn)} in, GHS ${cedis(m.spent)} out`).join('. ')}
@@ -237,7 +239,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                                 </View>
                             );
                         })}
-                    </View>
+                    </View>}
                 </View>
                 <View style={{ flexDirection: 'row', gap: 14 }}>
                     <Legend color={inColor} label={`In · GHS ${cedis(f.cameIn)}`} />
@@ -256,7 +258,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                     {f.rows.map((r) => {
                         const color = r.style.tone === 'muted' ? colors.text.tertiary : colors.cat[r.style.tone];
                         return (
-                            <View key={r.category} style={{ gap: 5 }} accessible accessibilityLabel={`${r.style.label}: GHS ${cedis(r.amount)}, ${Math.round(r.share * 100)}% of income`}>
+                            <View key={r.category} style={{ gap: 5 }} accessible accessibilityLabel={`${r.style.label}: GHS ${cedis(r.amount)}, ${Math.round(r.share * 100)}% of ${f.base === 'in' ? 'income' : 'spending'}`}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                     <Text size={13} weight="semibold">{r.style.label}</Text>
                                     <Text size={13} weight="semibold" tone="secondary">GHS {cedis(r.amount)} · {Math.round(r.share * 100)}%</Text>
@@ -268,7 +270,9 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                         );
                     })}
                 </View>
-                <Text size={12} weight="medium" tone="tertiary">Share of the GHS {cedis(f.income)} that came in {about}.</Text>
+                <Text size={12} weight="medium" tone="tertiary">
+                    {f.base === 'in' ? `Share of the GHS ${cedis(f.income)} that came in ${about}.` : `Share of the GHS ${cedis(f.income)} you spent ${about}.`}
+                </Text>
             </Card>
         );
     }
