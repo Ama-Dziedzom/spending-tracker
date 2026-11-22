@@ -9,8 +9,8 @@ import { AnimatedView } from '@/components/ui/animated-view';
 
 /**
  * Ask LogIt thinking loader (Figma "LogIt / Thinking orb" 1221:5945, screen
- * 1221:5950). A glassy blue sphere that changes shape like a liquid drop
- * while colours swirl inside it. No ring. Under it, a status line that moves
+ * 1221:5950). A glassy blue sphere with a soft, shifting wobble while
+ * light colours swirl inside it. No ring. Under it, a status line that moves
  * on every couple of seconds. When the answer lands, it shrinks away into the
  * answer's mark. Fixed brand colours: it's part of the logo family.
  */
@@ -45,29 +45,29 @@ function Swirl({ color, opacity, size, offset, duration, reverse, still }: {
 
 export function ThinkingOrb() {
     const reduce = useReducedMotion();
-    const morph = useSharedValue(0);
+    const wobbleA = useSharedValue(0);
+    const wobbleB = useSharedValue(0);
     const spin = useSharedValue(0);
 
     useEffect(() => {
         if (reduce) return;
-        morph.value = withRepeat(withTiming(1, { duration: 3600, easing: Easing.inOut(Easing.sin) }), -1, true);
+        // Two wobbles on different clocks never line up, so the shape keeps changing
+        // without an obvious loop.
+        wobbleA.value = withRepeat(withTiming(1, { duration: 2300, easing: Easing.inOut(Easing.sin) }), -1, true);
+        wobbleB.value = withRepeat(withTiming(1, { duration: 3700, easing: Easing.inOut(Easing.sin) }), -1, true);
         spin.value = withRepeat(withTiming(1, { duration: 9000, easing: Easing.linear }), -1);
-    }, [reduce, morph, spin]);
+    }, [reduce, wobbleA, wobbleB, spin]);
 
-    // The outline eases between uneven soft shapes (each corner 42–60 % of the size)
-    // and stretches a touch, so it reads as a drop of liquid, not a spinning ball.
+    // Always a true circle (React Native squashes uneven corner radii into an oval).
+    // The "liquid" change comes from a soft stretch that shifts direction as it turns.
     const body = useAnimatedStyle(() => {
-        const m = morph.value;
-        const r = (a: number, b: number) => SIZE * (a + (b - a) * m);
+        const a = wobbleA.value * 2 - 1;
+        const b = wobbleB.value * 2 - 1;
         return {
-            borderTopLeftRadius: r(0.5, 0.6),
-            borderTopRightRadius: r(0.5, 0.42),
-            borderBottomRightRadius: r(0.5, 0.58),
-            borderBottomLeftRadius: r(0.5, 0.44),
             transform: [
                 { rotate: `${spin.value * 360}deg` },
-                { scaleX: 1 + 0.05 * Math.sin(m * Math.PI) },
-                { scaleY: 1 - 0.04 * Math.sin(m * Math.PI) },
+                { scaleX: 1 + 0.045 * a },
+                { scaleY: 1 - 0.035 * a + 0.02 * b },
             ],
         };
     });
@@ -75,20 +75,29 @@ export function ThinkingOrb() {
     const gloss = useAnimatedStyle(() => ({ transform: [{ rotate: `${-spin.value * 360}deg` }] }));
 
     return (
-        <AnimatedView exiting={ZoomOut.duration(260)} style={{ shadowColor: '#1642E5', shadowOpacity: 0.42, shadowRadius: 20, shadowOffset: { width: 0, height: 16 }, elevation: 10 }}>
-            <AnimatedView style={[{ width: SIZE, height: SIZE, overflow: 'hidden', backgroundColor: '#1642E5', borderRadius: SIZE / 2, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' }, body]}>
-                <Swirl color="#6F8CFF" opacity={1} size={100} offset={{ x: -18, y: -16 }} duration={3200} still={!!reduce} />
-                <Swirl color="#FFCC00" opacity={0.8} size={78} offset={{ x: 22, y: 18 }} duration={4100} reverse still={!!reduce} />
-                <Swirl color="#22D3EE" opacity={0.7} size={88} offset={{ x: -4, y: 28 }} duration={2700} still={!!reduce} />
+        <AnimatedView exiting={ZoomOut.duration(260)} style={{ shadowColor: '#1642E5', shadowOpacity: 0.4, shadowRadius: 22, shadowOffset: { width: 0, height: 14 }, elevation: 10 }}>
+            <AnimatedView style={[{ width: SIZE, height: SIZE, borderRadius: SIZE / 2, overflow: 'hidden', backgroundColor: '#1642E5', borderWidth: 1, borderColor: 'rgba(255,255,255,0.55)' }, body]}>
+                {/* Light colours only: on a phone they sit on top of the blue rather than
+                    glowing through it, and a dark yellow over blue turns olive. */}
+                <Swirl color="#8EA6FF" opacity={0.95} size={104} offset={{ x: -20, y: -18 }} duration={3200} still={!!reduce} />
+                <Swirl color="#5FE3F5" opacity={0.75} size={84} offset={{ x: 0, y: 30 }} duration={2700} reverse still={!!reduce} />
+                <Swirl color="#FFE680" opacity={0.6} size={50} offset={{ x: 30, y: 14 }} duration={4100} still={!!reduce} />
                 <AnimatedView style={[{ position: 'absolute', left: 0, top: 0, width: SIZE, height: SIZE }, gloss]}>
                     <Svg width={SIZE} height={SIZE}>
                         <Defs>
                             <RadialGradient id="orbGloss" cx="50%" cy="50%" r="50%">
-                                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.7} />
+                                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.9} />
+                                <Stop offset="0.6" stopColor="#FFFFFF" stopOpacity={0.35} />
                                 <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
                             </RadialGradient>
+                            <RadialGradient id="orbRim" cx="50%" cy="50%" r="50%">
+                                <Stop offset="0.72" stopColor="#0A1E73" stopOpacity={0} />
+                                <Stop offset="1" stopColor="#0A1E73" stopOpacity={0.35} />
+                            </RadialGradient>
                         </Defs>
-                        <Ellipse cx={40} cy={28} rx={28} ry={16} fill="url(#orbGloss)" />
+                        {/* Darker edge + bright shine: reads as a glass sphere, not a flat disc */}
+                        <Ellipse cx={SIZE / 2} cy={SIZE / 2} rx={SIZE / 2} ry={SIZE / 2} fill="url(#orbRim)" />
+                        <Ellipse cx={38} cy={30} rx={24} ry={14} fill="url(#orbGloss)" />
                     </Svg>
                 </AnimatedView>
             </AnimatedView>
