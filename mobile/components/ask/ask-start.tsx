@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ImageBackground, ScrollView, View, type ImageSourcePropType } from 'react-native';
-import { Button, CategoryTile, Icon, Tap, Text, type IconName } from '@/components/ui';
+import { CategoryTile, Icon, Tap, Text, type IconName } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 import { loadMoneyWindow, catOf, cedis, type MoneyWindow } from '@/lib/money-window';
@@ -8,7 +8,7 @@ import { flowOf, startOfWeek, startOfMonth } from '@/lib/spending-service';
 import { categoryStyle } from '@/lib/category-style';
 import { getAskHistory } from '@/lib/ask-history';
 import { STARTERS } from '@/lib/ask-engine';
-import { withAlpha, type CategoryColor } from '@/constants/theme';
+import { PALETTE, withAlpha, type CategoryColor } from '@/constants/theme';
 
 /**
  * Ask LogIt start (Figma "Ask LogIt · start v2", 1216:5886). A greeting and
@@ -29,8 +29,12 @@ const ART: Record<string, ImageSourcePropType> = {
     other: require('@/assets/illustrations/top-spend/other.png'),
 };
 
-/** The card sits on the illustration's own pale lavender in light and dark, so its text is fixed ink. */
-const INK = { primary: '#14183A', secondary: '#4A5072' };
+/**
+ * The card sits on the illustration's own pale lavender in light and dark
+ * mode, so everything on it uses the light theme's colours (dark mode's
+ * lighter category colours and blue lose contrast on it).
+ */
+const CARD = PALETTE.light;
 
 const TOPICS: { id: string; label: string; q: string }[] = [
     { id: 'food', label: 'Food', q: 'How much did I spend on food this month?' },
@@ -82,7 +86,7 @@ export function AskStart({ onAsk, onSeeAll }: { onAsk: (q: string) => void; onSe
     }, []);
 
     const style = top ? categoryStyle(top.category) : null;
-    const accent = style && style.tone !== 'muted' ? colors.cat[style.tone] : colors.brand['accent-text'];
+    const accent = style && style.tone !== 'muted' ? CARD.cat[style.tone] : CARD.brand['accent-text'];
     const label = style?.label ?? '';
     const rows = recent && recent.length ? recent : STARTERS.slice(0, 3);
 
@@ -105,15 +109,17 @@ export function AskStart({ onAsk, onSeeAll }: { onAsk: (q: string) => void; onSe
                         <Text size={12} weight="bold" style={{ color: accent, letterSpacing: 0.6 }}>
                             {top.period === 'week' ? 'YOUR TOP SPEND THIS WEEK' : 'YOUR TOP SPEND THIS MONTH'}
                         </Text>
-                        <Text size={26} weight="bold" style={{ color: INK.primary, letterSpacing: -0.4 }}>{label}</Text>
-                        <Text size={13} weight="medium" style={{ color: INK.secondary }}>GHS {cedis(top.amount)} of GHS {cedis(top.total)} so far</Text>
+                        <Text size={26} weight="bold" style={{ color: CARD.text.primary, letterSpacing: -0.4 }}>{label}</Text>
+                        <Text size={13} weight="medium" style={{ color: CARD.text.secondary }}>GHS {cedis(top.amount)} of GHS {cedis(top.total)} so far</Text>
                         <View style={{ flex: 1 }} />
                         <View style={{ alignSelf: 'flex-start' }}>
-                            <Button
-                                label="Break it down"
-                                size="md"
+                            <Tap
                                 onPress={() => onAsk(`Break down my ${label.toLowerCase()} spending ${top.period === 'week' ? 'this week' : 'this month'}`)}
-                            />
+                                accessibilityRole="button"
+                                style={({ pressed }) => ({ minHeight: 44, justifyContent: 'center', paddingHorizontal: 18, borderRadius: 999, backgroundColor: CARD.brand.accent, opacity: pressed ? 0.85 : 1 })}
+                            >
+                                <Text size={13} weight="bold" style={{ color: CARD.brand['on-accent'] }}>Break it down</Text>
+                            </Tap>
                         </View>
                     </View>
                 </ImageBackground>
