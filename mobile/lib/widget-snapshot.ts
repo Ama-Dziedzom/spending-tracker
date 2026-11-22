@@ -33,7 +33,13 @@ function age(d: Date | null, now: Date): string {
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
-function write(value: object | null) {
+/** The last snapshot written, so a settings change can update the widgets without reloading data. */
+let last: Record<string, unknown> | null = null;
+const LAST_KEY = 'logit.widgetSnapshot.last';
+
+function write(value: Record<string, unknown> | null) {
+    last = value;
+    AsyncStorage.setItem(LAST_KEY, JSON.stringify(value)).catch(() => {});
     if (!AppGroupBridge) return;
     try {
         if (value) AppGroupBridge.setItem(KEY, JSON.stringify(value));
@@ -117,4 +123,17 @@ export function clearWidgetSnapshot() {
         autopilotOn: true, todaySpent: 0, todayPayments: 0, weekSpent: 0, weekChange: null, dateLabel: '',
         days: [], latest: [], wallets: [], walletsTotal: 0, toCheck: 0,
     });
+}
+
+/**
+ * "Hide amounts on widgets" changed: rewrite the snapshot with the new flags
+ * and refresh the widgets now, instead of waiting for the next Spending load.
+ */
+export async function applyWidgetPrivacy(h: { lock_screen: boolean; home_screen: boolean }) {
+    if (!last) {
+        const saved = await AsyncStorage.getItem(LAST_KEY).catch(() => null);
+        try { last = saved ? JSON.parse(saved) : null; } catch { last = null; }
+    }
+    if (!last || last.signedIn === false) return;
+    write({ ...last, hideLockScreen: h.lock_screen, hideHomeScreen: h.home_screen, updatedAt: new Date().toISOString() });
 }

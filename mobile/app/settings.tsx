@@ -6,6 +6,7 @@ import { BAND, Avatar, Button, CategoryTile, Dialog, Icon, ListGroup, ListRow, S
 import { useAppLock } from '@/components/app-lock';
 import { useTheme, type ThemePreference } from '@/lib/theme';
 import { getProfile, lastAlertAt, setHideWidgetAmounts, type Profile } from '@/lib/settings-service';
+import { applyWidgetPrivacy } from '@/lib/widget-snapshot';
 import { getShareSamples, setShareSamples } from '@/lib/review-service';
 import { getWallets } from '@/lib/wallet-service';
 import { getExpectedIncome } from '@/lib/income-service';
@@ -89,12 +90,16 @@ export default function Settings() {
 
     const toggleHideAmounts = async (on: boolean) => {
         if (!profile) return;
-        const next = on ? { ...profile.hideWidgetAmounts, lock_screen: true } : { lock_screen: false, home_screen: false };
+        // One switch, so on means every widget. Before, "on" only covered the lock
+        // screen and home-screen widgets kept showing amounts.
+        const next = { lock_screen: on, home_screen: on };
         setProfile({ ...profile, hideWidgetAmounts: next });
+        applyWidgetPrivacy(next);
         try {
             await setHideWidgetAmounts(next);
         } catch (e) {
             setProfile(profile);
+            applyWidgetPrivacy(profile.hideWidgetAmounts);
             toast.show({ message: e instanceof Error ? e.message : 'Couldn’t save that.', icon: 'alert' });
         }
     };
@@ -160,7 +165,7 @@ export default function Settings() {
                     leading={tile('shield')}
                     title="Hide amounts on widgets"
                     meta={hideMeta}
-                    toggle={{ value: !!(hide?.lock_screen || hide?.home_screen), onChange: toggleHideAmounts }}
+                    toggle={{ value: !!(hide?.lock_screen && hide?.home_screen), onChange: toggleHideAmounts }}
                 />
             </ListGroup>
 
