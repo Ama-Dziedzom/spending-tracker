@@ -7,7 +7,7 @@ import { BAND, AskBar, AskMark, BrandBand, Button, Icon, ListGroup, ListRow, Rou
 import { AnswerView, answerText } from '@/components/ask/answer-view';
 import { ChatAnswer } from '@/components/ask/chat-answer';
 import { ListeningOverlay } from '@/components/ask/listening';
-import { ThinkingState } from '@/components/ask/thinking-orb';
+import { ThinkingState } from '@/components/ask/thinking';
 import { AskStart } from '@/components/ask/ask-start';
 import { TransactionRow } from '@/components/spending/transaction-row';
 import { useTheme } from '@/lib/theme';
