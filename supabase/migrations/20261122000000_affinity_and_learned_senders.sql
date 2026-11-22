@@ -1,11 +1,10 @@
--- LogIt: (1) Affinity alerts, (2) learning banks from your first confirmation.
+-- LogIt: 1. Affinity alerts. 2. Learning banks from your first confirmation.
 -- Safe to run more than once.
 
--- 1 · Affinity ──────────────────────────────────────────────────────────────
--- "Successful transaction of GHS 31.00 from your acct *******988611 to
---  *******46085. Fee GHS 0.23, e-levy GHS , Bal: GHS 88.87. Ref: MM-VQX…  Affinity"
--- Groups: 1 amount, 2 the other account, 3 balance, 4 reference. The fee and
--- E-levy are read separately (api/src/lib/sms-helpers.ts extractFee).
+-- 1. Affinity
+-- Outgoing alerts: Successful transaction of GHS amount from your acct ... to ... Fee, e-levy, Bal, Ref.
+-- Capture groups: 1 amount, 2 the other account, 3 balance, 4 reference.
+-- The fee and E-levy are read separately by the API (extractFee).
 INSERT INTO patterns (institution_name, institution_code, regex_pattern, field_map, transfer_type, priority)
 SELECT 'Affinity', 'affinity',
   'Successful transaction of GHS\s?([\d,]+\.?\d*) from your acct\s*\S+ to\s*(\S+?)\.?\s(?:.*?Bal:?\s*GHS\s?([\d,]+\.?\d*))?(?:.*?Ref:?\s*([A-Z0-9-]{6,}))?',
@@ -13,8 +12,8 @@ SELECT 'Affinity', 'affinity',
   NULL, 40
 WHERE NOT EXISTS (SELECT 1 FROM patterns WHERE institution_code = 'affinity' AND regex_pattern LIKE '%from your acct%');
 
--- Money in. Written from the outgoing wording; if Affinity's incoming alert reads
--- differently it simply won't match, and learning (below) picks it up instead.
+-- Incoming alerts, written from the outgoing wording. If they read differently
+-- they simply will not match, and learning (below) picks them up instead.
 INSERT INTO patterns (institution_name, institution_code, regex_pattern, field_map, transfer_type, priority)
 SELECT 'Affinity', 'affinity',
   'Successful transaction of GHS\s?([\d,]+\.?\d*) (?:to|into) your acct\s*\S+ from\s*(\S+?)\.?\s(?:.*?Bal:?\s*GHS\s?([\d,]+\.?\d*))?(?:.*?Ref:?\s*([A-Z0-9-]{6,}))?',
@@ -22,11 +21,11 @@ SELECT 'Affinity', 'affinity',
   NULL, 41
 WHERE NOT EXISTS (SELECT 1 FROM patterns WHERE institution_code = 'affinity' AND regex_pattern LIKE '%your acct%from%');
 
--- 2 · Learned senders ──────────────────────────────────────────────────────
--- When you confirm an alert LogIt couldn't read (Check), it remembers that
--- alert's SHAPE (the wording with every amount, name, number and date
--- removed) and the wallet you chose. Later alerts with the same shape are
--- logged straight into that wallet. Per person; nobody else sees them.
+-- 2. Learned senders
+-- When you confirm an alert LogIt could not read (Check), it remembers that
+-- alert's shape (the wording with every amount, name, number and date removed)
+-- and the wallet you chose. Later alerts with the same shape are logged straight
+-- into that wallet. Per person, nobody else sees them.
 
 -- The shape of each unread alert, so Check can learn from it.
 ALTER TABLE failed_parses ADD COLUMN IF NOT EXISTS shape TEXT;
@@ -39,7 +38,7 @@ CREATE TABLE IF NOT EXISTS learned_senders (
   wallet_id   UUID        NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
   direction   TEXT        NOT NULL CHECK (direction IN ('debit', 'credit')),
   category    TEXT,
-  label       TEXT,                 -- what you called it when you confirmed ("Affinity transfer")
+  label       TEXT,                 -- what you called it when you confirmed it
   template    TEXT,                 -- masked wording, shown in Settings
   uses        INTEGER     NOT NULL DEFAULT 0,
   last_used   TIMESTAMPTZ,
