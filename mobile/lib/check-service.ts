@@ -49,6 +49,7 @@ const SOURCE_IDENTIFIER: Record<string, { id: string; name: string; type: 'momo'
     StanChart: { id: 'stanchart', name: 'Standard Chartered', type: 'bank' },
     GCBBank: { id: 'gcb', name: 'GCB Bank', type: 'bank' },
     UBAGHANA: { id: 'uba', name: 'UBA', type: 'bank' },
+    Affinity: { id: 'affinity', name: 'Affinity', type: 'bank' },
 };
 
 export function providerOf(source?: string | null) {

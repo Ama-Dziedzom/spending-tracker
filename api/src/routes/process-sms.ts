@@ -21,6 +21,7 @@ import { PROVIDERS, counterpartProvider, extractSmsDate } from '../lib/sms-helpe
 import { recordAnchor, estimateDateFromId } from '../lib/date-estimate.js';
 import { extractUser, type AuthenticatedRequest } from '../middleware/auth.js';
 import { readUnknownSms, maskSms, shapeOf } from '../lib/fallback-reader.js';
+import { categorizeTransaction } from '../lib/categorize.js';
 
 export const processSmsRouter = Router();
 
@@ -217,6 +218,43 @@ function isShortcutRequest(req: AuthenticatedRequest): boolean {
 
 function wantsPlainText(req: AuthenticatedRequest): boolean {
   return req.query.format !== 'json' && isShortcutRequest(req);
+}
+
+/**
+ * An alert no pattern reads, from a sender this person has taught LogIt
+ * (learned_senders: confirmed once in Check). Same shape → read it with the
+ * fallback reader and log it into the wallet they chose. Null when there's no
+ * match or the amount can't be found, so it goes to Check as before.
+ */
+async function learnedReading(userId: string, rawSms: string): Promise<{ tx: ParsedTx; walletId: string; id: string } | null> {
+  const shape = shapeOf(maskSms(rawSms));
+  const { data, error } = await supabaseAdmin
+    .from('learned_senders')
+    .select('id, wallet_id, direction, category, label, uses')
+    .eq('user_id', userId)
+    .eq('shape', shape)
+    .maybeSingle();
+  if (error || !data) return null; // includes: migration not run yet
+  const guess = readUnknownSms(rawSms);
+  if (guess.amount === null || guess.amount <= 0) return null;
+  const type: 'debit' | 'credit' = guess.direction ?? (data.direction as 'debit' | 'credit');
+  const source = guess.provider ?? 'Learned';
+  const description = guess.counterparty ?? data.label ?? 'Transaction';
+  const tx: ParsedTx = {
+    amount: guess.amount,
+    type,
+    source,
+    description,
+    balance: guess.balance,
+    category: data.category ?? categorizeTransaction(description, source, rawSms, type),
+    is_transfer: false,
+    transfer_type: null,
+    fee: guess.fee ?? 0,
+    provider_txn_id: guess.reference,
+    affects_balance: true,
+  };
+  await supabaseAdmin.from('learned_senders').update({ uses: (data.uses ?? 0) + 1, last_used: new Date().toISOString() }).eq('id', data.id);
+  return { tx, walletId: data.wallet_id, id: data.id };
 }
 
 /**
@@ -728,7 +766,17 @@ processSmsRouter.post(
       }
 
       // ── Step 1: Parse SMS ───────────────────────────────────────────────
-      const parseResult = await parseSms(rawSms);
+      let parseResult = await parseSms(rawSms);
+      // The wallet to use: the one sent with the alert, or the one a learned sender points to.
+      let walletHint = accountId;
+      if (!parseResult.parsed) {
+        const learned = await learnedReading(userId, rawSms).catch(() => null);
+        if (learned) {
+          parseResult = { parsed: true, transaction: { ...learned.tx, transaction_date: new Date().toISOString(), transfer_metadata: null } };
+          walletHint = learned.walletId;
+          console.log(`🎓 Read with a learned sender user=${userId} preview="${previewSms(rawSms)}"`);
+        }
+      }
 
       if (!parseResult.parsed && !looksLikeProviderAlert(rawSms)) {
         console.log(`ℹ️ Skipped (not an alert) user=${userId} len=${rawSms.length} preview="${previewSms(rawSms)}"`);
@@ -759,7 +807,13 @@ processSmsRouter.post(
             raw_sms: rawSms,
             reason: parseResult.reason ?? 'no_pattern_matched',
           };
-          let { error: failInsertError } = await supabaseAdmin.from('failed_parses').insert({ ...failRow, guess });
+          // The shape lets Check learn this sender when it's confirmed (learned_senders).
+          const template = maskSms(rawSms);
+          let { error: failInsertError } = await supabaseAdmin.from('failed_parses').insert({ ...failRow, guess, shape: shapeOf(template), template });
+          // Before the learned_senders migration there's no shape column
+          if (failInsertError && /shape|template/i.test(failInsertError.message)) {
+            ({ error: failInsertError } = await supabaseAdmin.from('failed_parses').insert({ ...failRow, guess }));
+          }
           // Before the unknown_senders migration runs there's no guess column
           if (failInsertError && /guess/i.test(failInsertError.message)) {
             ({ error: failInsertError } = await supabaseAdmin.from('failed_parses').insert(failRow));
@@ -803,7 +857,7 @@ processSmsRouter.post(
         let existingWalletName: string | null = null;
 
         if (!prev.wallet_id) {
-          linkedWallet = await resolveWallet(userId, accountId, transaction);
+          linkedWallet = await resolveWallet(userId, walletHint, transaction);
           if (linkedWallet) {
             const smsDate = extractSmsDate(rawSms);
             await supabaseAdmin
@@ -913,7 +967,7 @@ processSmsRouter.post(
         if (ruled) transaction.category = ruled;
       }
 
-      const wallet = await resolveWallet(userId, accountId, transaction);
+      const wallet = await resolveWallet(userId, walletHint, transaction);
 
       // When it happened: the date in the SMS, else an estimate from the
       // provider's transaction ID (only used when the message is clearly

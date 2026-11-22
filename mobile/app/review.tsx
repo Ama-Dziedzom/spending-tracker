@@ -12,6 +12,7 @@ import { highlight } from '@/components/transactions/transaction-detail-sheet';
 import { money } from '@/components/transactions/money';
 import { getCheckItems, discardUnplaced, placeInWallet, providerOf, suggestWallets, type CheckItem } from '@/lib/check-service';
 import { dismissReview, resolveReview } from '@/lib/review-service';
+import { learnFromReview } from '@/lib/learned-senders';
 import { getWallets } from '@/lib/wallet-service';
 import type { Wallet } from '@/lib/supabase';
 import { categoryStyle } from '@/lib/category-style';
@@ -168,8 +169,10 @@ export default function Check() {
                 onSuccess={async (txId) => {
                     if (!editing) return;
                     await resolveReview(editing.review.id, txId);
+                    // Teach LogIt this sender: alerts shaped like this go straight to that wallet from now on.
+                    const learned = await learnFromReview(editing.review, txId).catch(() => false);
                     setEditing(null);
-                    advance({ title: 'Added', meta: 'It’s in your transactions now.' });
+                    advance({ title: 'Added', meta: learned ? 'Got it. Alerts like this go straight to that wallet now.' : 'It’s in your transactions now.' });
                 }}
             />
 

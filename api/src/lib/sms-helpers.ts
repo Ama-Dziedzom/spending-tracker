@@ -23,6 +23,7 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
   StanChart: { type: 'bank', identifier: 'stanchart', name: 'Standard Chartered', color: '#6B7280', nameHints: ['stanchart', 'standard chartered', 'stan chart', 'scb'] },
   GCBBank: { type: 'bank', identifier: 'gcb', name: 'GCB Bank', color: '#6B7280', nameHints: ['gcb'] },
   UBAGHANA: { type: 'bank', identifier: 'uba', name: 'UBA', color: '#6B7280', nameHints: ['uba'] },
+  Affinity: { type: 'bank', identifier: 'affinity', name: 'Affinity', color: '#6B7280', nameHints: ['affinity'] },
 };
 
 /**

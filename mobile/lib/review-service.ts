@@ -14,6 +14,9 @@ export interface ReviewItem {
     created_at: string;
     /** The server's fallback reading of an unfamiliar alert (may be missing) */
     guess?: ServerGuess | null;
+    /** The alert's shape and masked wording, so confirming it can teach LogIt the sender */
+    shape?: string | null;
+    template?: string | null;
 }
 
 /** Shape written by api/src/lib/fallback-reader.ts */
@@ -41,9 +44,17 @@ export interface ReviewPrefill {
 export async function getPendingReviews(): Promise<ReviewItem[]> {
     let { data, error }: { data: ReviewItem[] | null; error: { message: string } | null } = await supabase
         .from('failed_parses')
-        .select('id, raw_sms, reason, created_at, guess')
+        .select('id, raw_sms, reason, created_at, guess, shape, template')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
+    // Before the learned_senders migration there's no shape column
+    if (error && /shape|template/i.test(error.message)) {
+        ({ data, error } = await supabase
+            .from('failed_parses')
+            .select('id, raw_sms, reason, created_at, guess')
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false }));
+    }
     // Before the unknown_senders migration there's no guess column
     if (error && /guess/i.test(error.message)) {
         ({ data, error } = await supabase

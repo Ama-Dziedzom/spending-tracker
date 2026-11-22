@@ -61,6 +61,7 @@ const PROVIDER_HINTS: Array<[RegExp, string]> = [
   [/\bsociete generale\b|\bsg ghana\b/i, 'SocGen'],
   [/\bg-?money\b/i, 'GMoney'],
   [/\bzeepay\b/i, 'Zeepay'],
+  [/\baffinity\b/i, 'Affinity'],
 ];
 
 const CREDIT = /\b(received|credited|credit(?:ed)? to|deposit(?:ed)?|cash[- ]?in|refund(?:ed)?|reversal|reversed|transferred to you|has been paid to your)\b/i;

@@ -1,12 +1,13 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BAND, Avatar, Button, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Text, TopBar, useToast, type IconName } from '@/components/ui';
+import { BAND, Avatar, Button, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Sheet, Text, TopBar, useToast, type IconName } from '@/components/ui';
 import { useAppLock } from '@/components/app-lock';
 import { useTheme, type ThemePreference } from '@/lib/theme';
 import { getProfile, lastAlertAt, setHideWidgetAmounts, type Profile } from '@/lib/settings-service';
 import { applyWidgetPrivacy } from '@/lib/widget-snapshot';
+import { forgetSender, getLearnedSenders, type LearnedSender } from '@/lib/learned-senders';
 import { getShareSamples, setShareSamples } from '@/lib/review-service';
 import { getWallets } from '@/lib/wallet-service';
 import { getExpectedIncome } from '@/lib/income-service';
@@ -39,6 +40,18 @@ export default function Settings() {
     const [autopilotOn, setAutopilotOn] = useState<boolean | null>(null);
     const [shareSamples, setShareSamplesState] = useState(false);
     const [logoutOpen, setLogoutOpen] = useState(false);
+    /** Banks LogIt learned from Check; the sheet lets you remove one. */
+    const [learned, setLearned] = useState<LearnedSender[] | null>(null);
+    const [learnedOpen, setLearnedOpen] = useState(false);
+    useEffect(() => { getLearnedSenders().then(setLearned); }, []);
+    const forget = async (l: LearnedSender) => {
+        const before = learned;
+        setLearned((list) => (list ?? []).filter((x) => x.id !== l.id));
+        if (!(await forgetSender(l.id))) {
+            setLearned(before);
+            toast.show({ message: 'Couldn’t remove that. Try again.', icon: 'alert' });
+        }
+    };
 
     const logOut = async () => {
         setLogoutOpen(false);
@@ -148,6 +161,16 @@ export default function Settings() {
                     trailing="chevron"
                     onPress={() => router.push('/sms-settings')}
                 />
+                <ListRow
+                    dense
+                    leading={tile('bank')}
+                    title="Banks LogIt learned"
+                    value={learned === null ? '' : learned.length === 0 ? 'None yet' : String(learned.length)}
+                    valueStyle="setting"
+                    valueTone="secondary"
+                    trailing="chevron"
+                    onPress={() => { setLearnedOpen(true); getLearnedSenders().then(setLearned); }}
+                />
                 <ListRow dense leading={tile('shield')} title="Help LogIt read more banks" toggle={{ value: shareSamples, onChange: toggleSamples }} />
             </ListGroup>
 
@@ -178,6 +201,27 @@ export default function Settings() {
                 <Button label="Log out" icon="logout" variant="dangerSoft" size="lg" onPress={() => setLogoutOpen(true)} />
             </View>
         </Screen>
+        <Sheet
+            visible={learnedOpen}
+            onClose={() => setLearnedOpen(false)}
+            title="Banks LogIt learned"
+            subtitle="When you add an alert from Check, LogIt remembers its wording and wallet, and logs the next ones like it on its own."
+        >
+            {learned && learned.length > 0 ? (
+                <ListGroup bare>
+                    {learned.map((l) => (
+                        <ListRow
+                            key={l.id}
+                            title={l.wallet?.name ? `${l.label ?? 'Alerts'} → ${l.wallet.name}` : l.label ?? 'Alerts'}
+                            meta={[l.template ? `“${l.template.slice(0, 60)}${l.template.length > 60 ? '…' : ''}”` : null, l.uses ? `Logged ${l.uses} ${l.uses === 1 ? 'time' : 'times'}` : 'Not used yet'].filter(Boolean).join(' · ')}
+                            trailing={<Button label="Remove" variant="ghost" size="sm" onPress={() => forget(l)} />}
+                        />
+                    ))}
+                </ListGroup>
+            ) : (
+                <Text size={13} tone="secondary">Nothing yet. Add an alert from Check and LogIt will remember that bank’s alerts.</Text>
+            )}
+        </Sheet>
         <Dialog
             visible={logoutOpen}
             tone="neutral"
