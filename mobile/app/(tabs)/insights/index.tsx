@@ -128,7 +128,7 @@ export default function Insights() {
             </Screen>
 
             <View style={{ position: 'absolute', left: 16, right: 16, bottom: askBottom }}>
-                <AskBar compact onPress={() => ask()} onMic={() => router.push({ pathname: '/ask', params: { voice: '1' } })} />
+                <AskBar compact icon="sparkle" onPress={() => ask()} onMic={() => router.push({ pathname: '/ask', params: { voice: '1' } })} />
             </View>
 
             <Sheet visible={pickerOpen} onClose={() => setPickerOpen(false)} title="Choose a period">

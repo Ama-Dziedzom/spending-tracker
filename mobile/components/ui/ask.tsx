@@ -2,7 +2,8 @@ import React from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { FONT } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
-import { Icon } from './icon';
+import { Icon, type IconName } from './icon';
+import { AskMark } from './ask-mark';
 import { Text } from './text';
 import { Tap } from './tap';
 
@@ -19,10 +20,12 @@ interface AskBarProps {
     compact?: boolean;
     autoFocus?: boolean;
     inputRef?: React.Ref<TextInput>;
+    /** Leading icon. Ask LogIt uses the plain chat bubble; the Insights bar keeps its sparkle. */
+    icon?: IconName;
 }
 
-/** Sparkle, input, keyboard and mic. 56 tall pill on bg/surface. */
-export function AskBar({ onPress, value, onChangeText, onSubmit, onKeyboard, onMic, placeholder = 'Ask about your money…', compact, autoFocus, inputRef }: AskBarProps) {
+/** Icon, input, keyboard and mic. 56 tall pill on bg/surface. */
+export function AskBar({ onPress, value, onChangeText, onSubmit, onKeyboard, onMic, placeholder = 'Ask about your money…', compact, autoFocus, inputRef, icon = 'chat' }: AskBarProps) {
     const { colors, shadows } = useTheme();
     const editable = !!onChangeText;
     // Typing: the mic turns into send (Figma 1009:1601).
@@ -37,7 +40,7 @@ export function AskBar({ onPress, value, onChangeText, onSubmit, onKeyboard, onM
                 backgroundColor: colors.bg.surface, borderWidth: canSend ? 1.5 : 1, borderColor: canSend ? colors.brand.accent : colors.line.default, ...shadows.card,
             }}
         >
-            <Icon name="sparkle" size={compact ? 18 : 20} color={colors.brand['accent-text']} />
+            <Icon name={icon} size={compact ? 18 : 20} color={colors.brand['accent-text']} />
             {editable ? (
                 <TextInput
                     ref={inputRef}
@@ -93,14 +96,11 @@ export function UserBubble({ children }: { children: string }) {
     );
 }
 
-/** "✦ LogIt" label above an answer. */
+/** The mark and "LogIt" above an answer (Figma 1211:6197). */
 export function LogItLabel() {
-    const { colors } = useTheme();
     return (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ width: 26, height: 26, borderRadius: 999, backgroundColor: colors.brand['accent-tint'], alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="sparkle" size={14} color={colors.brand['accent-text']} />
-            </View>
+            <AskMark size={26} />
             <Text size={13} weight="bold" tone="primary">LogIt</Text>
         </View>
     );
@@ -120,7 +120,7 @@ export function SuggestionRow({ label, onPress }: { label: string; onPress: () =
                 opacity: pressed ? 0.7 : 1,
             })}
         >
-            <Icon name="sparkle" size={14} color={colors.brand['accent-text']} />
+            <Icon name="chat" size={14} color={colors.brand['accent-text']} />
             <Text size={13} weight="semibold" style={{ flex: 1 }}>{label}</Text>
             <Icon name="next" size={14} color={colors.text.tertiary} />
         </Tap>

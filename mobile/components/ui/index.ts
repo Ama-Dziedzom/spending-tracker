@@ -1,6 +1,7 @@
 // LogIt v1 shared components (docs/design-handoff.md §5).
 // Every colour comes from useTheme(); see constants/theme.ts for RAW exceptions.
 export { AskBar, UserBubble, LogItLabel, SuggestionRow, AnswerAction } from './ask';
+export { AskMark } from './ask-mark';
 export { Avatar, type AvatarChoice } from './avatar';
 export { Banner, ActionBanner, OfflinePill, FieldError } from './banner';
 export { DayBars, HBars, PAST_OPACITY, type DayBar, type HBar } from './bar-chart';

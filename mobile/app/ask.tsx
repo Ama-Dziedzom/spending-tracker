@@ -3,13 +3,15 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BAND, AskBar, BrandBand, Button, CategoryTile, Icon, ListGroup, ListRow, RoundButton, Sheet, Tap, Text, UserBubble, useToast, type IconName } from '@/components/ui';
+import { BAND, AskBar, AskMark, BrandBand, Button, Icon, ListGroup, ListRow, RoundButton, Sheet, Tap, Text, UserBubble, useToast } from '@/components/ui';
 import { AnswerView, answerText } from '@/components/ask/answer-view';
 import { ChatAnswer } from '@/components/ask/chat-answer';
 import { ListeningOverlay } from '@/components/ask/listening';
+import { ThinkingState } from '@/components/ask/thinking-orb';
+import { AskStart } from '@/components/ask/ask-start';
 import { TransactionRow } from '@/components/spending/transaction-row';
 import { useTheme } from '@/lib/theme';
-import { answer as answerQuestion, STARTERS, type Answer, type AskContext } from '@/lib/ask-engine';
+import { answer as answerQuestion, type Answer, type AskContext } from '@/lib/ask-engine';
 import { loadMoneyWindow } from '@/lib/money-window';
 import { buildMoneySnapshot } from '@/lib/money-snapshot';
 import { askChat, ChatError, type ChatReply, type ChatTurn } from '@/lib/ask-chat';
@@ -19,7 +21,6 @@ import { listen, micPermission, requestMic, voiceAvailable, type Listening } fro
 import { dayHeading } from '@/lib/format';
 import { CATEGORIES } from '@/lib/categories';
 import { categoryStyle } from '@/lib/category-style';
-import { RAW, type CategoryColor } from '@/constants/theme';
 
 interface Turn {
     id: number;
@@ -33,19 +34,12 @@ interface Turn {
     looking?: number;
 }
 
-const STARTER_STYLE: { tone: CategoryColor; icon: IconName }[] = [
-    { tone: 'cash', icon: 'wallet' },
-    { tone: 'food', icon: 'food' },
-    { tone: 'transport', icon: 'idea' },
-    { tone: 'airtime', icon: 'airtime' },
-];
-
 /**
  * Ask LogIt (Figma 993:52, right side). A chat you can type or talk to.
  * Opens from the Ask bar on Insights and any "Ask about…" button.
  */
 export default function Ask() {
-    const { colors, shadows } = useTheme();
+    const { colors } = useTheme();
     const insets = useSafeAreaInsets();
     const toast = useToast();
     const params = useLocalSearchParams<{ q?: string; voice?: string }>();
@@ -186,9 +180,8 @@ export default function Ask() {
             <View style={{ paddingTop: insets.top + 10, paddingHorizontal: 22, height: insets.top + 10 + 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 }}>
                     <RoundButton icon="back" label="Back" onPress={() => router.back()} />
-                    <View style={{ width: 34, height: 34, borderRadius: 999, backgroundColor: RAW.onBand, alignItems: 'center', justifyContent: 'center' }}>
-                        <Icon name="sparkle" size={18} color={colors.brand.accent} />
-                    </View>
+                    {/* The start screen's card carries the brand; the mark joins the header once you've asked. */}
+                    {!empty && <AskMark size={34} />}
                     <View style={{ flexShrink: 1 }}>
                         <Text size={17} weight="bold" tone="onBand" accessibilityRole="header">Ask LogIt</Text>
                         <Text size={12} weight="semibold" tone="onBand">Answers from your own money</Text>
@@ -206,33 +199,12 @@ export default function Ask() {
                     showsVerticalScrollIndicator={false}
                 >
                     {empty ? (
-                        <>
-                            <View style={{ gap: 8, paddingHorizontal: 6, marginBottom: 10 }}>
-                                <Text weight="bold" size={24} tone="onBand" style={{ letterSpacing: -0.48 }}>What would you like to know?</Text>
-                                <Text size={14} weight="semibold" tone="onBand">Type, or tap the mic and just ask.</Text>
-                            </View>
-                            <View style={{ gap: 8 }}>
-                                {STARTERS.map((s, i) => (
-                                    <Tap
-                                        key={s}
-                                        onPress={() => run(s)}
-                                        accessibilityRole="button"
-                                        style={({ pressed }) => ({
-                                            flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 12, paddingVertical: 10,
-                                            borderRadius: 16, backgroundColor: colors.bg.surface, opacity: pressed ? 0.8 : 1, ...shadows.small,
-                                        })}
-                                    >
-                                        <CategoryTile tone={STARTER_STYLE[i].tone} icon={STARTER_STYLE[i].icon} size={30} />
-                                        <Text size={13} weight="semibold" style={{ flex: 1 }}>{s}</Text>
-                                    </Tap>
-                                ))}
-                            </View>
-                        </>
+                        <AskStart onAsk={(q) => run(q)} onSeeAll={openHistory} />
                     ) : (
                         turns.map((t) => (
                             <View key={t.id} style={{ gap: 14 }}>
                                 <UserBubble>{t.q}</UserBubble>
-                                {t.state === 'thinking' && <Thinking count={t.looking} />}
+                                {t.state === 'thinking' && <ThinkingState count={t.looking} question={t.q} />}
                                 {t.state === 'offline' && <OfflineBubble onRetry={() => run(t.q, t.id)} />}
                                 {t.state === 'done' && t.chat && (
                                     <ChatAnswer
@@ -331,18 +303,6 @@ function relativeDay(d: Date): string {
 }
 
 /** Says what it's doing, with a real count, so the wait feels earned (Figma 1008:1756). */
-function Thinking({ count }: { count?: number }) {
-    const { colors, shadows } = useTheme();
-    return (
-        <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 20, borderTopLeftRadius: 6, backgroundColor: colors.bg.surface, ...shadows.bubble }} accessibilityLiveRegion="polite">
-            <View style={{ flexDirection: 'row', gap: 4 }}>
-                {[0, 1, 2].map((i) => <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.brand.accent, opacity: 0.5 + i * 0.25 }} />)}
-            </View>
-            <Text size={13} tone="secondary">{count ? `Looking at ${count} transactions…` : 'Looking…'}</Text>
-        </View>
-    );
-}
-
 /** The question stays put; retry is in the bubble, not a modal (Figma 1009:1726). */
 function OfflineBubble({ onRetry }: { onRetry: () => void }) {
     const { colors } = useTheme();

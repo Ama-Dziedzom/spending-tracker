@@ -3,7 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/react-native';
 import {
     Add01Icon, Alert02Icon, AiMagicIcon, ArrowDataTransferHorizontalIcon, ArrowDown01Icon,
     ArrowDownLeft01Icon, ArrowLeft01Icon, ArrowRight01Icon, ArrowUpRight01Icon, BankIcon,
-    BubbleChatAddIcon, BubbleChatSparkIcon, Calendar03Icon, Cancel01Icon, Coins01Icon,
+    BubbleChatAddIcon, BubbleChatIcon, BubbleChatSparkIcon, Calendar03Icon, Cancel01Icon, Coins01Icon,
     Copy01Icon, Delete02Icon, Download04Icon, Edit02Icon, FaceIdIcon, FilterHorizontalIcon,
     FlashIcon, HelpCircleIcon, Home01Icon, Idea01Icon, InboxIcon, InformationCircleIcon,
     Invoice01Icon, KeyboardIcon, Logout03Icon, Mail01Icon, Message01Icon, Mic01Icon, Money03Icon,
@@ -28,6 +28,8 @@ export const ICONS = {
     bank: BankIcon,
     bell: Notification01Icon,
     bills: Invoice01Icon,
+    // Ask LogIt: a plain bubble, no sparkle (Figma "Ask LogIt · mark")
+    chat: BubbleChatIcon,
     calendar: Calendar03Icon,
     cash: Money03Icon,
     check: TaskDone01Icon,
