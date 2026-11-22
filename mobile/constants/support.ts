@@ -6,9 +6,9 @@ export const SUPPORT = {
     /** International format without "+", e.g. "233201234567". Opens WhatsApp. */
     whatsappNumber: '',
     /** Public terms page, linked from Sign up. */
-    termsUrl: '',
+    termsUrl: 'https://spending-tracker-site.vercel.app/terms',
     /** Public privacy policy page. */
-    privacyPolicyUrl: '',
+    privacyPolicyUrl: 'https://spending-tracker-site.vercel.app/privacy',
     /** Store pages for Update required, e.g. "itms-apps://apps.apple.com/app/id123" and "market://details?id=com.ama.spendingtracker". */
     appStoreUrl: '',
     playStoreUrl: 'market://details?id=com.ama.spendingtracker',
