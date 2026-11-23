@@ -57,7 +57,7 @@ const PRICES: Record<string, { input: number; output: number; cacheWrite: number
 };
 
 /** One line per Claude call. No question, summary or money data — only counts and a short hashed id. */
-function logUsage(userId: string, model: string, usage: Anthropic.Beta.BetaUsage) {
+function logUsage(userId: string, model: string, usage: Anthropic.Beta.BetaUsage, stop: string | null) {
   const input = usage.input_tokens ?? 0;
   const output = usage.output_tokens ?? 0;
   const cacheWrite = usage.cache_creation_input_tokens ?? 0;
@@ -68,7 +68,7 @@ function logUsage(userId: string, model: string, usage: Anthropic.Beta.BetaUsage
     : null;
   const user = createHash('sha256').update(userId).digest('hex').slice(0, 8);
   console.log(
-    `ask_usage model=${model} user=${user} input_tokens=${input} output_tokens=${output} ` +
+    `ask_usage model=${model} user=${user} stop=${stop ?? 'none'} input_tokens=${input} output_tokens=${output} ` +
       `cache_creation_input_tokens=${cacheWrite} cache_read_input_tokens=${cacheRead} ` +
       `est_usd=${usd === null ? 'unknown' : usd.toFixed(6)}`,
   );
@@ -249,10 +249,11 @@ askRouter.post('/ask', extractUser, async (req: AuthenticatedRequest, res: Respo
   try {
     const response = await anthropic.beta.messages.create({
       model: MODEL,
-      // Replies are a short JSON card; 1,000 is plenty and caps a runaway reply.
+      // A ceiling, not a cost: you pay for tokens used. Thinking counts toward it
+      // (on by default on every model), so 1,000 cut replies off mid-JSON.
       // No server-side fallback: Haiku doesn't support it, and on Sonnet/Opus it
       // could re-run a refused question on a pricier model. Refusals are handled below.
-      max_tokens: 1_000,
+      max_tokens: 4_000,
       // Everyday chat: low effort keeps replies quick and cheap.
       output_config: { effort: 'low', format: { type: 'json_schema', schema: REPLY_SCHEMA } },
       // Persona first (never changes), then this person's summary. The phone
@@ -264,7 +265,7 @@ askRouter.post('/ask', extractUser, async (req: AuthenticatedRequest, res: Respo
       messages: turns,
     });
 
-    logUsage(userId, MODEL, response.usage);
+    logUsage(userId, MODEL, response.usage, response.stop_reason);
 
     if (response.stop_reason === 'refusal') {
       res.json({ reply: 'I can’t help with that one. Ask me anything about your spending, income or saving.', suggestions: [] });
@@ -275,7 +276,11 @@ askRouter.post('/ask', extractUser, async (req: AuthenticatedRequest, res: Respo
     try {
       parsed = JSON.parse(text);
     } catch {
-      parsed = { shape: 'note', sentence: text };
+      // Cut off or malformed: never show raw JSON. Keep the sentence if it got through.
+      const sentence = text.match(/"sentence"\s*:\s*"((?:[^"\\]|\\.)*)"/)?.[1];
+      parsed = sentence
+        ? { shape: 'note', sentence: JSON.parse(`"${sentence}"`) }
+        : { shape: 'note', sentence: 'Sorry, I lost my train of thought. Could you ask that again?' };
     }
     const card = toCard(parsed);
     const reply = card ? cardText(card) : 'Sorry, I lost my train of thought. Could you ask that again?';
