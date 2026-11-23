@@ -18,6 +18,8 @@ const USER_TABLES = [
   'category_rules',
   'limits',
   'pattern_samples',
+  'learned_senders',
+  'ask_usage',
   'wallets',
 ];
 

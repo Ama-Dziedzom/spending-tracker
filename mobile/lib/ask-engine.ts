@@ -182,6 +182,37 @@ export function answer(question: string, w: MoneyWindow, ctx: AskContext = {}, n
     return cant('I can answer questions about what you spent, received and moved, using the alerts LogIt has logged.', ['What can you see?', 'How much did I spend this month?']);
 }
 
+/** Advice, plans and "why" need judgement: those go to Claude even when they mention money words. */
+const NEEDS_CLAUDE = /\b(should|advice|advise|tips?|plan|budget|recommend|suggest|help me|how (can|do|could|would) i|ways? to|cut back|save more|spend less|why|explain|what if|is it (ok|okay|wise|good|bad)|pattern|habit|trend|usually|average|normal|weekends?|weekdays?)\b/;
+
+/** What the phone answers fully, matched on the question itself (not on a bare category word). */
+const PHONE_INTENTS: RegExp[] = [
+    /afford|can i (buy|get|pay for)/, // needs a price; without one the engine says "cant" and Claude gets it
+    /wait (until|till|for) (payday|pay day|salary|my salary)/,
+    /(?:show|see|list) (?:my )?(?:sends|payments|transfers|money) to /,
+    /balance|how much (money )?(do i have|have i got|is (in|on|left))|money left/,
+    /who .*(most|send|sent|pay|paid|gave)|(most|top) (person|people)/,
+    /compare|vs\.?|versus|than last|more .* than|less .* than|spending more|spending less/,
+    /(what|where).*(most|biggest)|top (categories|spend)/,
+    /receive|received|came in|income|earn|got paid/,
+    /how much|spent|spend|spending|total|cost/,
+];
+
+/**
+ * The phone's answer when it can give a confident one, else null (send it to
+ * Claude). Confident means: the question plainly matches something the engine
+ * fully supports, isn't asking for advice, isn't a bare "it/that" follow-up
+ * (the context may sit in a Claude turn), and the engine didn't say "cant".
+ */
+export function answerOnPhone(question: string, w: MoneyWindow, ctx: AskContext = {}, now = new Date()): Answer | null {
+    const q = question.toLowerCase().replace(/[’']/g, "'").trim();
+    if (NEEDS_CLAUDE.test(q)) return null;
+    if (/\b(it|that|those|them)\b/.test(q) && !findCategory(q)) return null;
+    if (!PHONE_INTENTS.some((r) => r.test(q))) return null;
+    const a = answer(question, w, ctx, now);
+    return a.shape === 'cant' ? null : a;
+}
+
 function findSecondCategory(q: string, first?: string): string | undefined {
     for (const c of CATEGORY_WORDS) {
         if (c.id === first) continue;

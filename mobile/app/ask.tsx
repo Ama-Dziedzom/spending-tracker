@@ -11,7 +11,7 @@ import { ThinkingState } from '@/components/ask/thinking';
 import { AskStart } from '@/components/ask/ask-start';
 import { TransactionRow } from '@/components/spending/transaction-row';
 import { useTheme } from '@/lib/theme';
-import { answer as answerQuestion, type Answer, type AskContext } from '@/lib/ask-engine';
+import { answer as answerQuestion, answerOnPhone, type Answer, type AskContext } from '@/lib/ask-engine';
 import { loadMoneyWindow } from '@/lib/money-window';
 import { buildMoneySnapshot } from '@/lib/money-snapshot';
 import { askChat, ChatError, type ChatReply, type ChatTurn } from '@/lib/ask-chat';
@@ -79,6 +79,14 @@ export default function Ask() {
             setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, looking: w.rows.length } : x)));
             // A short, honest pause so the count can be read.
             await new Promise((r) => setTimeout(r, Math.max(0, 600 - (Date.now() - started))));
+            // Phone first: totals, rankings and the rest the engine fully supports
+            // are answered here, free, and never count toward the daily cap.
+            const onPhone = answerOnPhone(question, w, context.current);
+            if (onPhone) {
+                if (onPhone.context.category || onPhone.context.period) context.current = onPhone.context;
+                setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', answer: onPhone, chat: undefined } : x)));
+                return;
+            }
             if (chatOn.current) {
                 snapshot.current ??= buildMoneySnapshot(w);
                 try {
@@ -86,6 +94,11 @@ export default function Ask() {
                     setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', chat, answer: undefined } : x)));
                     return;
                 } catch (e) {
+                    if (e instanceof ChatError && e.kind === 'limit') {
+                        // Same card as "can't answer"; no modal, no retry chip.
+                        setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', chat: undefined, answer: { shape: 'cant', sentence: e.message, chips: [], context: {} } } : x)));
+                        return;
+                    }
                     if (e instanceof ChatError && e.kind === 'busy') {
                         setTurns((t) => t.map((x) => (x.id === turnId ? { ...x, state: 'done', chat: { reply: e.message, suggestions: [] } } : x)));
                         return;

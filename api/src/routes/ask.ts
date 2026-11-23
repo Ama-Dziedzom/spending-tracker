@@ -1,5 +1,7 @@
 import { Router, type Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
+import { createHash } from 'node:crypto';
+import { supabaseAdmin } from '../lib/supabase.js';
 import { extractUser, type AuthenticatedRequest } from '../middleware/auth.js';
 
 /**
@@ -13,11 +15,18 @@ import { extractUser, type AuthenticatedRequest } from '../middleware/auth.js';
  */
 export const askRouter = Router();
 
-const MODEL = 'claude-opus-5-5';
+/** Switch with ASK_MODEL on Railway (claude-sonnet-5-5, claude-opus-5-5) — no code change. */
+const MODEL = process.env.ASK_MODEL?.trim() || 'claude-haiku-5-5';
+/** Questions per person per Accra day that reach Claude. Phone-answered ones don't count. */
+const DAILY_LIMIT = Math.max(1, Number(process.env.ASK_DAILY_LIMIT) || 20);
 const MAX_TURNS = 20;
 const MAX_MESSAGE_CHARS = 2_000;
 const MAX_SNAPSHOT_CHARS = 60_000;
-/** Per person, per rolling hour. Keeps a stuck client or a chatty evening from running up the bill. */
+/**
+ * Per person, per rolling hour, in memory. Only a short-burst guard against a
+ * stuck client: it resets on every deploy/restart. The real cap is the daily
+ * count in Supabase (ask_usage).
+ */
 const HOURLY_LIMIT = 40;
 
 let client: Anthropic | null = null;
@@ -38,6 +47,45 @@ function overLimit(userId: string): boolean {
   list.push(now);
   recent.set(userId, list);
   return false;
+}
+
+/** USD per million tokens. Haiku is the ≤100K-input tier. */
+const PRICES: Record<string, { input: number; output: number; cacheWrite: number; cacheRead: number }> = {
+  'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheWrite: 0.125, cacheRead: 0.01 },
+  'claude-sonnet-5-5': { input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.1 },
+  'claude-opus-5-5': { input: 4, output: 20, cacheWrite: 5, cacheRead: 0.2 },
+};
+
+/** One line per Claude call. No question, summary or money data — only counts and a short hashed id. */
+function logUsage(userId: string, model: string, usage: Anthropic.Beta.BetaUsage) {
+  const input = usage.input_tokens ?? 0;
+  const output = usage.output_tokens ?? 0;
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const p = PRICES[model];
+  const usd = p
+    ? (input * p.input + output * p.output + cacheWrite * p.cacheWrite + cacheRead * p.cacheRead) / 1_000_000
+    : null;
+  const user = createHash('sha256').update(userId).digest('hex').slice(0, 8);
+  console.log(
+    `ask_usage model=${model} user=${user} input_tokens=${input} output_tokens=${output} ` +
+      `cache_creation_input_tokens=${cacheWrite} cache_read_input_tokens=${cacheRead} ` +
+      `est_usd=${usd === null ? 'unknown' : usd.toFixed(6)}`,
+  );
+}
+
+/**
+ * Atomically adds one to today's (Africa/Accra) count and returns the new
+ * total. Returns null if the table/function isn't there yet, so a missing
+ * migration fails open with a warning instead of breaking Ask.
+ */
+async function bumpDailyCount(userId: string): Promise<number | null> {
+  const { data, error } = await supabaseAdmin.rpc('increment_ask_usage', { p_user: userId });
+  if (error) {
+    console.warn('Ask: daily count unavailable, skipping the cap:', error.message);
+    return null;
+  }
+  return typeof data === 'number' ? data : Number(data);
 }
 
 const PERSONA = `You are LogIt, the friendly money companion inside a Ghanaian spending-tracker app. People log mobile money (MTN MoMo, Telecel Cash, AT Money) and bank alerts, and you help them understand their money and make better choices.
@@ -189,13 +237,22 @@ askRouter.post('/ask', extractUser, async (req: AuthenticatedRequest, res: Respo
     res.status(429).json({ error: 'Too many questions this hour. Try again a bit later.' });
     return;
   }
+  const today = await bumpDailyCount(userId);
+  if (today !== null && today > DAILY_LIMIT) {
+    res.status(429).json({
+      error: `You've asked ${DAILY_LIMIT} questions today. Ask LogIt resets at midnight.`,
+      code: 'daily_limit',
+    });
+    return;
+  }
 
   try {
     const response = await anthropic.beta.messages.create({
       model: MODEL,
-      max_tokens: 8_000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
+      // Replies are a short JSON card; 1,000 is plenty and caps a runaway reply.
+      // No server-side fallback: Haiku doesn't support it, and on Sonnet/Opus it
+      // could re-run a refused question on a pricier model. Refusals are handled below.
+      max_tokens: 1_000,
       // Everyday chat: low effort keeps replies quick and cheap.
       output_config: { effort: 'low', format: { type: 'json_schema', schema: REPLY_SCHEMA } },
       // Persona first (never changes), then this person's summary. The phone
@@ -206,6 +263,8 @@ askRouter.post('/ask', extractUser, async (req: AuthenticatedRequest, res: Respo
       ],
       messages: turns,
     });
+
+    logUsage(userId, MODEL, response.usage);
 
     if (response.stop_reason === 'refusal') {
       res.json({ reply: 'I can’t help with that one. Ask me anything about your spending, income or saving.', suggestions: [] });

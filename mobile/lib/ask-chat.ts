@@ -24,10 +24,11 @@ export interface ChatReply { reply: string; suggestions: string[]; card?: ChatCa
 /**
  * Why a chat reply couldn't be had. 'unavailable' means the server has no
  * chat set up (or isn't reachable in a way we can retry): use the on-device
- * answers instead. 'busy' is a rate limit with a message to show.
+ * answers instead. 'busy' is a short-burst rate limit with a message to show.
+ * 'limit' is the daily cap: show the message as a card, no retry.
  */
 export class ChatError extends Error {
-    constructor(public kind: 'unavailable' | 'busy' | 'failed', message: string) { super(message); }
+    constructor(public kind: 'unavailable' | 'busy' | 'limit' | 'failed', message: string) { super(message); }
 }
 
 /**
@@ -45,6 +46,7 @@ export async function askChat(messages: ChatTurn[], snapshot: string): Promise<C
     });
     const body = await res.json().catch(() => ({}));
     if (res.status === 503 || res.status === 404) throw new ChatError('unavailable', body.error ?? 'Chat not available');
+    if (res.status === 429 && body.code === 'daily_limit') throw new ChatError('limit', body.error ?? "You've reached today's limit. Ask LogIt resets at midnight.");
     if (res.status === 429) throw new ChatError('busy', body.error ?? 'Too many questions. Try again shortly.');
     if (!res.ok || typeof body.reply !== 'string') throw new ChatError('failed', body.error ?? `ask ${res.status}`);
     return { reply: body.reply, suggestions: Array.isArray(body.suggestions) ? body.suggestions : [], card: body.card && typeof body.card === 'object' ? body.card as ChatCard : null };
