@@ -2,6 +2,7 @@
 // Every colour comes from useTheme(); see constants/theme.ts for RAW exceptions.
 export { AskBar, UserBubble, LogItLabel, SuggestionRow, AnswerAction } from './ask';
 export { AskMark } from './ask-mark';
+export { Wordmark } from './wordmark';
 export { Avatar, type AvatarChoice } from './avatar';
 export { Banner, ActionBanner, OfflinePill, FieldError } from './banner';
 export { DayBars, HBars, PAST_OPACITY, type DayBar, type HBar } from './bar-chart';

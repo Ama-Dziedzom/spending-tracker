@@ -25,4 +25,10 @@ fees 4c894aec-c087-4314-a5be-3aa2431332fc
 other 8912d03c-51c9-4c78-9f97-bee95b5f0e81
 LIST
 ls -la "$OUT"
+
+# Welcome photo (Figma: "Photo / Welcome / Accra street"). AI-generated placeholder;
+# replace with a licensed photo before launch, same framing: face high, phone mid-frame.
+echo "↓ welcome photo"
+curl -fsSL -o assets/images/welcome-photo.png "https://www.figma.com/api/mcp/asset/2c62a28b-06a4-4330-8af1-69e89470b424.png"
+if command -v sips >/dev/null; then sips -Z 1400 assets/images/welcome-photo.png >/dev/null; fi
 echo "Done. Reload the app."
