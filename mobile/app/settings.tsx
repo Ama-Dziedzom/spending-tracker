@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BAND, Avatar, Button, CategoryTile, Dialog, Icon, ListGroup, ListRow, Screen, SegmentedControl, Sheet, Text, TopBar, useToast, type IconName } from '@/components/ui';
 import { useAppLock } from '@/components/app-lock';
 import { useTheme, type ThemePreference } from '@/lib/theme';
-import { getProfile, lastAlertAt, setHideWidgetAmounts, type Profile } from '@/lib/settings-service';
+import { getProfile, getProfileFast, profileNow, lastAlertAt, setHideWidgetAmounts, type Profile } from '@/lib/settings-service';
 import { applyWidgetPrivacy } from '@/lib/widget-snapshot';
 import { forgetSender, getLearnedSenders, type LearnedSender } from '@/lib/learned-senders';
 import { getShareSamples, setShareSamples } from '@/lib/review-service';
@@ -33,7 +33,7 @@ export default function Settings() {
     const { colors, shadows, preference, setPreference } = useTheme();
     const toast = useToast();
     const lock = useAppLock();
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [profile, setProfile] = useState<Profile | null>(profileNow);
     const [walletCount, setWalletCount] = useState<number | null>(null);
     const [expected, setExpected] = useState<string | null>(null);
     const [limitCount, setLimitCount] = useState<number | null>(null);
@@ -66,25 +66,22 @@ export default function Settings() {
 
     useFocusEffect(useCallback(() => {
         let live = true;
-        (async () => {
-            const [p, wallets, income, samples, last, androidOn, limits] = await Promise.all([
-                getProfile(),
-                getWallets().catch(() => []),
-                getExpectedIncome().catch(() => []),
-                getShareSamples().catch(() => false),
-                lastAlertAt().catch(() => null),
-                AsyncStorage.getItem('sms_auto_logging_enabled').catch(() => null),
-                getLimits().catch(() => []),
-            ]);
-            if (!live) return;
-            setProfile(p);
-            setWalletCount(wallets.length);
-            setExpected(income.length === 0 ? 'None' : income.length === 1 ? income[0].label : `${income.length} set`);
-            setShareSamplesState(samples);
-            setLimitCount(limits.length);
-            // iPhone: on if an alert has come in through autopilot in the last two weeks.
-            setAutopilotOn(Platform.OS === 'android' ? androidOn === 'true' : !!last && Date.now() - last.getTime() < 14 * 86_400_000);
-        })();
+        // Each row fills in as soon as its own answer arrives; none waits for the slowest.
+        // Profile: the copy saved on the phone first (instant), then the server's.
+        getProfileFast().then((p) => { if (live && p) setProfile(p); });
+        getProfile().then((p) => { if (live && p) setProfile(p); }).catch(() => {});
+        getWallets().catch(() => []).then((w) => { if (live) setWalletCount(w.length); });
+        getExpectedIncome().catch(() => []).then((income) => {
+            if (live) setExpected(income.length === 0 ? 'None' : income.length === 1 ? income[0].label : `${income.length} set`);
+        });
+        getShareSamples().catch(() => false).then((on) => { if (live) setShareSamplesState(on); });
+        getLimits().catch(() => []).then((l) => { if (live) setLimitCount(l.length); });
+        // iPhone: on if an alert has come in through autopilot in the last two weeks.
+        if (Platform.OS === 'android') {
+            AsyncStorage.getItem('sms_auto_logging_enabled').catch(() => null).then((v) => { if (live) setAutopilotOn(v === 'true'); });
+        } else {
+            lastAlertAt().catch(() => null).then((last) => { if (live) setAutopilotOn(!!last && Date.now() - last.getTime() < 14 * 86_400_000); });
+        }
         return () => { live = false; };
     }, []));
 

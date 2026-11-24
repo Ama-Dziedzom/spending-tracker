@@ -41,9 +41,9 @@ export interface Profile {
     hideWidgetAmounts: HideWidgetAmounts;
 }
 
-export async function getProfile(): Promise<Profile | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+type AuthUser = NonNullable<Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user']>;
+
+function toProfile(user: AuthUser): Profile {
     const m = user.user_metadata ?? {};
     const email = user.email || null;
     return {
@@ -57,9 +57,33 @@ export async function getProfile(): Promise<Profile | null> {
     };
 }
 
+/** The last profile this app run saw, so screens can draw it on their first frame. */
+let lastProfile: Profile | null = null;
+export const profileNow = (): Profile | null => lastProfile;
+
+/**
+ * The profile from the session saved on this phone: no network, a few ms.
+ * Use it to draw straight away, then getProfile() to refresh.
+ */
+export async function getProfileFast(): Promise<Profile | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return lastProfile;
+    lastProfile ??= toProfile(session.user);
+    return lastProfile;
+}
+
+/** The profile from the server (picks up changes made on another phone). */
+export async function getProfile(): Promise<Profile | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    lastProfile = toProfile(user);
+    return lastProfile;
+}
+
 async function updateMeta(data: Record<string, unknown>): Promise<void> {
-    const { error } = await supabase.auth.updateUser({ data });
+    const { data: res, error } = await supabase.auth.updateUser({ data });
     if (error) throw new Error('Couldn’t save that. Check your connection and try again.');
+    if (res.user) lastProfile = toProfile(res.user);
 }
 
 export const setName = (name: string) => updateMeta({ full_name: name.trim() });

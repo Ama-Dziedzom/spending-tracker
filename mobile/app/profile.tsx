@@ -6,7 +6,7 @@ import { AvatarPickerSheet } from '@/components/settings/avatar-picker-sheet';
 import { TextEditSheet } from '@/components/settings/text-edit-sheet';
 import { useTheme } from '@/lib/theme';
 import { forgetPhone, signOutOnPurpose } from '@/lib/session';
-import { getProfile, setName, setRecoveryEmail, type Profile } from '@/lib/settings-service';
+import { getProfile, getProfileFast, profileNow, setName, setRecoveryEmail, type Profile } from '@/lib/settings-service';
 import { formatPhone } from '@/lib/phone';
 import { RAW } from '@/constants/theme';
 
@@ -17,12 +17,15 @@ import { RAW } from '@/constants/theme';
 export default function ProfileScreen() {
     const { colors, shadows } = useTheme();
     const toast = useToast();
-    const [profile, setProfile] = useState<Profile | null>(null);
+    const [profile, setProfile] = useState<Profile | null>(profileNow);
     const [avatarOpen, setAvatarOpen] = useState(false);
     const [edit, setEdit] = useState<'name' | 'email' | null>(null);
     const [logoutOpen, setLogoutOpen] = useState(false);
 
-    const load = useCallback(() => { getProfile().then(setProfile).catch(() => {}); }, []);
+    const load = useCallback(() => {
+        getProfileFast().then((p) => { if (p) setProfile(p); });
+        getProfile().then((p) => { if (p) setProfile(p); }).catch(() => {});
+    }, []);
     useFocusEffect(load);
 
     const logOut = async () => {
