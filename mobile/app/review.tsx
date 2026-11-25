@@ -7,6 +7,8 @@ import {
     TopBar, useToast,
 } from '@/components/ui';
 import { AddEntrySheet } from '@/components/transactions/add-entry-sheet';
+import { AddWalletSheet } from '@/components/wallets/add-wallet-sheet';
+import { createCashWallet } from '@/lib/add-transaction';
 import { WalletList } from '@/components/transactions/pickers';
 import { highlight } from '@/components/transactions/transaction-detail-sheet';
 import { money } from '@/components/transactions/money';
@@ -42,6 +44,7 @@ export default function Check() {
     const [confirmSkip, setConfirmSkip] = useState(false);
     const [chosen, setChosen] = useState<Wallet | null>(null);
     const [pickOpen, setPickOpen] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -177,8 +180,28 @@ export default function Check() {
             />
 
             <Sheet visible={pickOpen} onClose={() => setPickOpen(false)} title="Which account?">
-                <WalletList wallets={wallets} selected={chosen?.id} onPick={(w) => { setChosen(w); setPickOpen(false); }} />
+                <WalletList
+                    wallets={wallets}
+                    selected={chosen?.id}
+                    onPick={(w) => { setChosen(w); setPickOpen(false); }}
+                    onAdd={() => { setPickOpen(false); setAddOpen(true); }}
+                />
             </Sheet>
+            {/* An account LogIt doesn't know yet: add it here, then it's the answer. */}
+            <AddWalletSheet
+                visible={addOpen}
+                onClose={() => setAddOpen(false)}
+                onAdded={(w) => { setWallets((prev) => [...prev, w]); setChosen(w); }}
+                onCash={async () => {
+                    try {
+                        const cash = wallets.find((w) => w.type === 'cash') ?? (await createCashWallet());
+                        setWallets((prev) => (prev.some((w) => w.id === cash.id) ? prev : [...prev, cash]));
+                        setChosen(cash);
+                    } catch {
+                        toast.show({ message: 'Couldn’t start your Cash wallet. Try again.', icon: 'alert' });
+                    }
+                }}
+            />
 
             <Dialog
                 visible={confirmSkip}
@@ -373,7 +396,9 @@ function AccountStep({ item, wallets, chosen, onChoose, onPickAnother, onDone, o
             {tx.raw_sms && <Message sms={tx.raw_sms} description={tx.description} />}
             <Text size={15} weight="bold">{isCard ? 'Which account is this card?' : 'Which account is this?'}</Text>
             {wallets.length === 0 ? (
-                <Text size={13} tone="secondary">You have no wallets yet. Add one in Wallets, then come back.</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <AnswerChip label="Add a wallet" active={false} onPress={onPickAnother} />
+                </View>
             ) : (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
                     {shown && <AnswerChip label={shown.name} active={chosen?.id === shown.id} onPress={() => onChoose(shown)} />}

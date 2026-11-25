@@ -120,12 +120,14 @@ export function CategoryValue({ id }: { id: string }) {
 }
 
 /** Wallet list with a tick on the current one. Loads wallets itself unless given. */
-export function WalletList({ selected, onPick, wallets: given, exclude }: {
+export function WalletList({ selected, onPick, wallets: given, exclude, onAdd }: {
     selected?: string | null;
     onPick: (w: Wallet) => void;
     wallets?: Wallet[];
     /** Hide one wallet (the "from" side of a move). */
     exclude?: string | null;
+    /** Shows an "Add a wallet" row, for money going somewhere LogIt doesn't know yet. */
+    onAdd?: () => void;
 }) {
     const { colors } = useTheme();
     const [loaded, setLoaded] = useState<Wallet[] | null>(given ?? null);
@@ -136,7 +138,19 @@ export function WalletList({ selected, onPick, wallets: given, exclude }: {
 
     if (loaded === null) return <Text tone="secondary">Loading your wallets…</Text>;
     const list = loaded.filter((w) => w.id !== exclude);
-    if (list.length === 0) return <Text tone="secondary">You have no other wallets yet. Add one from the Wallets tab.</Text>;
+    const addRow = onAdd && (
+        <ListRow
+            leading={<CategoryTile tone="accent" icon="plus" />}
+            title="Add a wallet"
+            meta="Mobile money, bank or cash"
+            trailing="chevron"
+            onPress={onAdd}
+        />
+    );
+    if (list.length === 0) {
+        if (!addRow) return <Text tone="secondary">You have no other wallets yet. Add one from the Wallets tab.</Text>;
+        return <ListGroup bare>{addRow}</ListGroup>;
+    }
     return (
         <ListGroup bare>
             {list.map((w) => (
@@ -149,6 +163,7 @@ export function WalletList({ selected, onPick, wallets: given, exclude }: {
                     accessibilityLabel={`${w.name}${w.id === selected ? ', current' : ''}`}
                 />
             ))}
+            {addRow}
         </ListGroup>
     );
 }

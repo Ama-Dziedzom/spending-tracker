@@ -7,7 +7,8 @@ import { useTheme } from '@/lib/theme';
 import type { Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
 import { suggestCategory } from '@/lib/categories';
-import { addEntry, addMove, getAddDefaults } from '@/lib/add-transaction';
+import { addEntry, addMove, createCashWallet, getAddDefaults } from '@/lib/add-transaction';
+import { AddWalletSheet } from '@/components/wallets/add-wallet-sheet';
 import { dayHeading, time24 } from '@/lib/format';
 import {
     AmountInput, CategoryGrid, CategoryValue, FactRow, IN_CATEGORIES, SPENT_CATEGORIES, WalletList, WhenForm,
@@ -59,6 +60,8 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
     const [wallets, setWallets] = useState<Wallet[] | null>(null);
     const [walletId, setWalletId] = useState<string | null>(null);
     const [toWalletId, setToWalletId] = useState<string | null>(null);
+    /** Which side a wallet is being added for, while Add a wallet is open on top. */
+    const [addingFor, setAddingFor] = useState<'wallet' | 'to' | null>(null);
     const [when, setWhen] = useState<Date | null>(null); // null = now
     const [note, setNote] = useState('');
     const [fee, setFee] = useState('');
@@ -154,7 +157,28 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
         }
     };
 
+    /** A wallet just added (or Cash found/started): add it to the list and choose it for that side. */
+    const chooseNewWallet = (w: Wallet, side: 'wallet' | 'to') => {
+        setWallets((prev) => (prev?.some((x) => x.id === w.id) ? prev : [...(prev ?? []), w]));
+        if (side === 'to') setToWalletId(w.id);
+        else {
+            setWalletId(w.id);
+            if (w.id === toWalletId) setToWalletId(null);
+        }
+        setMode('form');
+    };
+
+    const chooseCash = async (side: 'wallet' | 'to') => {
+        try {
+            const cash = wallets?.find((w) => w.type === 'cash') ?? (await createCashWallet());
+            chooseNewWallet(cash, side);
+        } catch (e) {
+            toast.show({ message: e instanceof Error ? e.message : 'Couldn’t start your Cash wallet. Try again.', icon: 'alert' });
+        }
+    };
+
     return (
+        <>
         <Sheet
             visible={visible}
             onClose={onClose}
@@ -249,6 +273,7 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
                         wallets={wallets ?? undefined}
                         selected={mode === 'to' ? toWalletId : walletId}
                         exclude={mode === 'to' ? walletId : null}
+                        onAdd={() => setAddingFor(mode === 'to' ? 'to' : 'wallet')}
                         onPick={(w) => {
                             if (mode === 'to') setToWalletId(w.id);
                             else {
@@ -271,5 +296,12 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
                 />
             )}
         </Sheet>
+        <AddWalletSheet
+            visible={addingFor !== null}
+            onClose={() => setAddingFor(null)}
+            onAdded={(w) => { if (addingFor) chooseNewWallet(w, addingFor); }}
+            onCash={() => { if (addingFor) chooseCash(addingFor); }}
+        />
+        </>
     );
 }
