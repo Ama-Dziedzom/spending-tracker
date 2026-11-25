@@ -1,3 +1,4 @@
+import { cur, curLabel } from '@/lib/currency';
 /**
  * Voice questions for Ask LogIt, through expo-speech-recognition. Loaded
  * lazily so a build made before the module was added still runs: voice is
@@ -92,7 +93,7 @@ export function listen(onWords: (text: string) => void, onEnd: (finalText: strin
             interimResults: true,
             continuous: true,
             addsPunctuation: true,
-            contextualStrings: ['GHS', 'MoMo', 'airtime', 'trotro', 'cedis'],
+            contextualStrings: [curLabel(), cur().plural, 'MoMo', 'airtime', 'trotro', ...cur().momo.map((m) => m.name)],
         });
         stopSoon(WAIT_FOR_FIRST_WORD_MS);
     };

@@ -9,6 +9,7 @@ import type { SpendingSummary } from '@/lib/spending-service';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
 import { ghs, heroAmount, listAmount } from '@/lib/format';
 import { TransactionRow } from './transaction-row';
+import { curLabel } from '@/lib/currency';
 
 export type Period = 'today' | 'week' | 'month';
 
@@ -52,7 +53,7 @@ function Total({ label, amount, tag }: { label: string; amount: number; tag?: Re
             <Text size={13} weight="semibold" tone="secondary">{label}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }} accessible accessibilityLabel={`${label}: ${ghs(amount)}`}>
-                    <Text size={15} weight="bold" tone="secondary">GHS</Text>
+                    <Text size={15} weight="bold" tone="secondary">{curLabel()}</Text>
                     <Text variant="hero" style={{ letterSpacing: -1.44 }}>{heroAmount(amount)}</Text>
                 </View>
                 {tag}

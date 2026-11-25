@@ -85,5 +85,5 @@ export function merchantName(description: string): string {
     return first.split(/\s+/).map((w) => (w.length <= 3 && /^[A-Z]+$/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase())).join(' ');
 }
 
-/** Whole cedis with grouping: 1840 → "1,840". */
+/** Whole units with grouping: 1840 → "1,840". */
 export const cedis = (n: number) => Math.round(Math.abs(n)).toLocaleString('en-US');

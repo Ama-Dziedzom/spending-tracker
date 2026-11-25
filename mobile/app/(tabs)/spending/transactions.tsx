@@ -18,6 +18,7 @@ import { listAmount } from '@/lib/format';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { useTheme } from '@/lib/theme';
 import { FONT, HIT_SLOP, RAW } from '@/constants/theme';
+import { curLabel } from '@/lib/currency';
 
 const FILTERS = [
     { value: 'all', label: 'All' },
@@ -371,7 +372,7 @@ function SearchResults({ query, results, busy, error, onRetry, onClear, onOpen }
         <Card hero gap={8} style={{ opacity: busy ? 0.6 : 1 }}>
             <ListDayHeader
                 title={`${results.length} ${results.length === 1 ? 'result' : 'results'}${results.length === 100 ? '+' : ''}`}
-                summary={spent > 0 ? `GHS ${listAmount(spent)} in total` : undefined}
+                summary={spent > 0 ? `${curLabel()} ${listAmount(spent)} in total` : undefined}
             />
             <ListGroup bare>
                 {results.map((tx) => <TransactionRow key={tx.id} tx={tx} context="search" onPress={() => onOpen(tx)} />)}

@@ -1,3 +1,4 @@
+import { cur, curLabel, ex } from '@/lib/currency';
 import React, { useEffect, useState } from 'react';
 import { BAND, CategoryTile, ListGroup, ListRow, Screen, TopBar, useToast, type IconName } from '@/components/ui';
 import { DEFAULT_NOTIFICATIONS, getProfile, setNotificationPrefs, type NotificationPrefs } from '@/lib/settings-service';
@@ -29,7 +30,7 @@ export default function NotificationSettings() {
     return (
         <Screen band={BAND.notificationSettings} header={<TopBar title="Notifications" />} contentStyle={{ gap: 12 }}>
             <ListGroup label="Tell me when" labelOnBand>
-                <ListRow dense leading={tile('flash')} title="An alert is logged" meta="“Spent GHS 10 on airtime · MTN MoMo”" toggle={{ value: prefs.logged, onChange: set('logged') }} />
+                <ListRow dense leading={tile('flash')} title="An alert is logged" meta={`“Spent ${curLabel()} ${ex(10)} on airtime · ${cur().momo[0].name}”`} toggle={{ value: prefs.logged, onChange: set('logged') }} />
                 <ListRow dense leading={tile('check')} title="A message needs a look" toggle={{ value: prefs.needsLook, onChange: set('needsLook') }} />
                 <ListRow dense leading={tile('receive')} title="Salary day" toggle={{ value: prefs.salaryDay, onChange: set('salaryDay') }} />
             </ListGroup>

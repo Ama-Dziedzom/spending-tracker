@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Text, PAST_OPACITY } from '@/components/ui';
 import type { WeekTotal } from '@/lib/insights-engine';
 import { monthShort } from '@/lib/money-window';
+import { curLabel } from '@/lib/currency';
 
 /**
  * Last 6 weeks (Figma 1022:4663): 120 tall, 26 wide bars with 7 corners,
@@ -23,7 +24,7 @@ export function WeekChart({ weeks, average, color, lastLabel = 'This week' }: { 
     };
 
     return (
-        <View style={{ height: 120 }} accessible accessibilityLabel={`Last ${weeks.length} weeks, average GHS ${Math.round(average)}. ${lastLabel} GHS ${Math.round(weeks[weeks.length - 1]?.total ?? 0)}.`}>
+        <View style={{ height: 120 }} accessible accessibilityLabel={`Last ${weeks.length} weeks, average ${curLabel()} ${Math.round(average)}. ${lastLabel} ${curLabel()} ${Math.round(weeks[weeks.length - 1]?.total ?? 0)}.`}>
             {average > 0 && <View style={{ position: 'absolute', left: 0, right: 0, top: avgY, height: 1.5, backgroundColor: color }} />}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', height: area }}>
                 {weeks.map((w, i) => {

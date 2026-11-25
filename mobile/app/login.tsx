@@ -6,7 +6,8 @@ import { AuthLayout, CardLink, FieldLabel, PhoneField, TextField } from '@/compo
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '../lib/useAuth';
 import { biometrics } from '../utils/biometrics';
-import { phoneAuthMessage, toE164 } from '../lib/phone';
+import { phoneAuthMessage, phoneRule, toE164 } from '../lib/phone';
+import { cur, type Country } from '../lib/currency';
 
 /**
  * Log in (Figma 1000:149). Phone by default. Email and password stay for
@@ -23,7 +24,8 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const passwordRef = useRef<TextInput>(null);
-    const e164 = toE164(phone, '+233');
+    const [country, setCountry] = useState<Country>(cur());
+    const e164 = toE164(phone, `+${country.dial}`);
 
     const biometricLogin = useCallback(async () => {
         const result = await biometrics.attemptBiometricLogin();
@@ -43,7 +45,7 @@ export default function Login() {
     }, [biometricLogin]);
 
     const sendCode = async () => {
-        if (!e164) { setError('Use a Ghana mobile number: 9 digits after +233, like 24 412 3456.'); return; }
+        if (!e164) { setError(phoneRule(country)); return; }
         const result = await sendPhoneCode(e164, { create: false });
         if (result.success) router.push({ pathname: '/otp', params: { mode: 'phone', intent: 'login', phone: e164 } });
         else setError(phoneAuthMessage(result.error));
@@ -81,7 +83,7 @@ export default function Login() {
             {method === 'phone' ? (
                 <View style={{ gap: 8 }}>
                     <FieldLabel>Phone number</FieldLabel>
-                    <PhoneField value={phone} onChange={(v) => { setPhone(v); setError(null); }} autoFocus onSubmit={sendCode} error={error} />
+                    <PhoneField value={phone} onChange={(v) => { setPhone(v); setError(null); }} autoFocus onSubmit={sendCode} error={error} country={country} onCountry={(c) => { setCountry(c); setError(null); }} />
                 </View>
             ) : (
                 <>

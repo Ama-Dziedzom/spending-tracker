@@ -1,10 +1,12 @@
 // v1 copy rules for numbers and dates (docs/design-handoff.md §10).
+import { cur } from './currency';
 
-const two = { minimumFractionDigits: 2, maximumFractionDigits: 2 } as const;
+/** 2 decimals where the currency has coins (GHS, NGN…), none where it doesn't (FCFA, UGX, RWF). */
+const digits = () => ({ minimumFractionDigits: cur().decimals, maximumFractionDigits: cur().decimals });
 
-/** List amounts: no currency, no minus sign. "85.00", "1,240.50". */
+/** List amounts: no currency, no minus sign. "85.00", "1,240.50" ("25,000" in FCFA). */
 export function listAmount(n: number): string {
-    return Math.abs(n).toLocaleString('en-US', two);
+    return Math.abs(n).toLocaleString('en-US', digits());
 }
 
 /** Received money in lists: green with a plus sign. "+200.00". */
@@ -12,14 +14,14 @@ export function receivedAmount(n: number): string {
     return `+${listAmount(n)}`;
 }
 
-/** Hero numbers: whole cedis with grouping; the "GHS" label is rendered separately. "1,840". */
+/** Hero numbers: whole units with grouping; the currency label is rendered separately. "1,840". */
 export function heroAmount(n: number): string {
     return Math.round(Math.abs(n)).toLocaleString('en-US');
 }
 
-/** Inline money in sentences: "GHS 200", "GHS 3,000". */
+/** Inline money in sentences: "GHS 200", "NGN 3,000". */
 export function ghs(n: number): string {
-    return `GHS ${heroAmount(n)}`;
+    return `${cur().label} ${heroAmount(n)}`;
 }
 
 /** "Wednesday, 26 Nov" */

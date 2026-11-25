@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { API_URL } from './sms-api';
+import { curLabel } from './currency';
 
 /** One message in the Ask LogIt chat, as sent to the server. */
 export interface ChatTurn { role: 'user' | 'assistant'; content: string }
@@ -42,7 +43,7 @@ export async function askChat(messages: ChatTurn[], snapshot: string): Promise<C
     const res = await fetch(`${API_URL}/api/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ messages, snapshot }),
+        body: JSON.stringify({ messages, snapshot, currency: curLabel() }),
     });
     const body = await res.json().catch(() => ({}));
     if (res.status === 503 || res.status === 404) throw new ChatError('unavailable', body.error ?? 'Chat not available');

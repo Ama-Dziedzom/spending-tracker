@@ -11,6 +11,7 @@ import { useTheme } from '@/lib/theme';
 import { cedis, loadMoneyWindow } from '@/lib/money-window';
 import { categoryDetail, type CategoryDetail } from '@/lib/insights-engine';
 import { BAND_CHIP_ALPHA, withAlpha } from '@/constants/theme';
+import { curLabel } from '@/lib/currency';
 
 /**
  * Insight detail (Figma 1022:4640). The number, six weeks with a quiet
@@ -56,10 +57,10 @@ export default function InsightDetail() {
                     <View style={{ paddingHorizontal: 6, paddingBottom: 4, gap: 2 }}>
                         <Text size={13} weight="semibold" tone="onBand">This week</Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <Text weight="extrabold" size={34} tone="onBand" style={{ letterSpacing: -1.02 }}>GHS {cedis(d.thisWeek)}</Text>
+                            <Text weight="extrabold" size={34} tone="onBand" style={{ letterSpacing: -1.02 }}>{curLabel()} {cedis(d.thisWeek)}</Text>
                             {Math.round(d.change) !== 0 && (
                                 <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: withAlpha(colors.brand['ink-button'], BAND_CHIP_ALPHA) }}>
-                                    <Text size={12} weight="bold" tone="onBand">{d.change > 0 ? '+' : '−'}GHS {cedis(d.change)}</Text>
+                                    <Text size={12} weight="bold" tone="onBand">{d.change > 0 ? '+' : '−'}{curLabel()} {cedis(d.change)}</Text>
                                 </View>
                             )}
                         </View>
@@ -68,7 +69,7 @@ export default function InsightDetail() {
                     <Card gap={12}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                             <Text size={14} weight="bold">Last 6 weeks</Text>
-                            {d.average > 0 && <Text size={12} weight="semibold" tone="tertiary">Avg GHS {cedis(d.average)}</Text>}
+                            {d.average > 0 && <Text size={12} weight="semibold" tone="tertiary">Avg {curLabel()} {cedis(d.average)}</Text>}
                         </View>
                         <WeekChart weeks={d.weeks} average={d.average} color={color} />
                     </Card>

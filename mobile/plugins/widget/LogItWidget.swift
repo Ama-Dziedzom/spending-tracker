@@ -8,6 +8,9 @@ import SwiftUI
 
 // MARK: - Snapshot
 
+/// Currency label for amounts, from the latest snapshot.
+func curLabel() -> String { Snapshot.load()?.currency ?? "GHS" }
+
 struct Snapshot: Codable {
     var v: Int
     var signedIn: Bool
@@ -26,6 +29,8 @@ struct Snapshot: Codable {
     var wallets: [WalletRow]
     var walletsTotal: Double
     var toCheck: Int
+    /// The person's currency label ("GHS", "NGN", "FCFA"). Older snapshots have none: Ghana.
+    var currency: String?
 
     struct Day: Codable { var letter: String; var value: Double; var isToday: Bool; var future: Bool }
     struct Item: Codable { var name: String; var meta: String; var amount: Double; var incoming: Bool; var symbol: String; var tone: String; var time: String }
@@ -243,11 +248,11 @@ struct TodayView: View {
                 Header(text: !s.autopilotOn ? "Paused" : s.staleLabel != nil ? "Today · offline" : "Today", onBlue: true)
                 Spacer(minLength: 4)
                 if isHidden(s, .systemSmall) {
-                    Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
+                    Text(curLabel()).font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
                     Text("• • • •").font(manrope(22, "ExtraBold")).foregroundStyle(.white)
                     Text("Tap to see").font(manrope(11, "Medium")).foregroundStyle(.white.opacity(0.75))
                 } else {
-                    Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
+                    Text(curLabel()).font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
                     Text(Fmt.m(s.todaySpent)).font(manrope(26, "ExtraBold")).foregroundStyle(.white).minimumScaleFactor(0.6).lineLimit(1).widgetAccentable()
                     Text(subtitle(s)).font(manrope(11, "Medium")).foregroundStyle(.white.opacity(0.8)).lineLimit(1)
                 }
@@ -365,7 +370,7 @@ struct WeekView: View {
                 }
                 HStack(alignment: .bottom) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(p.text2)
+                        Text(curLabel()).font(manrope(10, "SemiBold")).foregroundStyle(p.text2)
                         Text(hidden ? "• • • •" : Fmt.m(s.weekSpent)).font(manrope(26, "ExtraBold")).foregroundStyle(p.text).lineLimit(1).minimumScaleFactor(0.6).widgetAccentable()
                     }
                     Spacer()
@@ -394,7 +399,7 @@ struct WalletsView: View {
                 HStack {
                     Header(text: "You have")
                     Spacer()
-                    Text(hidden ? "GHS • • •" : "GHS \(Fmt.m(s.walletsTotal))").font(manrope(14, "ExtraBold")).foregroundStyle(p.text).widgetAccentable()
+                    Text(hidden ? "\(curLabel()) • • •" : "\(curLabel()) \(Fmt.m(s.walletsTotal))").font(manrope(14, "ExtraBold")).foregroundStyle(p.text).widgetAccentable()
                 }
                 ForEach(Array(s.wallets.prefix(3).enumerated()), id: \.offset) { _, w in
                     HStack(spacing: 8) {
@@ -436,7 +441,7 @@ struct OverviewView: View {
                             Spacer()
                             Text(s.dateLabel).font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
                         }
-                        Text("GHS").font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
+                        Text(curLabel()).font(manrope(10, "SemiBold")).foregroundStyle(.white.opacity(0.75))
                         HStack(alignment: .bottom) {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(hidden ? "• • • •" : Fmt.m(s.weekSpent)).font(manrope(28, "ExtraBold")).foregroundStyle(.white).lineLimit(1).minimumScaleFactor(0.6).widgetAccentable()
@@ -536,14 +541,14 @@ struct AccessoryView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Label("This week", systemImage: "bolt").font(manrope(11, "SemiBold"))
                 HStack(alignment: .bottom) {
-                    Text(signedIn ? (hidden ? "GHS •••" : "GHS \(Fmt.w(s!.weekSpent))") : "Log in").font(manrope(17, "ExtraBold"))
+                    Text(signedIn ? (hidden ? "\(curLabel()) •••" : "\(curLabel()) \(Fmt.w(s!.weekSpent))") : "Log in").font(manrope(17, "ExtraBold"))
                     Spacer()
                     if signedIn && !hidden, let s { Bars(days: s.days, height: 12) }
                 }
             }
             .widgetURL(links.spending)
         default:
-            Text(signedIn ? (hidden ? "LogIt · \(s!.toCheck) to check" : "GHS \(Fmt.w(s!.todaySpent)) today · \(s!.toCheck) to check") : "LogIt")
+            Text(signedIn ? (hidden ? "LogIt · \(s!.toCheck) to check" : "\(curLabel()) \(Fmt.w(s!.todaySpent)) today · \(s!.toCheck) to check") : "LogIt")
                 .widgetURL(links.spending)
         }
     }

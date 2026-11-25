@@ -14,6 +14,7 @@ import { SplitEditor } from './split-editor';
 import {
     CategoryGrid, CategoryValue, FactRow, IN_CATEGORIES, SPENT_CATEGORIES, WalletList, WhenForm, pickStyle,
 } from './pickers';
+import { CURRENCY_TOKENS, curLabel } from '@/lib/currency';
 
 type Mode = 'detail' | 'category' | 'wallet' | 'when' | 'split';
 
@@ -174,7 +175,7 @@ function Detail({ tx, onCategory, onWallet, onWhen, onSplit }: {
                 size={36}
                 tone={flow === 'in' ? 'success' : 'primary'}
                 style={{ letterSpacing: -1 }}
-                accessibilityLabel={`${flow === 'in' ? 'Received' : flow === 'moved' ? 'Moved' : 'Spent'} GHS ${listAmount(tx.amount)}`}
+                accessibilityLabel={`${flow === 'in' ? 'Received' : flow === 'moved' ? 'Moved' : 'Spent'} ${curLabel()} ${listAmount(tx.amount)}`}
             >
                 {flow === 'in' ? receivedAmount(tx.amount) : listAmount(tx.amount)}
             </Text>
@@ -285,7 +286,7 @@ function ReadMessage({ sms, description }: { sms: string; description: string })
     );
 }
 
-const AMOUNT = /(?:GHS|GH₵|GHC|GH¢)\s?[\d,]+(?:\.\d{1,2})?/gi;
+const AMOUNT = new RegExp(String.raw`${CURRENCY_TOKENS}\s?[\d,]+(?:\.\d{1,2})?`, 'gi');
 const DATE = /\b(?:\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{4}-\d{2}-\d{2})(?:[ T,]+\d{1,2}:\d{2}(?::\d{2})?(?:\s?[AP]M)?)?/gi;
 
 /** Split the SMS into plain and marked spans. Only the first amount is marked; balances stay plain. */

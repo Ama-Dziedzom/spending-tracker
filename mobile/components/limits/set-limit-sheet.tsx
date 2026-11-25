@@ -6,6 +6,7 @@ import { HIT_SLOP } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { WEEKDAYS, removeLimit, saveLimit, type Limit } from '@/lib/limits';
 import { cedis } from '@/lib/money-window';
+import { curLabel } from '@/lib/currency';
 
 type Mode = 'category' | 'amount' | 'reset' | 'warn';
 
@@ -61,7 +62,7 @@ export function SetLimitSheet({ visible, category: initialCategory, usual, exist
         setBusy(true);
         try {
             await saveLimit({ category, amount: value, reset_day: resetDay, warn_at: warnAt });
-            toast.show({ message: `Limit set · GHS ${cedis(value)} a week on ${style!.label}` });
+            toast.show({ message: `Limit set · ${curLabel()} ${cedis(value)} a week on ${style!.label}` });
             onSaved();
             onClose();
         } catch (e) {
@@ -83,7 +84,7 @@ export function SetLimitSheet({ visible, category: initialCategory, usual, exist
         }
     };
 
-    const warnLabel = warnAt === null ? 'Off' : `${Math.round(warnAt * 100)}%${value > 0 ? ` · GHS ${cedis(value * warnAt)}` : ''}`;
+    const warnLabel = warnAt === null ? 'Off' : `${Math.round(warnAt * 100)}%${value > 0 ? ` · ${curLabel()} ${cedis(value * warnAt)}` : ''}`;
 
     return (
         <Sheet
@@ -118,7 +119,7 @@ export function SetLimitSheet({ visible, category: initialCategory, usual, exist
                         <View style={{ flex: 1 }}>
                             <Text size={18} weight="bold">Weekly limit for {style.label}</Text>
                             <Text size={13} tone="secondary">
-                                {typical > 0 ? `You usually spend about GHS ${cedis(typical)}` : 'Pick a number that feels right for a week'}
+                                {typical > 0 ? `You usually spend about ${curLabel()} ${cedis(typical)}` : 'Pick a number that feels right for a week'}
                             </Text>
                         </View>
                     </View>
@@ -162,7 +163,7 @@ export function SetLimitSheet({ visible, category: initialCategory, usual, exist
                 <ChoiceList
                     options={WARN_OPTIONS.map((w) => ({
                         key: String(w),
-                        label: w === null ? 'Don’t warn me' : `${Math.round(w * 100)}%${value > 0 ? ` · at GHS ${cedis(value * w)}` : ''}`,
+                        label: w === null ? 'Don’t warn me' : `${Math.round(w * 100)}%${value > 0 ? ` · at ${curLabel()} ${cedis(value * w)}` : ''}`,
                         selected: warnAt === w,
                     }))}
                     onPick={(k) => { setWarnAt(k === 'null' ? null : Number(k)); setMode('amount'); }}

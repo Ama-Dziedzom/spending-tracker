@@ -1,3 +1,4 @@
+import { cur, curLabel, ex } from '@/lib/currency';
 import React from 'react';
 import { PermissionsAndroid, Platform, View } from 'react-native';
 import { router } from 'expo-router';
@@ -36,8 +37,8 @@ export default function AllowNotifications() {
             tone="band"
             preview={
                 <>
-                    <SampleToast icon="flash" text="Spent GHS 10 on airtime · MTN MoMo" />
-                    <SampleToast icon="receive" text="Salary in · GHS 3,000 · StanChart" faded />
+                    <SampleToast icon="flash" text={`Spent ${curLabel()} ${ex(10)} on airtime · ${cur().momo[0].name}`} />
+                    <SampleToast icon="receive" text={`Salary in · ${curLabel()} ${ex(3000)}`} faded />
                 </>
             }
             title="Know the moment it’s logged"

@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { Button, CategoryTile, Chip, DayBars, InsetPanel, ListGroup, ListRow, Sheet, Text } from '@/components/ui';
 import { ghs, heroAmount } from '@/lib/format';
 import { joinNames, recapHeadline, recapRange, type WeekRecap } from '@/lib/week-recap';
+import { curLabel } from '@/lib/currency';
 
 /**
  * Week recap (Figma "Week recap · sheet" in 02 · Spending). Shown once, the
@@ -48,7 +49,7 @@ function Body({ recap: r, onClose, onSeeAll }: { recap: WeekRecap; onClose: () =
                 <Text size={13} weight="semibold" tone="secondary">Spent last week</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }} accessible accessibilityLabel={`Spent last week: ${ghs(r.spent)}`}>
-                        <Text size={15} weight="bold" tone="secondary">GHS</Text>
+                        <Text size={15} weight="bold" tone="secondary">{curLabel()}</Text>
                         <Text variant="hero" style={{ letterSpacing: -1.44 }}>{heroAmount(r.spent)}</Text>
                     </View>
                     {tag}

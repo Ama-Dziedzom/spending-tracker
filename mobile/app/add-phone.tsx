@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { BAND, Button, Card, FieldError, Screen, Text, TopBar } from '@/components/ui';
+import { BAND, Button, Card, FieldError, Icon, Screen, Tap, Text, TopBar } from '@/components/ui';
 import { FONT, RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { useAuth } from '../lib/useAuth';
 import { supabase } from '../lib/supabase';
-import { formatPhone, ghanaNetwork, phoneAuthMessage, toE164 } from '../lib/phone';
+import { formatPhone, ghanaNetwork, phoneAuthMessage, phoneRule, toE164 } from '../lib/phone';
+import { cur, type Country } from '../lib/currency';
+import { CountrySheet } from '@/components/settings/country-sheet';
 
 /**
  * Phone number (Figma 1013:2200). Change or add the number on this account:
@@ -20,7 +22,9 @@ export default function PhoneNumberScreen() {
     const [current, setCurrent] = useState<string | null>(null);
     const [phone, setPhone] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const e164 = useMemo(() => toE164(phone, '+233'), [phone]);
+    const [country, setCountry] = useState<Country>(cur());
+    const [picking, setPicking] = useState(false);
+    const e164 = useMemo(() => toE164(phone, `+${country.dial}`), [phone, country]);
     const network = ghanaNetwork(e164);
 
     useEffect(() => {
@@ -29,7 +33,7 @@ export default function PhoneNumberScreen() {
 
     const send = async () => {
         if (!e164) {
-            setError('Use a Ghana number with 9 digits after +233, like 55 018 2290.');
+            setError(phoneRule(country));
             return;
         }
         if (current && e164 === current) {
@@ -62,11 +66,14 @@ export default function PhoneNumberScreen() {
                         backgroundColor: colors.bg.surface, borderWidth: 1.5, borderColor: error ? colors.status.danger : colors.brand.accent,
                     }}
                 >
-                    <Text size={15} weight="semibold" tone="secondary">+233</Text>
+                    <Tap onPress={() => setPicking(true)} accessibilityRole="button" accessibilityLabel={`${country.name}, +${country.dial}. Change country`} hitSlop={{ top: 10, bottom: 10, left: 8, right: 4 }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 }}>
+                        <Text size={15} weight="semibold" tone="secondary">{country.flag} +{country.dial}</Text>
+                        <Icon name="down" size={14} color={colors.text.secondary} />
+                    </Tap>
                     <TextInput
                         value={phone}
                         onChangeText={(t) => { setPhone(t); setError(null); }}
-                        placeholder="55 018 2290"
+                        placeholder={country.example}
                         placeholderTextColor={colors.text.tertiary}
                         keyboardType="phone-pad"
                         autoFocus
@@ -83,6 +90,16 @@ export default function PhoneNumberScreen() {
                 )}
                 {error && <FieldError message={error} />}
             </View>
+
+            <CountrySheet
+                visible={picking}
+                onClose={() => setPicking(false)}
+                selected={country.code}
+                withDial
+                title="Where’s your number from?"
+                subtitle="The country of the new number. Your currency stays as it is; change it in Settings."
+                onPick={(c) => { setPicking(false); setCountry(c); setError(null); }}
+            />
 
             <Button label="Send code" busy={loading} busyLabel="Sending code" disabled={!phone.trim()} onPress={send} />
         </Screen>

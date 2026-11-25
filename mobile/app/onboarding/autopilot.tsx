@@ -7,6 +7,8 @@ import { AuthLayout, CardLink } from '@/components/onboarding/auth-layout';
 import { useTheme } from '@/lib/theme';
 import { getSession } from '@/lib/supabase';
 import { syncSessionToAppGroup, setSmsLoggingFlag } from '@/lib/shareSync';
+import { cur } from '@/lib/currency';
+import { AutopilotSoon } from '@/components/onboarding/autopilot-soon';
 
 const IOS_STEPS: { title: string; meta: string }[] = [
     { title: 'Open Shortcuts › Automation › New', meta: 'Tap + at the top' },
@@ -29,6 +31,11 @@ const ANDROID_POINTS: { icon: IconName; title: string; meta: string }[] = [
  * asks, so the system prompt isn't a surprise.
  */
 export default function OnboardingAutopilot() {
+    // Reading alerts is Ghana-only for now (Figma 1283:6671).
+    return cur().readsAlerts ? <AutopilotSetup /> : <AutopilotSoon />;
+}
+
+function AutopilotSetup() {
     const { colors, shadows } = useTheme();
     const toast = useToast();
 

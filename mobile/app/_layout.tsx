@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold, useFonts } from '@expo-google-fonts/manrope';
 import * as SplashScreen from 'expo-splash-screen';
+import { loadCountry, syncCountryFromUser } from '@/lib/currency';
 import { useEffect, useState } from 'react';
 
 import { ThemeProvider as LogItThemeProvider, useTheme } from '@/lib/theme';
@@ -51,6 +52,9 @@ export default function RootLayout() {
   // after 4s carry on (system font if needed, and app/index.tsx shows the
   // same wordmark as the splash while it finishes).
   const [fontTimeout, setFontTimeout] = useState(false);
+  // The person's currency, saved on this phone, before any amount is drawn.
+  const [countryReady, setCountryReady] = useState(false);
+  useEffect(() => { loadCountry().finally(() => setCountryReady(true)); }, []);
   useEffect(() => {
     const t = setTimeout(() => {
       console.warn('[fonts] still loading after 4s, continuing without them');
@@ -66,10 +70,12 @@ export default function RootLayout() {
     // Sync initial session immediately
     supabase.auth.getSession().then(({ data: { session } }) => {
       syncSessionToAppGroup(session);
+      syncCountryFromUser(session?.user);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       syncSessionToAppGroup(session);
+      if (session?.user) syncCountryFromUser(session.user);
       // Login lapsed on its own (not Log out): "Log in again" (Figma 1014:2313).
       if (event === 'SIGNED_OUT') clearWidgetSnapshot();
       if (event === 'SIGNED_OUT' && !wasIntentionalSignOut()) {
@@ -94,7 +100,7 @@ export default function RootLayout() {
     return () => sub.remove();
   }, []);
 
-  if (!loaded && !error && !fontTimeout) {
+  if ((!loaded && !error && !fontTimeout) || !countryReady) {
     return null;
   }
 

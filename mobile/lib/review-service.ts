@@ -1,3 +1,4 @@
+import { CURRENCY_TOKENS } from './currency';
 import { supabase } from './supabase';
 import { extractFee } from './sms-fee';
 
@@ -111,7 +112,7 @@ const MONTHS: Record<string, number> = {
 export function guessFromSms(sms: string): ReviewPrefill {
     const prefill: ReviewPrefill = {};
 
-    const amount = sms.match(/(?:GHS|GH₵|GHC|¢)\s?([\d,]+(?:\.\d{1,2})?)/i);
+    const amount = sms.match(new RegExp(String.raw`${CURRENCY_TOKENS}\s?([\d,]+(?:\.\d{1,2})?)`, 'i'));
     if (amount) prefill.amount = amount[1].replace(/,/g, '');
 
     if (/\b(received|credited|credit|deposit|cash in|refund|reversal)\b/i.test(sms)) prefill.type = 'income';

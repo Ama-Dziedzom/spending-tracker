@@ -13,6 +13,9 @@ import { getWallets } from '@/lib/wallet-service';
 import { getExpectedIncome } from '@/lib/income-service';
 import { getLimits } from '@/lib/limits';
 import { formatPhone } from '@/lib/phone';
+import { cur, type Country } from '@/lib/currency';
+import { setCountry } from '@/lib/settings-service';
+import { CountrySheet, FlagTile } from '@/components/settings/country-sheet';
 import { forgetPhone, signOutOnPurpose } from '@/lib/session';
 
 const THEMES = [
@@ -40,6 +43,21 @@ export default function Settings() {
     const [autopilotOn, setAutopilotOn] = useState<boolean | null>(null);
     const [shareSamples, setShareSamplesState] = useState(false);
     const [logoutOpen, setLogoutOpen] = useState(false);
+    const [country, setCountryState] = useState<Country>(cur());
+    const [currencyOpen, setCurrencyOpen] = useState(false);
+    const [pendingCountry, setPendingCountry] = useState<Country | null>(null);
+    const changeCountry = async () => {
+        const c = pendingCountry;
+        setPendingCountry(null);
+        if (!c) return;
+        try {
+            await setCountry(c);
+            setCountryState(c);
+            toast.show({ message: `Now counting in ${c.label}` });
+        } catch (e) {
+            toast.show({ message: e instanceof Error ? e.message : 'Couldn’t save that. Try again.', icon: 'alert' });
+        }
+    };
     /** Banks LogIt learned from Check; the sheet lets you remove one. */
     const [learned, setLearned] = useState<LearnedSender[] | null>(null);
     const [learnedOpen, setLearnedOpen] = useState(false);
@@ -143,6 +161,16 @@ export default function Settings() {
 
             <ListGroup label="Money" labelOnBand>
                 <ListRow dense leading={tile('wallet')} title="Wallets" value={walletCount === null ? '' : String(walletCount)} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/wallets')} />
+                <ListRow
+                    dense
+                    leading={<FlagTile country={country} size={34} />}
+                    title="Currency"
+                    value={`${country.currencyName} · ${country.label}`}
+                    valueStyle="setting"
+                    valueTone="secondary"
+                    trailing="chevron"
+                    onPress={() => setCurrencyOpen(true)}
+                />
                 <ListRow dense leading={tile('receive')} title="Expected income" value={expected ?? ''} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/expected-income')} />
                 <ListRow dense leading={tile('shield')} title="Limits" value={limitCount === null ? '' : limitCount === 0 ? 'None' : `${limitCount} set`} valueStyle="setting" valueTone="secondary" trailing="chevron" onPress={() => router.push('/limits')} />
             </ListGroup>
@@ -152,9 +180,9 @@ export default function Settings() {
                     dense
                     leading={tile('flash')}
                     title="Read my alerts"
-                    value={autopilotOn === null ? '' : autopilotOn ? 'On' : 'Set up'}
+                    value={!country.readsAlerts ? 'Coming soon' : autopilotOn === null ? '' : autopilotOn ? 'On' : 'Set up'}
                     valueStyle="setting"
-                    valueTone={autopilotOn ? 'success' : 'secondary'}
+                    valueTone={autopilotOn && country.readsAlerts ? 'success' : 'secondary'}
                     trailing="chevron"
                     onPress={() => router.push('/sms-settings')}
                 />
@@ -219,6 +247,26 @@ export default function Settings() {
                 <Text size={13} tone="secondary">Nothing yet. Add an alert from Check and LogIt will remember that bank’s alerts.</Text>
             )}
         </Sheet>
+        <CountrySheet
+            visible={currencyOpen}
+            onClose={() => setCurrencyOpen(false)}
+            selected={country.code}
+            title="Your currency"
+            subtitle="LogIt counts in this from now on. What you’ve already logged stays as it is: nothing is converted."
+            onPick={(c) => { setCurrencyOpen(false); if (c.code !== country.code) setPendingCountry(c); }}
+        />
+        <Dialog
+            visible={!!pendingCountry}
+            tone="neutral"
+            icon="info"
+            title={pendingCountry ? `Count in ${pendingCountry.label} from now on?` : ''}
+            body={`Amounts you’ve already logged stay in ${country.label}. LogIt doesn’t convert them.`}
+            confirmLabel={pendingCountry ? `Use ${pendingCountry.label}` : 'Use it'}
+            cancelLabel="Keep it"
+            stacked
+            onCancel={() => setPendingCountry(null)}
+            onConfirm={changeCountry}
+        />
         <Dialog
             visible={logoutOpen}
             tone="neutral"

@@ -10,6 +10,8 @@ import { syncSessionToAppGroup, setSmsLoggingFlag } from '@/lib/shareSync';
 import { getShareSamples, setShareSamples } from '@/lib/review-service';
 import { lastAlertAt } from '@/lib/settings-service';
 import { ago } from '@/lib/format';
+import { cur } from '@/lib/currency';
+import { AutopilotSoon } from '@/components/onboarding/autopilot-soon';
 
 const tile = (icon: IconName) => <CategoryTile tone="accent" icon={icon} size={34} />;
 
@@ -29,6 +31,11 @@ const SMS_KEY = 'sms_auto_logging_enabled';
  * time it worked. Opt-in learning explained in one sentence.
  */
 export default function Autopilot() {
+    // Reading alerts is Ghana-only for now (Figma 1283:6671).
+    return cur().readsAlerts ? <AutopilotGhana /> : <AutopilotSoon inSettings />;
+}
+
+function AutopilotGhana() {
     const { colors } = useTheme();
     const toast = useToast();
     const [last, setLast] = useState<Date | null | undefined>(undefined);

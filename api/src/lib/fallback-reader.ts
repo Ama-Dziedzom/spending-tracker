@@ -30,8 +30,10 @@ export interface FallbackGuess {
   confidence: number;
 }
 
-const AMOUNT = String.raw`(?:GHS|GH₵|GHC|GH¢|¢|₵)\s?([\d,]+(?:\.\d{1,2})?)`;
-const AMOUNT_AFTER = String.raw`([\d,]+(?:\.\d{1,2})?)\s?(?:GHS|GH₵|GHC|cedis?)\b`;
+// Ghana first; the rest so pasted alerts from other countries read too (one currency per person).
+const CUR = String.raw`(?:GHS|GH₵|GHC|GH¢|¢|₵|NGN|₦|KES|KSh|Ksh|UGX|USh|RWF|FRW|ZMW|XOF|XAF|F\s?CFA|CFA)`;
+const AMOUNT = String.raw`${CUR}\s?([\d,]+(?:\.\d{1,2})?)`;
+const AMOUNT_AFTER = String.raw`([\d,]+(?:\.\d{1,2})?)\s?(?:${CUR}|cedis?|naira|shillings?|kwacha|francs?)\b`;
 
 const toNumber = (s: string | undefined | null): number | null => {
   if (!s) return null;

@@ -9,6 +9,7 @@ import { getWallets } from '@/lib/wallet-service';
 import { categoryStyle } from '@/lib/category-style';
 import { sameDay, shortDate, time24 } from '@/lib/format';
 import { Tap } from '@/components/ui/tap';
+import { cur, curLabel } from '@/lib/currency';
 
 /**
  * Pieces shared by Transaction detail, Add manually and Log cash
@@ -271,23 +272,23 @@ export function WhenForm({ initial, onSave, onBack, saveLabel = 'Save' }: {
 
 /**
  * Big amount entry: "GHS 45|" (Figma 1005:1120). Digits and one decimal
- * point, up to two decimals.
+ * point, up to two decimals; whole numbers only where the currency has no coins.
  */
 export function AmountInput({ value, onChange, autoFocus, size = 52 }: { value: string; onChange: (v: string) => void; autoFocus?: boolean; /** 52 (Add manually) or 48 (Set a limit). */ size?: 52 | 48 }) {
     const { colors } = useTheme();
     return (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 8, paddingVertical: 10 }}>
-            <Text size={18} weight={size === 48 ? 'semibold' : 'bold'} tone={size === 48 ? 'secondary' : 'tertiary'}>GHS</Text>
+            <Text size={18} weight={size === 48 ? 'semibold' : 'bold'} tone={size === 48 ? 'secondary' : 'tertiary'}>{curLabel()}</Text>
             <BottomSheetTextInput
                 value={value}
-                onChangeText={(t) => onChange(cleanAmount(t))}
-                keyboardType="decimal-pad"
+                onChangeText={(t) => onChange(cur().decimals === 0 ? cleanAmount(t).replace(/\..*/, '') : cleanAmount(t))}
+                keyboardType={cur().decimals === 0 ? 'number-pad' : 'decimal-pad'}
                 autoFocus={autoFocus}
                 placeholder="0"
                 placeholderTextColor={colors.text.tertiary}
                 selectionColor={colors.brand.accent}
                 cursorColor={colors.brand.accent}
-                accessibilityLabel="Amount in cedis"
+                accessibilityLabel={`Amount in ${cur().plural}`}
                 maxLength={12}
                 style={{
                     fontFamily: FONT.extrabold, fontSize: size, letterSpacing: size === 48 ? -1.44 : -2.08,

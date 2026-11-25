@@ -5,6 +5,7 @@ import { useTheme } from '@/lib/theme';
 import type { IncomePrompt } from '@/lib/income-service';
 import { ordinal } from '@/lib/income-service';
 import { ghs } from '@/lib/format';
+import { curLabel } from '@/lib/currency';
 
 /**
  * "Did your salary come in?" (Figma 1002:627). Only for banks that don't send
@@ -62,7 +63,7 @@ export function FirstRunCard({ onAutopilot, onPaste }: { onAutopilot: () => void
         <Card hero gap={14}>
             <Text size={13} weight="semibold" tone="secondary">Spent this week</Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                <Text size={15} weight="bold" tone="secondary">GHS</Text>
+                <Text size={15} weight="bold" tone="secondary">{curLabel()}</Text>
                 <Text variant="hero">0</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 48 }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

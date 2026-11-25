@@ -17,6 +17,7 @@ import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { useTheme } from '@/lib/theme';
 import { ago, listAmount } from '@/lib/format';
 import { FONT, RAW } from '@/constants/theme';
+import { curLabel } from '@/lib/currency';
 
 /**
  * Wallet detail (Figma 1006:1096). The balance comes from the alert itself,
@@ -99,7 +100,7 @@ export default function WalletScreen() {
                                 <CategoryTile tone={isCash ? 'cash' : 'accent'} icon={isCash ? 'cash' : w.type === 'bank' ? 'bank' : 'wallet'} size={44} />
                                 <View style={{ flex: 1, gap: 2 }}>
                                     <Text size={13} weight="semibold" tone="secondary">Balance</Text>
-                                    <Text weight="extrabold" size={28} accessibilityLabel={`Balance GHS ${listAmount(Number(w.current_balance) || 0)}`}>
+                                    <Text weight="extrabold" size={28} accessibilityLabel={`Balance ${curLabel()} ${listAmount(Number(w.current_balance) || 0)}`}>
                                         {listAmount(Number(w.current_balance) || 0)}
                                     </Text>
                                 </View>
@@ -151,7 +152,7 @@ export default function WalletScreen() {
 function Flow({ icon, label, amount, tone }: { icon: 'receive' | 'sent'; label: string; amount: number; tone: 'success' | 'primary' }) {
     const { colors } = useTheme();
     return (
-        <View style={{ flex: 1, backgroundColor: colors.bg.muted, borderRadius: 16, padding: 12, gap: 4 }} accessible accessibilityLabel={`${label}, GHS ${listAmount(amount)}`}>
+        <View style={{ flex: 1, backgroundColor: colors.bg.muted, borderRadius: 16, padding: 12, gap: 4 }} accessible accessibilityLabel={`${label}, ${curLabel()} ${listAmount(amount)}`}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Icon name={icon} size={14} color={colors.text.secondary} />
                 <Text variant="meta" weight="semibold" tone="secondary">{label}</Text>

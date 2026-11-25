@@ -3,6 +3,7 @@ import { categoryStyle } from './category-style';
 import { flowOf, startOfMonth } from './spending-service';
 import { merchantKey } from './category-rules';
 import { type MoneyWindow, addDays, amt, at, between, catOf, cedis, inOf, merchantName, monthLong, spentOf, startOfDay, sum } from './money-window';
+import { cur, curLabel } from '@/lib/currency';
 
 /**
  * A plain-text summary of someone's money for the Ask LogIt chat. Built on
@@ -12,10 +13,11 @@ import { type MoneyWindow, addDays, amt, at, between, catOf, cedis, inOf, mercha
  */
 export function buildMoneySnapshot(w: MoneyWindow, now = new Date()): string {
     const lines: string[] = [];
-    const g = (n: number) => `GHS ${cedis(n)}`;
+    const g = (n: number) => `${curLabel()} ${cedis(n)}`;
     const today = startOfDay(now);
     const tomorrow = addDays(today, 1);
 
+    lines.push(`Country: ${cur().name}. Currency: ${cur().label} (${cur().plural}); every amount below is in it.`);
     lines.push(`Today: ${now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}. Day ${now.getDate()} of ${new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()} this month.`);
     if (w.firstEntryAt) lines.push(`Logging since: ${w.firstEntryAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}.`);
 

@@ -6,6 +6,7 @@ import { flowOf, summarise } from './spending-service';
 import { merchantName } from './money-window';
 import { categoryStyle } from './category-style';
 import { lastAlertAt, getProfile } from './settings-service';
+import { curLabel } from './currency';
 
 /**
  * What the home-screen and lock-screen widgets show (Figma 1037:4555,
@@ -112,6 +113,7 @@ export async function updateWidgetSnapshot(input: {
         latest,
         wallets,
         walletsTotal: wallets.filter((w) => !w.uncounted).reduce((sum, w) => sum + w.balance, 0),
+        currency: curLabel(),
         toCheck: input.toCheck,
     });
 }
@@ -121,7 +123,7 @@ export function clearWidgetSnapshot() {
     write({
         v: 1, signedIn: false, updatedAt: new Date().toISOString(), hideLockScreen: true, hideHomeScreen: true,
         autopilotOn: true, todaySpent: 0, todayPayments: 0, weekSpent: 0, weekChange: null, dateLabel: '',
-        days: [], latest: [], wallets: [], walletsTotal: 0, toCheck: 0,
+        days: [], latest: [], wallets: [], walletsTotal: 0, toCheck: 0, currency: curLabel(),
     });
 }
 

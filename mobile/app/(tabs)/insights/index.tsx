@@ -12,6 +12,7 @@ import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { categoryStyle } from '@/lib/category-style';
 import { shortDate } from '@/lib/format';
 import { RAW, type CategoryColor, BAND_CHIP_ALPHA, withAlpha } from '@/constants/theme';
+import { curLabel } from '@/lib/currency';
 
 /** Room for the Ask bar that sits above the tab bar. */
 const ASK_BAR_SPACE = 64;
@@ -142,7 +143,7 @@ export default function Insights() {
                         ? (window ? pickableWeeks(window, now) : []).map(({ start, spent, current }, i) => {
                             const selected = mode === 'week' && start.getTime() === week.getTime();
                             const name = current ? 'This week' : i === 1 ? 'Last week' : weekRange(start);
-                            const amount = spent > 0 ? `GHS ${cedis(spent)} ${current ? 'so far' : 'spent'}` : 'Nothing logged';
+                            const amount = spent > 0 ? `${curLabel()} ${cedis(spent)} ${current ? 'so far' : 'spent'}` : 'Nothing logged';
                             return (
                                 <ListRow
                                     key={start.toISOString()}
@@ -160,7 +161,7 @@ export default function Insights() {
                                 <ListRow
                                     key={start.toISOString()}
                                     title={start.getFullYear() === now.getFullYear() ? monthLong(start) : `${monthLong(start)} ${start.getFullYear()}`}
-                                    meta={spent > 0 ? `GHS ${cedis(spent)} spent` : 'Nothing logged'}
+                                    meta={spent > 0 ? `${curLabel()} ${cedis(spent)} spent` : 'Nothing logged'}
                                     trailing={selected ? <Icon name="tick" size={18} color={tickColor} /> : 'none'}
                                     onPress={() => { setMode('month'); setMonth(start); setPickerOpen(false); }}
                                     accessibilityLabel={`${monthLong(start)}${selected ? ', selected' : ''}`}
@@ -206,7 +207,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                     <Text size={13} weight="medium" tone="secondary">{f.body}</Text>
                 </View>
                 <WeekChart weeks={f.weeks} average={f.average} color={colors.brand.accent} lastLabel={f.lastLabel} />
-                {f.average > 0 && <Text size={12} weight="semibold" tone="tertiary">Average GHS {cedis(f.average)} a week</Text>}
+                {f.average > 0 && <Text size={12} weight="semibold" tone="tertiary">Average {curLabel()} {cedis(f.average)} a week</Text>}
             </Card>
         );
     }
@@ -242,7 +243,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
         return (
             <Card gap={10} onPress={() => onAsk(`How much did I spend on subscriptions ${monthName ? `in ${monthName}` : 'this month'}?`)}>
                 {top(<Tag tone={s.tone} icon={s.icon} label="Subscriptions" />, f.renewBy ? `Renew by ${shortDate(f.renewBy)}` : f.period ?? 'This month')}
-                <Text weight="bold" size={18} style={{ letterSpacing: -0.18 }}>GHS {cedis(f.total)} a month on {f.apps.length} {f.apps.length === 1 ? 'app' : 'apps'}</Text>
+                <Text weight="bold" size={18} style={{ letterSpacing: -0.18 }}>{curLabel()} {cedis(f.total)} a month on {f.apps.length} {f.apps.length === 1 ? 'app' : 'apps'}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                     {f.apps.slice(0, 4).map((a) => (
                         <View key={a.name} style={{ paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, backgroundColor: colors.bg.muted }}>
@@ -275,7 +276,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                     {showChart && <View
                         style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}
                         accessible
-                        accessibilityLabel={months.map((m) => `${m.label}: GHS ${cedis(m.cameIn)} in, GHS ${cedis(m.spent)} out`).join('. ')}
+                        accessibilityLabel={months.map((m) => `${m.label}: ${curLabel()} ${cedis(m.cameIn)} in, ${curLabel()} ${cedis(m.spent)} out`).join('. ')}
                     >
                         {months.map((m, i) => {
                             const last = i === months.length - 1;
@@ -293,8 +294,8 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                     </View>}
                 </View>
                 <View style={{ flexDirection: 'row', gap: 14 }}>
-                    <Legend color={inColor} label={`In · GHS ${cedis(f.cameIn)}`} />
-                    <Legend color={outColor} label={`Out · GHS ${cedis(f.spent)}`} />
+                    <Legend color={inColor} label={`In · ${curLabel()} ${cedis(f.cameIn)}`} />
+                    <Legend color={outColor} label={`Out · ${curLabel()} ${cedis(f.spent)}`} />
                 </View>
             </Card>
         );
@@ -309,10 +310,10 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                     {f.rows.map((r) => {
                         const color = r.style.tone === 'muted' ? colors.text.tertiary : colors.cat[r.style.tone];
                         return (
-                            <View key={r.category} style={{ gap: 5 }} accessible accessibilityLabel={`${r.style.label}: GHS ${cedis(r.amount)}, ${Math.round(r.share * 100)}% of ${f.base === 'in' ? 'income' : 'spending'}`}>
+                            <View key={r.category} style={{ gap: 5 }} accessible accessibilityLabel={`${r.style.label}: ${curLabel()} ${cedis(r.amount)}, ${Math.round(r.share * 100)}% of ${f.base === 'in' ? 'income' : 'spending'}`}>
                                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                     <Text size={13} weight="semibold">{r.style.label}</Text>
-                                    <Text size={13} weight="semibold" tone="secondary">GHS {cedis(r.amount)} · {Math.round(r.share * 100)}%</Text>
+                                    <Text size={13} weight="semibold" tone="secondary">{curLabel()} {cedis(r.amount)} · {Math.round(r.share * 100)}%</Text>
                                 </View>
                                 <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.bg.muted, overflow: 'hidden' }}>
                                     <View style={{ width: `${Math.min(100, r.share * 100)}%`, height: 6, borderRadius: 3, backgroundColor: color }} />
@@ -322,7 +323,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
                     })}
                 </View>
                 <Text size={12} weight="medium" tone="tertiary">
-                    {f.base === 'in' ? `Share of the GHS ${cedis(f.income)} that came in ${about}.` : `Share of the GHS ${cedis(f.income)} you spent ${about}.`}
+                    {f.base === 'in' ? `Share of the ${curLabel()} ${cedis(f.income)} that came in ${about}.` : `Share of the ${curLabel()} ${cedis(f.income)} you spent ${about}.`}
                 </Text>
             </Card>
         );
@@ -361,7 +362,7 @@ function FindingCard({ finding: f, onAsk, monthName }: { finding: Finding; onAsk
     return (
         <Card gap={10} onPress={() => onAsk(`Who did I send the most money to ${monthName ? `in ${monthName}` : 'this month'}?`)}>
             {top(<Tag tone="people" icon="people" label="People" />, f.period)}
-            <Text weight="bold" size={18} style={{ letterSpacing: -0.18 }}>{first} got GHS {cedis(f.total)} in {f.sends} {f.sends === 1 ? 'send' : 'sends'}</Text>
+            <Text weight="bold" size={18} style={{ letterSpacing: -0.18 }}>{first} got {curLabel()} {cedis(f.total)} in {f.sends} {f.sends === 1 ? 'send' : 'sends'}</Text>
             <Text size={13} weight="medium" tone="secondary">More than anyone else {f.current ? 'this month' : `in ${f.period}`}.</Text>
         </Card>
     );

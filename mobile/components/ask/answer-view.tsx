@@ -6,6 +6,7 @@ import { useTheme } from '@/lib/theme';
 import type { Answer } from '@/lib/ask-engine';
 import { cedis } from '@/lib/money-window';
 import type { CategoryColor } from '@/constants/theme';
+import { curLabel } from '@/lib/currency';
 
 /**
  * One answer in the thread (Figma 1009:1514, 1045:5274, 1045:5425,
@@ -62,7 +63,7 @@ export function AnswerView({ answer: a, onFollowUp, onSource, onCopy, onRefresh,
 
             {a.shape === 'total' && (
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                    <Text weight="extrabold" size={34} style={{ letterSpacing: -1.02 }}>GHS {cedis(a.amount)}</Text>
+                    <Text weight="extrabold" size={34} style={{ letterSpacing: -1.02 }}>{curLabel()} {cedis(a.amount)}</Text>
                     <Text size={14} weight="semibold" tone="secondary">{a.unit}</Text>
                 </View>
             )}
@@ -179,7 +180,7 @@ export function AnswerView({ answer: a, onFollowUp, onSource, onCopy, onRefresh,
 /** Plain text of an answer, for Copy. */
 export function answerText(a: Answer): string {
     if (a.shape === 'cant') return a.sentence;
-    if (a.shape === 'total') return `GHS ${cedis(a.amount)} ${a.unit}. ${a.sentence}`;
+    if (a.shape === 'total') return `${curLabel()} ${cedis(a.amount)} ${a.unit}. ${a.sentence}`;
     if (a.shape === 'verdict') return `${a.tag}. ${a.sentence}\n${a.rows.map((r) => `${r.label}: ${r.value}`).join('\n')}`;
     return `${a.sentence}\n${a.rows.map((r) => `${r.label}: ${r.display}`).join('\n')}`;
 }

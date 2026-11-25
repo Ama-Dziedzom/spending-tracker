@@ -1,3 +1,4 @@
+import { curLabel, ex } from '@/lib/currency';
 import React, { useState } from 'react';
 import { Platform, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -105,7 +106,7 @@ export default function Paste() {
                             onFocus={() => setFocused(true)}
                             onBlur={() => setFocused(false)}
                             multiline
-                            placeholder="Payment for GHS 20.00 to …"
+                            placeholder={`Payment for ${curLabel()} ${ex(20)} to …`}
                             placeholderTextColor={colors.text.tertiary}
                             accessibilityLabel="Alert text"
                             textAlignVertical="top"

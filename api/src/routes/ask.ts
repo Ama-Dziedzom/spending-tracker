@@ -88,11 +88,12 @@ async function bumpDailyCount(userId: string): Promise<number | null> {
   return typeof data === 'number' ? data : Number(data);
 }
 
-const PERSONA = `You are LogIt, the friendly money companion inside a Ghanaian spending-tracker app. People log mobile money (MTN MoMo, Telecel Cash, AT Money) and bank alerts, and you help them understand their money and make better choices.
+const PERSONA = `You are LogIt, the friendly money companion inside an African spending-tracker app, built in Ghana. People log mobile money (MTN MoMo, Telecel Cash, M-Pesa, OPay, Orange Money and others) and bank alerts, and you help them understand their money and make better choices.
 
 How you talk:
 - Warm, plain and very brief, like a sensible friend who is good with money. The app draws your numbers as a card, so the words only carry the point.
-- Amounts are in Ghana cedis, written "GHS 1,250". Round to whole cedis unless pennies matter.
+- Amounts are in the person's currency, named on the first line of the MONEY SUMMARY. Write them with that label first, like "GHS 1,250", "NGN 45,000" or "FCFA 25,000". Round to whole units unless small amounts matter. Never convert between currencies.
+- Speak to their country: local providers, prices and habits from where they live, not Ghana's unless they're in Ghana.
 - Plain text only. No markdown, no bullet lists in "sentence".
 - Be honest and kind about overspending. Never lecture or shame.
 - You can chat about general money topics (budgeting, saving, susu, T-bills, emergency funds), but keep it grounded in their numbers where you can.
@@ -187,12 +188,12 @@ function toCard(p: Record<string, unknown>): ChatCard | null {
 }
 
 /** Plain text of a card, kept as the reply for the conversation history and Copy. */
-function cardText(c: ChatCard): string {
+function cardText(c: ChatCard, label: string): string {
   const parts: string[] = [];
-  if (c.shape === 'total') parts.push(`GHS ${Math.round(c.amount).toLocaleString('en-US')} ${c.unit}.`.replace(/\s+\./, '.'));
+  if (c.shape === 'total') parts.push(`${label} ${Math.round(c.amount).toLocaleString('en-US')} ${c.unit}.`.replace(/\s+\./, '.'));
   if (c.shape === 'verdict') parts.push(`${c.tag}.`);
   parts.push(c.sentence);
-  if (c.shape === 'total' && c.bars.length) parts.push(c.bars.map((b) => `${b.label}: GHS ${Math.round(b.value).toLocaleString('en-US')}`).join(', '));
+  if (c.shape === 'total' && c.bars.length) parts.push(c.bars.map((b) => `${b.label}: ${label} ${Math.round(b.value).toLocaleString('en-US')}`).join(', '));
   if (c.rows.length && c.shape !== 'total' && c.shape !== 'note') parts.push(c.rows.map((r) => `${r.label}: ${r.display || r.value}`).join(', '));
   return parts.join(' ');
 }
@@ -228,6 +229,8 @@ askRouter.post('/ask', extractUser, async (req: AuthenticatedRequest, res: Respo
   }
 
   const turns = validTurns(req.body?.messages);
+  // The person's currency label, sent by the phone ("GHS", "NGN", "FCFA"…). Only used to write replies.
+  const label = typeof req.body?.currency === 'string' && /^[A-Z]{3,4}$/.test(req.body.currency) ? req.body.currency : 'GHS';
   const snapshot = typeof req.body?.snapshot === 'string' ? req.body.snapshot.slice(0, MAX_SNAPSHOT_CHARS) : '';
   if (!turns || !snapshot) {
     res.status(400).json({ error: 'messages and snapshot are required' });
@@ -283,7 +286,7 @@ askRouter.post('/ask', extractUser, async (req: AuthenticatedRequest, res: Respo
         : { shape: 'note', sentence: 'Sorry, I lost my train of thought. Could you ask that again?' };
     }
     const card = toCard(parsed);
-    const reply = card ? cardText(card) : 'Sorry, I lost my train of thought. Could you ask that again?';
+    const reply = card ? cardText(card, label) : 'Sorry, I lost my train of thought. Could you ask that again?';
     const suggestions = Array.isArray(parsed.suggestions)
       ? parsed.suggestions.filter((s): s is string => typeof s === 'string' && s.trim().length > 0).map((s) => s.trim()).slice(0, 3)
       : [];

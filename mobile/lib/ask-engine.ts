@@ -6,6 +6,7 @@ import { merchantKey } from './category-rules';
 import {
     type MoneyWindow, addDays, between, catOf, cedis, inOf, merchantName, monthLong, monthShort, spentOf, startOfDay, sum,
 } from './money-window';
+import { CURRENCY_WORDS, curLabel, ex } from '@/lib/currency';
 
 /**
  * Ask LogIt (handoff §8). Every answer is one of four shapes, and only
@@ -77,12 +78,16 @@ function namedMonthStart(index: number, now: Date): Date {
     return new Date(year, index, 1);
 }
 
-export const STARTERS = [
+/** Starter questions. A function so the example price is in the person's currency. */
+export const starters = (): string[] => [
     'Am I spending more than I earn?',
     'How much did I spend on food this month?',
     'Where can I cut back this month?',
-    'Can I afford a GHS 500 phone this month?',
+    affordExample(),
 ];
+
+/** The afford question with a phone price in the person's currency. */
+const affordExample = () => `Can I afford a ${curLabel()} ${ex(500)} phone this month?`;
 
 // ---------------------------------------------------------------------------
 
@@ -152,18 +157,18 @@ export function answer(question: string, w: MoneyWindow, ctx: AskContext = {}, n
 
     if (/what can you see|what do you know|what can you answer|help/.test(q)) return capabilities(w);
 
-    const money = q.match(/(?:ghs|gh₵|ghc|¢|cedis?)\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.\d+)?)\s*(?:ghs|cedis?)/);
+    const money = q.match(new RegExp(String.raw`${CURRENCY_WORDS}\s*([\d,]+(?:\.\d+)?)|([\d,]+(?:\.\d+)?)\s*${CURRENCY_WORDS}`));
     const amountAsked = money ? Number((money[1] ?? money[2]).replace(/,/g, '')) : null;
     if (/wait (until|till|for) (payday|pay day|salary|my salary)/.test(q)) {
-        if (!ctx.afford) return cant('Ask about something first, like “Can I afford a GHS 500 phone?”, then I can check payday.', ['Can I afford a GHS 500 phone this month?']);
+        if (!ctx.afford) return cant(`Ask about something first, like “Can I afford a ${curLabel()} ${ex(500)} phone?”, then I can check payday.`, [affordExample()]);
         return afford(ctx.afford.price, ctx.afford.thing, w, now, true);
     }
     if (/cut back|save more|spend less|where can i save/.test(q)) return topCategories(w, 'month', now, true);
     const sendsTo = q.match(/(?:show|see|list) (?:my )?(?:sends|payments|transfers|money) to ([a-z][a-z .'-]+?)\??$/);
     if (sendsTo) return sendsToPerson(sendsTo[1].trim(), w, period ?? 'month', now);
     if (/afford|can i (buy|get|pay for)/.test(q)) {
-        if (!amountAsked) return cant('Tell me the price and I’ll check, like “Can I afford a GHS 500 phone?”.', ['Can I afford a GHS 500 phone this month?']);
-        const thing = q.match(/(?:a|an|the)?\s*(?:ghs|gh₵|¢)?\s*[\d,]+(?:\.\d+)?\s*(?:ghs|cedis?)?\s+([a-z][a-z ]{1,24}?)(?:\s+this month|\?|$)/)?.[1]?.trim();
+        if (!amountAsked) return cant(`Tell me the price and I’ll check, like “Can I afford a ${curLabel()} ${ex(500)} phone?”.`, [affordExample()]);
+        const thing = q.match(new RegExp(String.raw`(?:a|an|the)?\s*${CURRENCY_WORDS}?\s*[\d,]+(?:\.\d+)?\s*${CURRENCY_WORDS}?\s+([a-z][a-z ]{1,24}?)(?:\s+this month|\?|$)`))?.[1]?.trim();
         return afford(amountAsked, thing || 'it', w, now);
     }
     if (/balance|how much (money )?(do i have|have i got|is (in|on|left))|money left/.test(q)) return balance(q, w);
@@ -253,12 +258,12 @@ function total(category: string | undefined, w: MoneyWindow, period: Period, now
         });
         const prev = months[1];
         if (prev.value > 0) {
-            if (amount > prev.value) parts.push(`That’s GHS ${cedis(amount - prev.value)} more than ${prev.name}`);
-            else parts.push(`${prev.name} was GHS ${cedis(prev.value)} in total`);
+            if (amount > prev.value) parts.push(`That’s ${curLabel()} ${cedis(amount - prev.value)} more than ${prev.name}`);
+            else parts.push(`${prev.name} was ${curLabel()} ${cedis(prev.value)} in total`);
         }
         if (period === 'month') {
             const weeks = Math.max(1, (startOfDay(now).getTime() - startOfMonth(now).getTime()) / (7 * 86_400_000) + 1 / 7);
-            if (amount > 0) parts[parts.length - 1] = `${parts[parts.length - 1] ?? 'So far'}, about GHS ${cedis(amount / weeks)} a week`;
+            if (amount > 0) parts[parts.length - 1] = `${parts[parts.length - 1] ?? 'So far'}, about ${curLabel()} ${cedis(amount / weeks)} a week`;
         }
         // The chip compares like with like: this month so far vs the same days last month.
         let delta: number | null = null;
@@ -285,7 +290,7 @@ function total(category: string | undefined, w: MoneyWindow, period: Period, now
         shape: 'total',
         amount,
         unit,
-        sentence: parts.length ? `${parts.join('. ')}.`.replace('..', '.') : `GHS ${cedis(amount)} ${r.label}.`,
+        sentence: parts.length ? `${parts.join('. ')}.`.replace('..', '.') : `${curLabel()} ${cedis(amount)} ${r.label}.`,
         chart: chart && chart.rows.some((x) => x.value > 0) ? chart : undefined,
         source: { label: fromN(list.length), txs: list },
         followUps: category
@@ -356,7 +361,7 @@ function balance(q: string, w: MoneyWindow): Answer {
         unit: `across ${counted.length} ${counted.length === 1 ? 'wallet' : 'wallets'}`,
         sentence: counted.length ? counted.map((x) => `${x.name} ${cedis(Number(x.current_balance) || 0)}`).join(', ') + '.' : 'You have no wallets yet.',
         source: { label: 'From your wallets’ latest alerts', txs: [] },
-        followUps: ['Can I afford a GHS 500 phone this month?'],
+        followUps: [affordExample()],
         context: {},
     };
 }
@@ -405,14 +410,14 @@ function afford(price: number, thing: string, w: MoneyWindow, now: Date, afterPa
             tagTone: left >= 0 ? 'success' : 'neutral',
             tagIcon: left >= 0 ? 'tick' : 'alert',
             sentence: left >= 0
-                ? `If you wait until ${ordinalDay}, you’d have about GHS ${cedis(left)} after buying ${thing === 'it' ? 'it' : `the ${thing}`}.`
-                : `Even after payday you’d be about GHS ${cedis(-left)} short.`,
+                ? `If you wait until ${ordinalDay}, you’d have about ${curLabel()} ${cedis(left)} after buying ${thing === 'it' ? 'it' : `the ${thing}`}.`
+                : `Even after payday you’d be about ${curLabel()} ${cedis(-left)} short.`,
             rows: [
-                { label: 'You have now', value: `GHS ${cedis(have)}` },
+                { label: 'You have now', value: `${curLabel()} ${cedis(have)}` },
                 { label: `Usual spending until ${ordinalDay}`, value: `− ${cedis(usual)}` },
                 { label: `${upcoming.e.label} on ${ordinalDay}`, value: `+ ${cedis(salary)}` },
                 { label, value: `− ${cedis(cost)}` },
-                { label: 'Left after payday', value: `≈ ${left < 0 ? '−' : ''}GHS ${cedis(left)}`, strong: true },
+                { label: 'Left after payday', value: `≈ ${left < 0 ? '−' : ''}${curLabel()} ${cedis(left)}`, strong: true },
             ],
             source: { label: 'Based on your last 3 months', icon: 'calendar', txs: last3 },
             followUps: ['Where could I cut back?'],
@@ -429,13 +434,13 @@ function afford(price: number, thing: string, w: MoneyWindow, now: Date, afterPa
         tagTone: left < 0 ? 'neutral' : tight ? 'warn' : 'success',
         tagIcon: left < 0 ? 'alert' : tight ? 'info' : 'tick',
         sentence: left >= 0
-            ? `You’d have about GHS ${cedis(left)} left until ${untilText}.`
-            : `You’d be about GHS ${cedis(-left)} short before ${untilText}.`,
+            ? `You’d have about ${curLabel()} ${cedis(left)} left until ${untilText}.`
+            : `You’d be about ${curLabel()} ${cedis(-left)} short before ${untilText}.`,
         rows: [
-            { label: 'You have now', value: `GHS ${cedis(have)}` },
+            { label: 'You have now', value: `${curLabel()} ${cedis(have)}` },
             { label: `Usual spending until ${upcoming ? ordinalDay : 'month end'}`, value: `− ${cedis(usual)}` },
             { label, value: `− ${cedis(cost)}` },
-            { label: upcoming ? `Left before ${upcoming.e.label.toLowerCase()}` : 'Left at month end', value: `≈ ${left < 0 ? '−' : ''}GHS ${cedis(left)}`, strong: true },
+            { label: upcoming ? `Left before ${upcoming.e.label.toLowerCase()}` : 'Left at month end', value: `≈ ${left < 0 ? '−' : ''}${curLabel()} ${cedis(left)}`, strong: true },
         ],
         source: { label: 'Based on your last 3 months', icon: 'calendar', txs: last3 },
         followUps: [upcoming ? 'What if I wait until payday?' : '', 'Where could I cut back?'].filter(Boolean),
@@ -495,7 +500,7 @@ function topPeople(w: MoneyWindow, period: Period, now: Date): Answer {
     const prevMonth = monthLong(new Date(r.from.getFullYear(), r.from.getMonth() - 1, 1));
     return {
         shape: 'ranking',
-        sentence: `${top.name.split(' ')[0]}, GHS ${cedis(top.total)} in ${top.n} ${top.n === 1 ? 'send' : 'sends'} ${when}.`,
+        sentence: `${top.name.split(' ')[0]}, ${curLabel()} ${cedis(top.total)} in ${top.n} ${top.n === 1 ? 'send' : 'sends'} ${when}.`,
         rows: ranked.map((p) => ({ label: p.name, value: p.total, display: cedis(p.total), meta: `${p.n} ${p.n === 1 ? 'send' : 'sends'}`, initials: initialsOf(p.name) })),
         color: 'people',
         source: { label: `From ${sends.length} ${sends.length === 1 ? 'transfer' : 'transfers'} ${r.label}`, txs: sends },
@@ -523,8 +528,8 @@ function topCategories(w: MoneyWindow, period: Period, now: Date, cutBack = fals
     return {
         shape: 'ranking',
         sentence: cutBack
-            ? `${name(topId)} is where a small change goes furthest: GHS ${cedis(top.v)} ${r.label}.`
-            : `${name(topId)}, GHS ${cedis(top.v)} ${r.label}.`,
+            ? `${name(topId)} is where a small change goes furthest: ${curLabel()} ${cedis(top.v)} ${r.label}.`
+            : `${name(topId)}, ${curLabel()} ${cedis(top.v)} ${r.label}.`,
         rows: ranked.map(([id, x]) => ({ label: name(id), value: x.v, display: cedis(x.v), meta: `${x.n} ${x.n === 1 ? 'payment' : 'payments'}`, category: id })),
         source: { label: fromN(list.length), txs: list },
         followUps: [`How much did I spend on ${catLabel(topId)} this month?`, `Set ${/^[aeiou]/i.test(catLabel(topId)) ? 'an' : 'a'} ${catLabel(topId)} limit`],
@@ -552,8 +557,8 @@ function compareToLast(category: string | undefined, w: MoneyWindow, period: Per
         tag: a === b ? 'Same' : more ? 'Yes' : 'No',
         tagTone: more ? 'warn' : 'success',
         sentence: a === b
-            ? `About the same as ${unitWord} so far: GHS ${cedis(a)}.`
-            : `${more ? 'Yes' : 'No'}, GHS ${cedis(Math.abs(a - b))} ${more ? 'more' : 'less'} ${what} than by this point ${unitWord}.`.replace('  ', ' '),
+            ? `About the same as ${unitWord} so far: ${curLabel()} ${cedis(a)}.`
+            : `${more ? 'Yes' : 'No'}, ${curLabel()} ${cedis(Math.abs(a - b))} ${more ? 'more' : 'less'} ${what} than by this point ${unitWord}.`.replace('  ', ' '),
         rows: [
             { label: weekly ? 'This week so far' : `${monthLong(now)} so far`, value: cedis(a), strong: true },
             { label: weekly ? 'Same days last week' : `Same days in ${monthLong(prevFrom)}`, value: cedis(b) },
@@ -574,8 +579,8 @@ function compareCategories(a: string, b: string, w: MoneyWindow, period: Period,
     return {
         shape: 'ranking',
         sentence: rows[0].value === rows[1].value
-            ? `The same on both ${r.label}: GHS ${cedis(rows[0].value)}.`
-            : `${rows[0].label} is ahead by GHS ${cedis(rows[0].value - rows[1].value)} ${r.label}.`,
+            ? `The same on both ${r.label}: ${curLabel()} ${cedis(rows[0].value)}.`
+            : `${rows[0].label} is ahead by ${curLabel()} ${cedis(rows[0].value - rows[1].value)} ${r.label}.`,
         rows: rows.map(({ label, value, display }) => ({ label, value, display })),
         source: { label: fromN(list.filter((t) => catOf(t) === a || catOf(t) === b).length), txs: list.filter((t) => catOf(t) === a || catOf(t) === b) },
         followUps: [`How much did I spend on ${catLabel(rows[0].id)} this month?`],
@@ -600,7 +605,7 @@ function why(category: string | undefined, period: Period, w: MoneyWindow, now: 
     const top = ranked[0];
     return {
         shape: 'ranking',
-        sentence: `Mostly ${top.name}: GHS ${cedis(top.total)} over ${top.n} ${top.n === 1 ? 'payment' : 'payments'} ${r.label}.`,
+        sentence: `Mostly ${top.name}: ${curLabel()} ${cedis(top.total)} over ${top.n} ${top.n === 1 ? 'payment' : 'payments'} ${r.label}.`,
         rows: ranked.map((m) => ({ label: m.name, value: m.total, display: cedis(m.total) })),
         color: category,
         source: { label: fromN(list.length), txs: list },

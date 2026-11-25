@@ -13,6 +13,7 @@ import { useLiveRefresh } from '@/lib/useLiveRefresh';
 import { useTheme } from '@/lib/theme';
 import { ago, heroAmount, listAmount, shortDate } from '@/lib/format';
 import { RAW } from '@/constants/theme';
+import { curLabel } from '@/lib/currency';
 
 /**
  * Wallets (Figma section 993:51): what you have, wallet by wallet, and
@@ -71,8 +72,8 @@ export default function Wallets() {
                         <Card hero gap={16}>
                             <View style={{ gap: 2 }}>
                                 <Text size={13} weight="semibold" tone="secondary">You have</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }} accessible accessibilityLabel={`GHS ${listAmount(data.total)}`}>
-                                    <Text size={15} weight="bold" tone="secondary">GHS</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }} accessible accessibilityLabel={`${curLabel()} ${listAmount(data.total)}`}>
+                                    <Text size={15} weight="bold" tone="secondary">{curLabel()}</Text>
                                     <Text weight="extrabold" size={32} style={{ letterSpacing: -0.96 }}>{listAmount(data.total)}</Text>
                                 </View>
                                 <Text variant="meta" tone="tertiary">
@@ -128,7 +129,7 @@ function WalletRow({ line, onPress, onCount }: { line: WalletLine; onPress: () =
             value={line.uncounted ? undefined : listAmount(Number(w.current_balance) || 0)}
             trailing={line.uncounted ? <Button label="Count" variant="secondary" size="sm" onPress={onCount} /> : 'none'}
             onPress={onPress}
-            accessibilityLabel={`${w.name}, ${line.uncounted ? 'not counted yet' : `GHS ${listAmount(Number(w.current_balance) || 0)}`}`}
+            accessibilityLabel={`${w.name}, ${line.uncounted ? 'not counted yet' : `${curLabel()} ${listAmount(Number(w.current_balance) || 0)}`}`}
         />
     );
 }
@@ -147,7 +148,7 @@ function ComingUpRow({ item, onPress }: { item: ComingUp; onPress: () => void })
                 </View>
             }
             onPress={onPress}
-            accessibilityLabel={`${item.label}, about GHS ${heroAmount(item.amount)}, ${when}`}
+            accessibilityLabel={`${item.label}, about ${curLabel()} ${heroAmount(item.amount)}, ${when}`}
         />
     );
 }

@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 import type { AvatarChoice } from '@/components/ui';
 import { API_URL } from './sms-api';
 import { forgetPhone, signOutOnPurpose } from './session';
+import { curLabel, setLocalCountry, type Country } from './currency';
 
 /**
  * Settings (Figma section 993:53). Everything here is stored on the account
@@ -88,6 +89,11 @@ async function updateMeta(data: Record<string, unknown>): Promise<void> {
 
 export const setName = (name: string) => updateMeta({ full_name: name.trim() });
 export const setAvatar = (avatar: AvatarChoice) => updateMeta({ avatar });
+/** The person's country and currency (Settings → Currency). Nothing already logged is converted. */
+export async function setCountry(c: Country): Promise<void> {
+    await updateMeta({ country: c.code, currency: c.currency });
+    setLocalCountry(c);
+}
 export const setNotificationPrefs = (prefs: NotificationPrefs) => updateMeta({ notification_prefs: prefs });
 export const setHideWidgetAmounts = (v: HideWidgetAmounts) => updateMeta({ hide_widget_amounts: v });
 
@@ -144,7 +150,7 @@ export async function exportTransactions(): Promise<number> {
         rows.push(...(data ?? []));
         if (!data || data.length < page) break;
     }
-    const header = ['Date', 'Description', 'Amount (GHS)', 'Direction', 'Category', 'Wallet', 'Moved between wallets', 'Source'];
+    const header = ['Date', 'Description', `Amount (${curLabel()})`, 'Direction', 'Category', 'Wallet', 'Moved between wallets', 'Source'];
     const lines = rows.map((r) => {
         const wallet = (r.wallet as { name?: string } | null)?.name ?? '';
         const out = r.type === 'debit' || r.type === 'expense';

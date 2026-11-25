@@ -5,6 +5,7 @@ import { useTheme } from '@/lib/theme';
 import type { Limit, LimitStatus } from '@/lib/limits';
 import { categoryStyle } from '@/lib/category-style';
 import { cedis } from '@/lib/money-window';
+import { curLabel } from '@/lib/currency';
 
 /** Meter colour: the category's own colour, status/warn once over (never danger). */
 function useMeterColor(category: string, over: boolean) {
@@ -33,18 +34,18 @@ export function LimitCard({ limit, status, onEdit }: { limit: Limit; status: Lim
                 </Tap>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                <Text size={17} weight="bold">GHS {cedis(status.spent)}</Text>
+                <Text size={17} weight="bold">{curLabel()} {cedis(status.spent)}</Text>
                 <Text size={12} tone="secondary">of {cedis(limit.amount)}</Text>
                 <View style={{ flex: 1 }} />
                 <Text size={12} weight="semibold" style={{ color: over ? colors.status.warn : colors.text.secondary }}>
-                    {over ? `GHS ${cedis(status.over)} over` : `GHS ${cedis(status.left)} left`}
+                    {over ? `${curLabel()} ${cedis(status.over)} over` : `${curLabel()} ${cedis(status.left)} left`}
                 </Text>
             </View>
             <ProgressMeter progress={status.used} color={color} height={8} />
             <Text variant="meta" tone="tertiary">
                 {over
                     ? `It happens. Resets ${status.resetsOn}, or raise the limit if this week was unusual.`
-                    : `Resets ${status.resetsOn}. About GHS ${cedis(status.perDay)} a day left.`}
+                    : `Resets ${status.resetsOn}. About ${curLabel()} ${cedis(status.perDay)} a day left.`}
             </Text>
         </Card>
     );
@@ -60,18 +61,18 @@ export function LimitRow({ limit, status, onPress, divider }: { limit: Limit; st
         <Tap
             onPress={onPress}
             accessibilityRole="button"
-            accessibilityLabel={`${s.label}, GHS ${cedis(status.spent)} of ${cedis(limit.amount)}, ${over ? `${cedis(status.over)} over` : `${cedis(status.left)} left`}`}
+            accessibilityLabel={`${s.label}, ${curLabel()} ${cedis(status.spent)} of ${cedis(limit.amount)}, ${over ? `${cedis(status.over)} over` : `${cedis(status.left)} left`}`}
             style={[{ gap: 8, paddingVertical: 12 }, divider ? { borderTopWidth: 1, borderTopColor: colors.line.default } : null]}
         >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <CategoryTile tone={s.tone} icon={s.icon} size={32} />
                 <Text size={14} weight="semibold" style={{ flex: 1 }}>{s.label}</Text>
                 <Text size={12} weight="bold" style={{ color: over ? colors.status.warn : colors.text.secondary }}>
-                    {over ? `GHS ${cedis(status.over)} over` : `GHS ${cedis(status.left)} left`}
+                    {over ? `${curLabel()} ${cedis(status.over)} over` : `${curLabel()} ${cedis(status.left)} left`}
                 </Text>
             </View>
             <ProgressMeter progress={status.used} color={color} height={8} />
-            <Text size={12} weight="medium" tone="tertiary">GHS {cedis(status.spent)} of {cedis(limit.amount)}</Text>
+            <Text size={12} weight="medium" tone="tertiary">{curLabel()} {cedis(status.spent)} of {cedis(limit.amount)}</Text>
         </Tap>
     );
 }

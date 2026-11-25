@@ -5,7 +5,8 @@ import { Button, CategoryTile, FieldError, ListGroup, ListRow, Sheet, Text, useT
 import { FONT, HIT_SLOP } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import type { Wallet } from '@/lib/supabase';
-import { MOMO_PROVIDERS, addWallet } from '@/lib/wallets-overview';
+import { addWallet } from '@/lib/wallets-overview';
+import { cur } from '@/lib/currency';
 import { AmountInput, parseAmount } from '@/components/transactions/pickers';
 
 type Step = 'choose' | 'momo' | 'bank';
@@ -24,7 +25,8 @@ export function AddWalletSheet({ visible, onClose, onAdded, onCash }: {
     const { colors } = useTheme();
     const toast = useToast();
     const [step, setStep] = useState<Step>('choose');
-    const [provider, setProvider] = useState<string>('mtn');
+    const providers = cur().momo;
+    const [provider, setProvider] = useState<string>(providers[0].id);
     const [name, setName] = useState('');
     const [balance, setBalance] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function AddWalletSheet({ visible, onClose, onAdded, onCash }: {
     useEffect(() => {
         if (!visible) return;
         setStep('choose');
-        setProvider('mtn');
+        setProvider(cur().momo[0].id);
         setName('');
         setBalance('');
         setError(null);
@@ -41,9 +43,9 @@ export function AddWalletSheet({ visible, onClose, onAdded, onCash }: {
     }, [visible]);
 
     const save = async () => {
-        const walletName = step === 'momo' ? MOMO_PROVIDERS.find((p) => p.id === provider)!.name : name.trim();
+        const walletName = step === 'momo' ? (providers.find((p) => p.id === provider) ?? providers[0]).name : name.trim();
         if (!walletName) {
-            setError('Give it a name, like GCB or Absa.');
+            setError(`Give it a name, like ${cur().banks.split(', ')[0]} or ${cur().banks.split(', ')[1]}.`);
             return;
         }
         setBusy(true);
@@ -71,14 +73,14 @@ export function AddWalletSheet({ visible, onClose, onAdded, onCash }: {
                     <ListRow
                         leading={<CategoryTile tone="accent" icon="wallet" />}
                         title="Mobile money"
-                        meta="MTN MoMo, Telecel Cash, AT Money"
+                        meta={providers.map((p) => p.name).join(', ')}
                         trailing="chevron"
                         onPress={() => setStep('momo')}
                     />
                     <ListRow
                         leading={<CategoryTile tone="accent" icon="bank" />}
                         title="Bank account or card"
-                        meta="GCB, Ecobank, Stanbic, Absa…"
+                        meta={cur().banks}
                         trailing="chevron"
                         onPress={() => setStep('bank')}
                     />
@@ -109,7 +111,7 @@ export function AddWalletSheet({ visible, onClose, onAdded, onCash }: {
         >
             {step === 'momo' ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }} accessibilityRole="radiogroup">
-                    {MOMO_PROVIDERS.map((p) => {
+                    {providers.map((p) => {
                         const active = p.id === provider;
                         return (
                             <Pressable
@@ -131,7 +133,7 @@ export function AddWalletSheet({ visible, onClose, onAdded, onCash }: {
                     <BottomSheetTextInput
                         value={name}
                         onChangeText={(t) => { setName(t); setError(null); }}
-                        placeholder="GCB, Ecobank, Absa…"
+                        placeholder={cur().banks}
                         placeholderTextColor={colors.text.tertiary}
                         autoFocus
                         maxLength={40}

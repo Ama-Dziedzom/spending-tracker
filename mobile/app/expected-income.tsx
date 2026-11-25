@@ -8,6 +8,7 @@ import type { Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
 import { type ExpectedIncome, getExpectedIncome, ordinal, removeExpectedIncome, saveExpectedIncome } from '@/lib/income-service';
 import { heroAmount } from '@/lib/format';
+import { cur, curLabel, ex } from '@/lib/currency';
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -83,7 +84,7 @@ export default function ExpectedIncomeScreen() {
                                 key={item.id}
                                 leading={<CategoryTile tone="success" icon="receive" size={40} />}
                                 title={item.label}
-                                meta={`≈GHS ${heroAmount(Number(item.amount))} · ${ordinal(item.day_of_month)} · ${walletName(item.wallet_id)}`}
+                                meta={`≈${curLabel()} ${heroAmount(Number(item.amount))} · ${ordinal(item.day_of_month)} · ${walletName(item.wallet_id)}`}
                                 trailing={<Icon name="edit" size={16} color={colors.text.tertiary} />}
                                 onPress={() => edit(item)}
                                 accessibilityLabel={`Edit ${item.label}`}
@@ -101,8 +102,8 @@ export default function ExpectedIncomeScreen() {
                         <TextInput value={label} onChangeText={(t) => { setLabel(t); setError(null); }} placeholder="Salary" placeholderTextColor={colors.text.tertiary} style={inputStyle} accessibilityLabel="What" maxLength={40} />
                     </FormRow>
                     <FormRow label="About how much" divider>
-                        <Text size={13} weight="semibold">GHS </Text>
-                        <TextInput value={amount} onChangeText={(t) => { setAmount(t.replace(/[^\d.,]/g, '')); setError(null); }} placeholder="3000" placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" style={[inputStyle, { flex: 0, minWidth: 60 }]} accessibilityLabel="About how much, in cedis" />
+                        <Text size={13} weight="semibold">{curLabel()} </Text>
+                        <TextInput value={amount} onChangeText={(t) => { setAmount(t.replace(/[^\d.,]/g, '')); setError(null); }} placeholder={ex(3000).replace(/,/g, '')} placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" style={[inputStyle, { flex: 0, minWidth: 60 }]} accessibilityLabel={`About how much, in ${cur().plural}`} />
                     </FormRow>
                     <FormRow label="Usually on the" divider onPress={() => setPicker('day')}>
                         <Text size={13} weight="semibold">{ordinal(day)}</Text>

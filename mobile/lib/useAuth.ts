@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { supabase } from './supabase';
+import type { Country } from './currency';
 
 // ============================================================================
 // Types
@@ -173,14 +174,19 @@ export function useAuth() {
      * Text a 6-digit code to a phone number (E.164). `create` is true on
      * sign up; on log in it's false, so a typo can't create a stray account.
      */
-    const sendPhoneCode = useCallback(async (phone: string, opts: { create: boolean; fullName?: string }): Promise<AuthResult> => {
+    const sendPhoneCode = useCallback(async (phone: string, opts: { create: boolean; fullName?: string; country?: Country }): Promise<AuthResult> => {
         setLoading(true);
         try {
             const { error } = await supabase.auth.signInWithOtp({
                 phone,
                 options: {
                     shouldCreateUser: opts.create,
-                    ...(opts.fullName ? { data: { full_name: opts.fullName } } : {}),
+                    ...(opts.fullName || opts.country ? {
+                        data: {
+                            ...(opts.fullName ? { full_name: opts.fullName } : {}),
+                            ...(opts.country ? { country: opts.country.code, currency: opts.country.currency } : {}),
+                        },
+                    } : {}),
                 },
             });
             return error ? { success: false, error: error.message } : { success: true };

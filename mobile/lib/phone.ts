@@ -6,6 +6,8 @@
  * the same person. Mixing formats would create duplicate accounts.
  */
 
+import { ALL_COUNTRIES, countryFromPhone, type Country } from './currency';
+
 export type GhanaNetwork = 'MTN' | 'Telecel' | 'AT';
 
 const GHANA_PREFIXES: Record<string, GhanaNetwork> = {
@@ -24,11 +26,15 @@ export function toE164(raw: string, countryCode = '+233'): string | null {
         return digits.length >= 8 && digits.length <= 15 ? `+${digits}` : null;
     }
     if (digits.startsWith(cc) && digits.length > cc.length + 6) digits = digits.slice(cc.length);
-    digits = digits.replace(/^0+/, '');
+    const country = ALL_COUNTRIES.find((c) => c.dial === cc);
+    // Côte d'Ivoire's 10 digits start with 0 (07…, 05…, 01…): it's part of the number, not a trunk prefix.
+    if (country?.code !== 'CI') digits = digits.replace(/^0+/, '');
 
     if (cc === '233') {
         // Ghana mobile: 9 digits after the country code, on a known network
         if (digits.length !== 9 || !GHANA_PREFIXES[digits.slice(0, 2)]) return null;
+    } else if (country) {
+        if (digits.length !== country.digits) return null;
     } else if (digits.length < 6 || digits.length > 12) {
         return null;
     }
@@ -40,12 +46,22 @@ export function ghanaNetwork(e164: string | null | undefined): GhanaNetwork | nu
     return GHANA_PREFIXES[e164.slice(4, 6)] ?? null;
 }
 
-/** +233244123456 → "+233 24 412 3456" */
+/** +233244123456 → "+233 24 412 3456"; other countries grouped like their example. */
 export function formatPhone(e164: string | null | undefined): string {
     if (!e164) return '';
     const p = e164.startsWith('+') ? e164 : `+${e164}`;
-    const m = p.match(/^\+233(\d{2})(\d{3})(\d{4})$/);
-    return m ? `+233 ${m[1]} ${m[2]} ${m[3]}` : p;
+    const c = countryFromPhone(p);
+    if (!c) return p;
+    const rest = p.slice(c.dial.length + 1);
+    if (rest.length !== c.digits) return p;
+    let i = 0;
+    const groups = c.example.split(' ').map((g) => { const part = rest.slice(i, i + g.length); i += g.length; return part; });
+    return `+${c.dial} ${groups.join(' ')}`;
+}
+
+/** "Use a Nigeria mobile number: 10 digits after +234, like 803 123 4567." */
+export function phoneRule(c: Country): string {
+    return `Use a ${c.name} mobile number: ${c.digits} digits after +${c.dial}, like ${c.example}.`;
 }
 
 /** Friendlier wording for the errors Supabase returns on phone sign-in. */

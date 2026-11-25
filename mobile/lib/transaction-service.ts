@@ -1,3 +1,4 @@
+import { cur } from './currency';
 /**
  * Transaction Service
  * 
@@ -367,9 +368,9 @@ export async function processTransfer(
  * Format currency for display
  */
 export function formatCurrency(amount: number): string {
-    return `GH₵ ${Math.abs(amount).toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+    return `${cur().label} ${Math.abs(amount).toLocaleString('en-US', {
+        minimumFractionDigits: cur().decimals,
+        maximumFractionDigits: cur().decimals,
     })}`;
 }
 

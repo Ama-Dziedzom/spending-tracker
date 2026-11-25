@@ -6,6 +6,7 @@ import {
     type MoneyWindow, addDays, at, between, catOf, cedis, daysInMonth, inOf, merchantName, monthLong, spentOf, startOfDay, sum,
 } from './money-window';
 import { merchantKey } from './category-rules';
+import { curLabel, scaled } from '@/lib/currency';
 
 /**
  * Insights (Figma 1022:4574): one sentence on the month, then up to three
@@ -154,12 +155,12 @@ function monthHeadline(w: MoneyWindow, now: Date): string {
         .filter((e) => e.last_confirmed_month !== monthKey && dueDateThisMonth(e.day_of_month, now) > now)
         .reduce((s, e) => s + Number(e.amount), 0);
     const income = cameIn + stillExpected;
-    if (income <= 0) return spent > 0 ? `GHS ${cedis(spent)} spent so far in ${monthLong(now)}.` : `${monthLong(now)} has only just started.`;
+    if (income <= 0) return spent > 0 ? `${curLabel()} ${cedis(spent)} spent so far in ${monthLong(now)}.` : `${monthLong(now)} has only just started.`;
     const projected = (spent / elapsed) * daysInMonth(now);
     const keep = income - projected;
-    if (keep >= 50) return `You’re on track to keep GHS ${cedis(keep)} this month.`;
+    if (keep >= scaled(50)) return `You’re on track to keep ${curLabel()} ${cedis(keep)} this month.`;
     if (keep >= 0) return 'You’re on track to spend about what came in this month.';
-    return `At this pace, spending will pass what came in by about GHS ${cedis(-keep)}.`;
+    return `At this pace, spending will pass what came in by about ${curLabel()} ${cedis(-keep)}.`;
 }
 
 /** The category whose spending this week moved most against its recent weeks. */
@@ -185,7 +186,7 @@ function categoryFinding(txs: TransactionWithWallet[], now: Date): Finding | nul
     const current = weeks[weeks.length - 1];
     const last = weeks[weeks.length - 2];
     const pct = Math.round(Math.abs(best.change) * 100);
-    const parts = [`GHS ${cedis(current.total)}, ${current.total >= last.total ? 'up' : 'down'} from ${cedis(last.total)} last week.`];
+    const parts = [`${curLabel()} ${cedis(current.total)}, ${current.total >= last.total ? 'up' : 'down'} from ${cedis(last.total)} last week.`];
     const fresh = newMerchants(txs, best.cat, now);
     parts.push(`${current.count} ${current.count === 1 ? 'payment' : 'payments'}${fresh[0] ? `, ${fresh[0]} is new` : ''}.`);
     return {
@@ -278,10 +279,10 @@ export function categoryDetail(txs: TransactionWithWallet[], category: string, n
     if (current.count === 0) parts.push('Nothing in this category yet this week.');
     else parts.push(`You paid ${current.count} ${current.count === 1 ? 'time' : 'times'}, ${current.count === last.count ? 'the same as' : current.count > last.count ? 'up from' : 'down from'} ${last.count === current.count ? 'last week' : last.count}.`);
     if (fresh[0] && biggest && merchantName(biggest.description) === fresh[0]) {
-        parts.push(`${fresh[0]} is new this week and was the biggest at GHS ${cedis(Number(biggest.amount))}.`);
+        parts.push(`${fresh[0]} is new this week and was the biggest at ${curLabel()} ${cedis(Number(biggest.amount))}.`);
     } else {
         if (fresh[0]) parts.push(`${fresh[0]} is new this week.`);
-        if (biggest) parts.push(`The biggest was ${merchantName(biggest.description)} at GHS ${cedis(Number(biggest.amount))}.`);
+        if (biggest) parts.push(`The biggest was ${merchantName(biggest.description)} at ${curLabel()} ${cedis(Number(biggest.amount))}.`);
     }
     return { style: categoryStyle(category), thisWeek: current.total, change: current.total - last.total, weeks, average, whatChanged: parts.join(' ') };
 }
@@ -310,10 +311,10 @@ function pastMonthInsights(w: MoneyWindow, now: Date, start: Date): InsightsResu
 
     let headline: string;
     if (spent === 0 && cameIn === 0) headline = `Nothing was logged in ${name}.`;
-    else if (cameIn <= 0) headline = `GHS ${cedis(spent)} spent in ${name}.`;
-    else if (cameIn - spent >= 50) headline = `You kept GHS ${cedis(cameIn - spent)} in ${name}.`;
+    else if (cameIn <= 0) headline = `${curLabel()} ${cedis(spent)} spent in ${name}.`;
+    else if (cameIn - spent >= scaled(50)) headline = `You kept ${curLabel()} ${cedis(cameIn - spent)} in ${name}.`;
     else if (cameIn - spent >= 0) headline = `${name}’s spending was about what came in.`;
-    else headline = `${name}’s spending passed what came in by GHS ${cedis(spent - cameIn)}.`;
+    else headline = `${name}’s spending passed what came in by ${curLabel()} ${cedis(spent - cameIn)}.`;
 
     const findings: Finding[] = [];
     const inout = inOutFinding(w, start, now);
@@ -342,7 +343,7 @@ function pastMonthInsights(w: MoneyWindow, now: Date, start: Date): InsightsResu
             category: best.cat,
             style: categoryStyle(best.cat),
             headline: `${best.change > 0 ? 'Up' : 'Down'} ${Math.round(Math.abs(best.change) * 100)}%`,
-            body: `GHS ${cedis(cur)} in ${name}, ${cur >= prev ? 'up' : 'down'} from ${cedis(prev)} in ${prevName}. ${count} ${count === 1 ? 'payment' : 'payments'}.`,
+            body: `${curLabel()} ${cedis(cur)} in ${name}, ${cur >= prev ? 'up' : 'down'} from ${cedis(prev)} in ${prevName}. ${count} ${count === 1 ? 'payment' : 'payments'}.`,
             bars: best.totals,
         });
     }
@@ -424,25 +425,25 @@ function inOutFinding(w: MoneyWindow, start: Date, now: Date): Finding | null {
 
     // Short number + one line, as in Figma 1176:5760 ("GHS 640 left").
     let headline: string;
-    if (cur.cameIn === 0) headline = `GHS ${cedis(cur.spent)} out`;
-    else if (net >= 0) headline = `GHS ${cedis(net)} left`;
-    else headline = `GHS ${cedis(-net)} over`;
+    if (cur.cameIn === 0) headline = `${curLabel()} ${cedis(cur.spent)} out`;
+    else if (net >= 0) headline = `${curLabel()} ${cedis(net)} left`;
+    else headline = `${curLabel()} ${cedis(-net)} over`;
 
     const first = cur.cameIn === 0
         ? `Nothing logged in yet${current ? '' : ` in ${name}`}.`
-        : `GHS ${cedis(cur.cameIn)} came in, ${cedis(cur.spent)} went out.`;
+        : `${curLabel()} ${cedis(cur.cameIn)} came in, ${cedis(cur.spent)} went out.`;
     let second = '';
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const stillExpected = current
         ? w.expected.filter((e) => e.is_active && e.last_confirmed_month !== monthKey && dueDateThisMonth(e.day_of_month, now) > now).reduce((a, e) => a + Number(e.amount), 0)
         : 0;
     const prev = months.slice(0, -1).filter((m) => m.cameIn > 0 || m.spent > 0).pop();
-    if (stillExpected > 0) second = `GHS ${cedis(stillExpected)} more is due this month.`;
+    if (stillExpected > 0) second = `${curLabel()} ${cedis(stillExpected)} more is due this month.`;
     else if (cur.cameIn === 0) second = 'Log your income to see what you keep.';
     else if (current) {
         const elapsed = Math.max(1, Math.floor((now.getTime() - start.getTime()) / 86_400_000) + 1);
         const projected = (cur.spent / elapsed) * daysInMonth(now);
-        if (projected > cur.cameIn * 1.02) second = `On pace to spend about GHS ${cedis(projected)}.`;
+        if (projected > cur.cameIn * 1.02) second = `On pace to spend about ${curLabel()} ${cedis(projected)}.`;
     }
     if (!second && prev && prev.cameIn > 0) {
         const prevNet = prev.cameIn - prev.spent;
@@ -551,11 +552,11 @@ export function computeWeekInsights(w: MoneyWindow, weekStart: Date, now = new D
 
     let headline: string;
     if (spent === 0) headline = current ? 'Nothing has gone out this week yet.' : `Nothing went out ${label}.`;
-    else if (prevSame === 0) headline = current ? `GHS ${cedis(spent)} so far this week.` : `GHS ${cedis(spent)} spent ${label}.`;
-    else if (Math.round(diff) === 0) headline = current ? `GHS ${cedis(spent)} so far, the same as this time last week.` : `GHS ${cedis(spent)} spent, the same as the week before.`;
+    else if (prevSame === 0) headline = current ? `${curLabel()} ${cedis(spent)} so far this week.` : `${curLabel()} ${cedis(spent)} spent ${label}.`;
+    else if (Math.round(diff) === 0) headline = current ? `${curLabel()} ${cedis(spent)} so far, the same as this time last week.` : `${curLabel()} ${cedis(spent)} spent, the same as the week before.`;
     else headline = current
-        ? `GHS ${cedis(spent)} so far, ${cedis(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than this time last week.`
-        : `GHS ${cedis(spent)} spent, ${cedis(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than the week before.`;
+        ? `${curLabel()} ${cedis(spent)} so far, ${cedis(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than this time last week.`
+        : `${curLabel()} ${cedis(spent)} spent, ${cedis(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than the week before.`;
 
     const findings: Finding[] = [];
 
@@ -571,10 +572,10 @@ export function computeWeekInsights(w: MoneyWindow, weekStart: Date, now = new D
             const pct = Math.round((Math.abs(diff) / prevSame) * 100);
             wHead = pct === 0 ? 'About the same' : `${diff < 0 ? 'Down' : 'Up'} ${pct}%`;
             wBody = current
-                ? `GHS ${cedis(spent)} ${by}, ${diff <= 0 ? 'down' : 'up'} from ${cedis(prevSame)} at this point last week.`
-                : `GHS ${cedis(spent)}, ${diff <= 0 ? 'down' : 'up'} from ${cedis(prevSame)} the week before.`;
+                ? `${curLabel()} ${cedis(spent)} ${by}, ${diff <= 0 ? 'down' : 'up'} from ${cedis(prevSame)} at this point last week.`
+                : `${curLabel()} ${cedis(spent)}, ${diff <= 0 ? 'down' : 'up'} from ${cedis(prevSame)} the week before.`;
         } else {
-            wHead = `GHS ${cedis(spent)}`;
+            wHead = `${curLabel()} ${cedis(spent)}`;
             wBody = 'Nothing was logged the week before, so there’s nothing to compare yet.';
         }
         findings.push({ kind: 'weeks', period: 'Last 6 weeks', headline: wHead, body: wBody, weeks, average, lastLabel: current ? 'This week' : dm(weekStart) });

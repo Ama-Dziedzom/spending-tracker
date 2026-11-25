@@ -54,6 +54,8 @@ object LogItWidgets {
         val weekChange: Double? = if (!j.has("weekChange") || j.isNull("weekChange")) null else j.optDouble("weekChange")
         val dateLabel: String = j.optString("dateLabel")
         val toCheck = j.optInt("toCheck")
+        /** The person's currency label; older snapshots have none (Ghana). */
+        val currency: String = j.optString("currency").ifBlank { "GHS" }
         val days: List<Day> = j.optJSONArray("days")?.let { a ->
             (0 until a.length()).map { i ->
                 val d = a.getJSONObject(i)
@@ -367,6 +369,7 @@ object LogItWidgets {
 
     fun today(ctx: Context, s: Snap?): RemoteViews {
         val v = RemoteViews(ctx.packageName, R.layout.logit_widget_today)
+        v.setTextViewText(R.id.ghs, s?.currency ?: "GHS")
         if (s == null || !s.signedIn) {
             v.setTextViewText(R.id.label, "LogIt")
             v.setViewVisibility(R.id.ghs, View.GONE)
@@ -416,6 +419,7 @@ object LogItWidgets {
     fun week(ctx: Context, s: Snap?): RemoteViews {
         if (s == null || !s.signedIn) return signedOut(ctx)
         val v = RemoteViews(ctx.packageName, R.layout.logit_widget_week)
+        v.setTextViewText(R.id.cur_week, s.currency)
         if (s.hidden) {
             v.setTextViewText(R.id.chip, "Hidden")
             v.setInt(R.id.chip, "setBackgroundResource", R.drawable.logit_widget_chip_muted)
@@ -446,6 +450,7 @@ object LogItWidgets {
     fun overview(ctx: Context, s: Snap?): RemoteViews {
         if (s == null || !s.signedIn) return signedOut(ctx)
         val v = RemoteViews(ctx.packageName, R.layout.logit_widget_overview)
+        v.setTextViewText(R.id.cur_overview, s.currency)
         v.setTextViewText(R.id.date, s.dateLabel)
         if (s.hidden) {
             manrope(ctx, v, R.id.amount, "• • • •", 28f)

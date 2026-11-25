@@ -9,6 +9,7 @@ import { useAuth } from '../lib/useAuth';
 import { supabase } from '../lib/supabase';
 import { formatPhone, phoneAuthMessage } from '../lib/phone';
 import { rememberPhone } from '@/lib/session';
+import { countryByCode } from '@/lib/currency';
 
 const RESEND_SECONDS = 60;
 
@@ -24,8 +25,8 @@ const RESEND_SECONDS = 60;
 export default function Code() {
     const router = useRouter();
     const { colors, shadows } = useTheme();
-    const { email, fullName, phone, mode = 'email', intent } = useLocalSearchParams<{
-        email?: string; fullName?: string; phone?: string; mode?: 'email' | 'phone' | 'phone_change'; intent?: 'signup' | 'login';
+    const { email, fullName, phone, mode = 'email', intent, country } = useLocalSearchParams<{
+        email?: string; fullName?: string; phone?: string; country?: string; mode?: 'email' | 'phone' | 'phone_change'; intent?: 'signup' | 'login';
     }>();
     const { loading, verifyOtp, resendOtp, sendPhoneCode, verifyPhoneCode, addPhoneToAccount, verifyPhoneChange } = useAuth();
     const byText = mode === 'phone' || mode === 'phone_change';
@@ -51,7 +52,12 @@ export default function Code() {
                 await rememberPhone(phone);
                 if (intent === 'signup') {
                     // Name was sent with the code request; save it again in case this number already had an account.
-                    if (fullName) await supabase.auth.updateUser({ data: { full_name: fullName } });
+                    const picked = countryByCode(country);
+                    if (fullName || picked) {
+                        await supabase.auth.updateUser({
+                            data: { ...(fullName ? { full_name: fullName } : {}), ...(picked ? { country: picked.code, currency: picked.currency } : {}) },
+                        });
+                    }
                     router.replace('/onboarding/avatar');
                 } else {
                     router.replace('/spending');
@@ -71,7 +77,7 @@ export default function Code() {
         } finally {
             verifying.current = false;
         }
-    }, [mode, phone, email, intent, fullName, router, verifyPhoneCode, verifyPhoneChange, verifyOtp]);
+    }, [mode, phone, email, intent, fullName, country, router, verifyPhoneCode, verifyPhoneChange, verifyOtp]);
 
     const onChange = (v: string) => {
         setCode(v);

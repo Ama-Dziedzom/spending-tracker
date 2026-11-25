@@ -7,6 +7,8 @@ import { BAND, BrandBand, Icon, Tap, Text, type BandShape, type IconName } from 
 import { FONT, RAW } from '@/constants/theme';
 import { useTheme } from '@/lib/theme';
 import { ghanaNetwork, toE164 } from '@/lib/phone';
+import type { Country } from '@/lib/currency';
+import { CountrySheet } from '@/components/settings/country-sheet';
 
 /**
  * Onboarding and sign-in layout (Figma section 993:48): a band with a
@@ -135,16 +137,21 @@ export const TextField = forwardRef<TextInput, TextInputProps & { icon?: IconNam
  * ("MTN number · we'll text you a code"), so the number is checked before a
  * text is spent (Figma 1000:136).
  */
-export function PhoneField({ value, onChange, autoFocus, onSubmit, error }: {
+export function PhoneField({ value, onChange, autoFocus, onSubmit, error, country, onCountry }: {
     value: string;
     onChange: (v: string) => void;
     autoFocus?: boolean;
     onSubmit?: () => void;
     error?: string | null;
+    /** Sets the dialling code and number rules (Figma "Sign up · Nigeria"). */
+    country: Country;
+    /** Picked from the country sheet; also sets the currency at sign up. */
+    onCountry: (c: Country) => void;
 }) {
     const { colors } = useTheme();
     const [focused, setFocused] = useState(false);
-    const e164 = toE164(value, '+233');
+    const [picking, setPicking] = useState(false);
+    const e164 = toE164(value, `+${country.dial}`);
     const network = ghanaNetwork(e164);
     const digits = value.replace(/\D/g, '');
     return (
@@ -156,7 +163,16 @@ export function PhoneField({ value, onChange, autoFocus, onSubmit, error }: {
                     borderColor: error ? colors.status.danger : focused ? colors.brand.accent : colors.line.default,
                 }}
             >
-                <Text size={16} weight="medium">🇬🇭  +233</Text>
+                <Tap
+                    onPress={() => setPicking(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${country.name}, +${country.dial}. Change country`}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 4 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 }}
+                >
+                    <Text size={16} weight="medium">{country.flag}  +{country.dial}</Text>
+                    <Icon name="down" size={16} color={colors.text.secondary} />
+                </Tap>
                 <View style={{ width: 1.5, height: 24, backgroundColor: colors.line.default }} />
                 <TextInput
                     value={value}
@@ -167,9 +183,9 @@ export function PhoneField({ value, onChange, autoFocus, onSubmit, error }: {
                     textContentType="telephoneNumber"
                     autoComplete="tel"
                     autoFocus={autoFocus}
-                    placeholder="24 412 3456"
+                    placeholder={country.example}
                     placeholderTextColor={colors.text.tertiary}
-                    maxLength={14}
+                    maxLength={16}
                     returnKeyType="done"
                     onSubmitEditing={onSubmit}
                     accessibilityLabel="Phone number"
@@ -180,9 +196,20 @@ export function PhoneField({ value, onChange, autoFocus, onSubmit, error }: {
                 <Text size={13} weight="medium" tone="danger">{error}</Text>
             ) : network ? (
                 <Text size={13} weight="medium" tone="success">{network} number · we’ll text you a code</Text>
-            ) : digits.length >= 9 ? (
-                <Text size={13} weight="medium" tone="warn">That doesn’t look like a Ghana mobile number. Check the digits.</Text>
+            ) : e164 && country.code !== 'GH' ? (
+                <Text size={13} weight="medium" tone="success">We’ll text you a code</Text>
+            ) : digits.length >= country.digits ? (
+                <Text size={13} weight="medium" tone="warn">That doesn’t look like a {country.name} mobile number. Check the digits.</Text>
             ) : null}
+            <CountrySheet
+                visible={picking}
+                onClose={() => setPicking(false)}
+                selected={country.code}
+                withDial
+                title="Where’s your number from?"
+                subtitle="Sets your phone code and the currency LogIt counts in. You can change it later in Settings."
+                onPick={(c) => { setPicking(false); onCountry(c); }}
+            />
         </View>
     );
 }

@@ -7,8 +7,9 @@ import { loadMoneyWindow, catOf, cedis, type MoneyWindow } from '@/lib/money-win
 import { flowOf, startOfWeek, startOfMonth } from '@/lib/spending-service';
 import { categoryStyle } from '@/lib/category-style';
 import { getAskHistory } from '@/lib/ask-history';
-import { STARTERS } from '@/lib/ask-engine';
+import { starters } from '@/lib/ask-engine';
 import { PALETTE, withAlpha, type CategoryColor } from '@/constants/theme';
+import { curLabel } from '@/lib/currency';
 
 /**
  * Ask LogIt start (Figma "Ask LogIt · start v2", 1216:5886). A greeting and
@@ -88,7 +89,7 @@ export function AskStart({ onAsk, onSeeAll }: { onAsk: (q: string) => void; onSe
     const style = top ? categoryStyle(top.category) : null;
     const accent = style && style.tone !== 'muted' ? CARD.cat[style.tone] : CARD.brand['accent-text'];
     const label = style?.label ?? '';
-    const rows = recent && recent.length ? recent : STARTERS.slice(0, 3);
+    const rows = recent && recent.length ? recent : starters().slice(0, 3);
 
     return (
         <View style={{ gap: 22 }}>
@@ -103,14 +104,14 @@ export function AskStart({ onAsk, onSeeAll }: { onAsk: (q: string) => void; onSe
                     resizeMode="cover"
                     style={{ height: 168, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)', ...shadows.card }}
                     imageStyle={{ borderRadius: 24 }}
-                    accessibilityLabel={`Your top spend ${top.period === 'week' ? 'this week' : 'this month'}: ${label}, GHS ${cedis(top.amount)}`}
+                    accessibilityLabel={`Your top spend ${top.period === 'week' ? 'this week' : 'this month'}: ${label}, ${curLabel()} ${cedis(top.amount)}`}
                 >
                     <View style={{ padding: 20, gap: 4, flex: 1 }}>
                         <Text size={12} weight="bold" style={{ color: accent, letterSpacing: 0.6 }}>
                             {top.period === 'week' ? 'YOUR TOP SPEND THIS WEEK' : 'YOUR TOP SPEND THIS MONTH'}
                         </Text>
                         <Text size={26} weight="bold" style={{ color: CARD.text.primary, letterSpacing: -0.4 }}>{label}</Text>
-                        <Text size={13} weight="medium" style={{ color: CARD.text.secondary }}>GHS {cedis(top.amount)} of GHS {cedis(top.total)} so far</Text>
+                        <Text size={13} weight="medium" style={{ color: CARD.text.secondary }}>{curLabel()} {cedis(top.amount)} of {curLabel()} {cedis(top.total)} so far</Text>
                         <View style={{ flex: 1 }} />
                         <View style={{ alignSelf: 'flex-start' }}>
                             <Tap

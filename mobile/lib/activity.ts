@@ -6,6 +6,7 @@ import { flowOf } from './spending-service';
 import { getCheckItems } from './check-service';
 import { computeInsights } from './insights-engine';
 import { getLimits, limitStatus } from './limits';
+import { curLabel } from '@/lib/currency';
 
 /**
  * Notifications (Figma 1003:862): what LogIt did and what needs you, newest
@@ -115,7 +116,7 @@ export async function getActivity(now = new Date()): Promise<ActivityItem[]> {
             const salary = w.expected.find((e) => Math.abs(Number(e.amount) - Number(t.amount)) <= Number(e.amount) * 0.15);
             items.push({
                 id: `in:${t.id}`, icon: 'receive', tone: 'success', at: d,
-                title: salary ? `${salary.label} of GHS ${cedis(Number(t.amount))} logged` : `GHS ${amount} came in from ${who}`,
+                title: salary ? `${salary.label} of ${curLabel()} ${cedis(Number(t.amount))} logged` : `${curLabel()} ${amount} came in from ${who}`,
                 meta: [t.wallet?.name, when(d, now)].filter(Boolean).join(' · '),
                 open: { kind: 'transaction', tx: t },
             });
@@ -123,7 +124,7 @@ export async function getActivity(now = new Date()): Promise<ActivityItem[]> {
             const toPerson = t.category === 'transfer';
             items.push({
                 id: `tx:${t.id}`, icon: 'flash', tone: 'accent', at: d,
-                title: `Logged GHS ${amount} ${toPerson ? 'to' : 'at'} ${toPerson ? who.split(' ')[0] : who}`,
+                title: `Logged ${curLabel()} ${amount} ${toPerson ? 'to' : 'at'} ${toPerson ? who.split(' ')[0] : who}`,
                 meta: [t.wallet?.name, when(d, now)].filter(Boolean).join(' · '),
                 open: { kind: 'transaction', tx: t },
             });
@@ -163,8 +164,8 @@ export async function getActivity(now = new Date()): Promise<ActivityItem[]> {
         const name = l.category === 'airtime' ? 'Airtime & data' : l.category.charAt(0).toUpperCase() + l.category.slice(1);
         items.push({
             id: `limit:${l.id}:${s.over > 0 ? 'over' : 'near'}`, icon: 'shield', tone: 'warn', at: latest,
-            title: s.over > 0 ? `${name} is GHS ${cedis(s.over)} over this week` : `${name}: GHS ${cedis(s.spent)} of ${cedis(l.amount)}`,
-            meta: s.over > 0 ? `It happens · resets ${s.resetsOn}` : `GHS ${cedis(s.left)} left until ${s.resetsOn}`,
+            title: s.over > 0 ? `${name} is ${curLabel()} ${cedis(s.over)} over this week` : `${name}: ${curLabel()} ${cedis(s.spent)} of ${cedis(l.amount)}`,
+            meta: s.over > 0 ? `It happens · resets ${s.resetsOn}` : `${curLabel()} ${cedis(s.left)} left until ${s.resetsOn}`,
             open: { kind: 'limits' },
         });
     }
