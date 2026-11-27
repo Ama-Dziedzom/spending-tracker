@@ -19,7 +19,7 @@ import { cur, curLabel } from '@/lib/currency';
 
 /** Category choices, in the design's order (Figma 1005:911). */
 export const SPENT_CATEGORIES = ['food', 'shopping', 'airtime', 'bills', 'transport', 'transfer', 'cash', 'subscription', 'fees', 'loans', 'other'];
-export const IN_CATEGORIES = ['income', 'transfer', 'gifts', 'loans', 'other'];
+export const IN_CATEGORIES = ['salary', 'income', 'transfer', 'gifts', 'loans', 'other'];
 
 /** Style for a category id; money to or from a person is "People". */
 export function pickStyle(id: string) {

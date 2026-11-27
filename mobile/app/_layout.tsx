@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold, useFonts } from '@expo-google-fonts/manrope';
 import * as SplashScreen from 'expo-splash-screen';
 import { loadCountry, syncCountryFromUser } from '@/lib/currency';
+import { listenForReminderTaps } from '@/lib/salary-reminder';
 import { useEffect, useState } from 'react';
 
 import { ThemeProvider as LogItThemeProvider, useTheme } from '@/lib/theme';
@@ -85,6 +86,9 @@ export default function RootLayout() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Tapping the salary reminder opens Spending, where the check is waiting.
+  useEffect(() => listenForReminderTaps((url) => router.push(url as never)), []);
 
   // Send messages saved while offline, at launch and whenever LogIt comes back
   // to the foreground. Notifications are asked for after the first alert is

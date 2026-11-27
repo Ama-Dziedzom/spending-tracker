@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Pressable, RefreshControl, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
     ActionBanner, Avatar, Banner, Chip, OfflinePill, RoundButton, Screen, Spinner, TAB_BAR_SPACE, Text, TopBar,
     type AvatarChoice,
 } from '@/components/ui';
 import { SpendingCard, SpendingCardSkeleton, type Period } from '@/components/spending/spending-card';
-import { FirstRunCard, SalaryPromptCard } from '@/components/spending/prompt-cards';
+import { FirstRunCard, SalaryLoggedCard, SalaryPromptCard } from '@/components/spending/prompt-cards';
 import { DayDetailSheet } from '@/components/spending/day-detail-sheet';
 import { WeekRecapSheet } from '@/components/spending/week-recap-sheet';
 import { TransactionDetailSheet } from '@/components/transactions/transaction-detail-sheet';
@@ -17,7 +17,8 @@ import { supabase, type Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
 import type { TransactionWithWallet } from '@/lib/transaction-service';
 import { getCheckCount } from '@/lib/check-service';
-import { getIncomePrompts, logExpectedIncome, markIncomeReceived, snoozeIncome, type IncomePrompt } from '@/lib/income-service';
+import { getIncomePrompts, logExpectedIncome, markIncomeReceived, snoozeIncome, undoLoggedIncome, type IncomePrompt, type LoggedIncome } from '@/lib/income-service';
+import { syncSalaryReminder } from '@/lib/salary-reminder';
 import { fetchSpendingWindow, summarise, type SpendingSummary } from '@/lib/spending-service';
 import { fetchWeekRecap, markRecapSeen, recapDue, type WeekRecap } from '@/lib/week-recap';
 import { useLiveRefresh } from '@/lib/useLiveRefresh';
@@ -49,6 +50,9 @@ export default function Spending() {
     const [wallets, setWallets] = useState<Wallet[]>([]);
     const [reviewCount, setReviewCount] = useState(0);
     const [incomePrompt, setIncomePrompt] = useState<IncomePrompt | null>(null);
+    /** What "Yes" just logged: the confirmation card with Undo (Figma "Salary check · logged"). */
+    const [loggedIncome, setLoggedIncome] = useState<LoggedIncome | null>(null);
+    useFocusEffect(useCallback(() => () => setLoggedIncome(null), []));
 
     const [dayOpen, setDayOpen] = useState<Date | null>(null);
     const [detailTx, setDetailTx] = useState<TransactionWithWallet | null>(null);
@@ -102,6 +106,8 @@ export default function Spending() {
             setWallets(walletList);
             setReviewCount(pending);
             setIncomePrompt(prompts[0] ?? null);
+            // The 8:30 reminder follows the card: scheduled while it waits, gone once it's answered.
+            syncSalaryReminder(prompts[0] ?? null, walletList.find((w) => w.id === prompts[0]?.item.wallet_id)?.name).catch(() => {});
             setError(false);
             setOfflineAt(null);
             updateWidgetSnapshot({ txs: window, wallets: walletList, toCheck: pending }).catch(() => {});
@@ -205,11 +211,27 @@ export default function Spending() {
 
                 {offlineAt && <OfflinePill label={`Offline · showing what you have at ${time24(offlineAt)}`} />}
 
-                {incomePrompt && !loading && (
+                {loggedIncome && !loading && (
+                    <SalaryLoggedCard
+                        label={loggedIncome.item.label}
+                        amount={loggedIncome.amount}
+                        walletName={wallets.find((w) => w.id === loggedIncome.item.wallet_id)?.name}
+                        balance={(() => { const w = wallets.find((x) => x.id === loggedIncome.item.wallet_id); return w ? Number(w.current_balance) || 0 : undefined; })()}
+                        onUndo={async () => {
+                            if (await undoLoggedIncome(loggedIncome)) { setLoggedIncome(null); await fetchData(); }
+                        }}
+                    />
+                )}
+
+                {incomePrompt && !loading && !loggedIncome && (
                     <SalaryPromptCard
                         prompt={incomePrompt}
                         walletName={wallets.find((w) => w.id === incomePrompt.item.wallet_id)?.name}
-                        onYes={async () => { await logExpectedIncome(incomePrompt); await fetchData(); }}
+                        onYes={async () => {
+                            const logged = await logExpectedIncome(incomePrompt);
+                            if (logged) setLoggedIncome(logged);
+                            await fetchData();
+                        }}
                         onDifferent={() => setIncomeSheetFor(incomePrompt)}
                         onNotYet={async () => { await snoozeIncome(incomePrompt.item.id); fetchData(); }}
                     />
@@ -302,7 +324,7 @@ export default function Spending() {
                     description: incomeSheetFor.item.label,
                     date: incomeSheetFor.dueDate.toISOString(),
                     walletId: incomeSheetFor.item.wallet_id ?? undefined,
-                    categoryId: 'income',
+                    categoryId: 'salary',
                 } : undefined}
             />
 

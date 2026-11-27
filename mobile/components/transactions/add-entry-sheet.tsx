@@ -8,6 +8,7 @@ import type { Wallet } from '@/lib/supabase';
 import { getWallets } from '@/lib/wallet-service';
 import { suggestCategory } from '@/lib/categories';
 import { addEntry, addMove, createCashWallet, getAddDefaults } from '@/lib/add-transaction';
+import { SALARY_CATEGORY, confirmIncomeFromEntry } from '@/lib/income-service';
 import { AddWalletSheet } from '@/components/wallets/add-wallet-sheet';
 import { dayHeading, time24 } from '@/lib/format';
 import {
@@ -132,6 +133,8 @@ export function AddEntrySheet({ visible, onClose, onSuccess, prefill }: {
                     description,
                     rawSms: prefill?.rawSms,
                 });
+                // Logging a salary by hand counts as the salary LogIt is waiting for: the daily check stops.
+                if (kind === 'in' && category === SALARY_CATEGORY) await confirmIncomeFromEntry(value, wallet.id, at).catch(() => {});
                 // The alert's fee/E-levy: its own Fees entry, as automatic logging does
                 let feeValue = kind === 'spent' ? parseAmount(fee) : 0;
                 if (feeValue > 0) {

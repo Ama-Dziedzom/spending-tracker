@@ -28,6 +28,7 @@ const STYLES: Record<string, CategoryStyle> = {
     // Money sent to a person is "People" in the design.
     transfer: { tone: 'people', icon: 'people', label: 'People' },
     income: { tone: 'muted', icon: 'receive', label: 'Income' },
+    salary: { tone: 'cash', icon: 'receive', label: 'Salary' },
     entertainment: { tone: 'muted', icon: 'sparkle', label: 'Entertainment' },
     healthcare: { tone: 'muted', icon: 'shield', label: 'Health' },
     education: { tone: 'muted', icon: 'idea', label: 'Education' },
