@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import type { IncomePrompt } from './income-service';
 import { getProfileFast } from './settings-service';
 import { ghs } from './format';
@@ -15,8 +16,17 @@ import { ghs } from './format';
 const ID = 'salary-check';
 
 type NotificationsModule = typeof import('expo-notifications');
+
+/**
+ * Only load expo-notifications when its native code is in this build. The
+ * package starts push-token work as soon as it's imported, and on a build
+ * without the native module that throws outside any try/catch and crashes
+ * the app (seen with a build made before `pod install`).
+ */
+const NATIVE = ['ExpoPushTokenManager', 'ExpoNotificationScheduler', 'ExpoNotificationPermissionsModule', 'ExpoNotificationsEmitter'];
 function notifications(): NotificationsModule | null {
     try {
+        if (!NATIVE.every((name) => requireOptionalNativeModule(name))) return null;
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         return require('expo-notifications') as NotificationsModule;
     } catch {

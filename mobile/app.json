@@ -116,7 +116,6 @@
       "favicon": "./assets/app-icon/favicon.png"
     },
     "plugins": [
-      "expo-notifications",
       "./plugins/withShareExtension",
       "./plugins/withWidget",
       "./plugins/withAndroidSmsReceiver",
