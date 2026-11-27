@@ -30,10 +30,12 @@ interface Props {
     compact?: boolean;
     /** Ids that just arrived on refresh, tinted for a moment. */
     freshIds?: ReadonlySet<string>;
+    /** Today shows the top 3; this opens the full list when there are more. */
+    onSeeAll?: () => void;
 }
 
 /** The Spending card (Figma 1002:203 / 351 / 475). */
-export function SpendingCard({ summary, period, onPeriod, onMore, onDay, onTransaction, compact, freshIds }: Props) {
+export function SpendingCard({ summary, period, onPeriod, onMore, onDay, onTransaction, compact, freshIds, onSeeAll }: Props) {
     return (
         <Card hero gap={16}>
             {!compact && (
@@ -41,7 +43,7 @@ export function SpendingCard({ summary, period, onPeriod, onMore, onDay, onTrans
             )}
             <SegmentedControl options={PERIODS} value={period} onChange={onPeriod} />
             {period === 'week' && <WeekView summary={summary} onDay={onDay} onTransaction={onTransaction} freshIds={freshIds} />}
-            {period === 'today' && <TodayView summary={summary} onTransaction={onTransaction} freshIds={freshIds} />}
+            {period === 'today' && <TodayView summary={summary} onTransaction={onTransaction} freshIds={freshIds} onSeeAll={onSeeAll} />}
             {period === 'month' && <MonthView summary={summary} />}
         </Card>
     );
@@ -123,7 +125,7 @@ function WeekView({ summary, onDay, onTransaction, freshIds }: {
     );
 }
 
-function TodayView({ summary, onTransaction, freshIds }: { summary: SpendingSummary; onTransaction: (tx: TransactionWithWallet) => void; freshIds?: ReadonlySet<string> }) {
+function TodayView({ summary, onTransaction, freshIds, onSeeAll }: { summary: SpendingSummary; onTransaction: (tx: TransactionWithWallet) => void; freshIds?: ReadonlySet<string>; onSeeAll?: () => void }) {
     const t = summary.today;
     return (
         <>
@@ -138,11 +140,13 @@ function TodayView({ summary, onTransaction, freshIds }: { summary: SpendingSumm
                 </InsetPanel>
             ) : (
                 <ListGroup bare>
-                    {t.entries.slice(0, 6).map((tx) => (
+                    {/* Top 3 by amount, like This week; the rest are in See all transactions. */}
+                    {[...t.entries].sort((x, y) => Number(y.amount) - Number(x.amount)).slice(0, 3).map((tx) => (
                         <TransactionRow key={tx.id} tx={tx} fresh={freshIds?.has(tx.id)} onPress={() => onTransaction(tx)} />
                     ))}
                 </ListGroup>
             )}
+            {t.entries.length > 3 && onSeeAll && <TextLink label={`See all ${t.entries.length} from today`} onPress={onSeeAll} />}
         </>
     );
 }

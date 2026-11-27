@@ -251,6 +251,7 @@ export default function Spending() {
                 ) : summary && (
                     <SpendingCard
                         summary={summary}
+                        onSeeAll={() => router.push('/spending/transactions')}
                         period={period}
                         onPeriod={setPeriod}
                         compact={!!incomePrompt}
